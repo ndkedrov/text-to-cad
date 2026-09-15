@@ -2011,6 +2011,285 @@
    ]
   },
   {
+   "id": "adafruitMicroSdBreakoutPlus",
+   "name": "Adafruit MicroSD Card Breakout Board+ (254)",
+   "category": "storage",
+   "width": 31.75,
+   "length": 25.4,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 2,
+   "padDiameter": 5.2,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 2.54,
+     "diameter": 2.2
+    },
+    {
+     "x": 22.86,
+     "y": 2.54,
+     "diameter": 2.2
+    },
+    {
+     "x": 2.54,
+     "y": 22.86,
+     "diameter": 2.2
+    },
+    {
+     "x": 22.86,
+     "y": 22.86,
+     "diameter": 2.2
+    }
+   ],
+   "ports": [
+    {
+     "type": "microSd",
+     "edge": "left",
+     "offset": 13.77,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 12,
+     "height": 2,
+     "radius": 0.3,
+     "overhang": 1.1,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "adafruitMicroSdSpiSdio",
+   "name": "Adafruit Micro SD SPI or SDIO Card Breakout (4682)",
+   "category": "storage",
+   "width": 25.4,
+   "length": 22.86,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 2,
+   "padDiameter": 5.5,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 20.32,
+     "diameter": 2.5
+    },
+    {
+     "x": 22.86,
+     "y": 20.32,
+     "diameter": 2.5
+    }
+   ],
+   "ports": [
+    {
+     "type": "microSd",
+     "edge": "back",
+     "offset": 13.9,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 12,
+     "height": 2,
+     "radius": 0.3,
+     "overhang": 0.8,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "adafruitAdaloggerFeatherWing",
+   "name": "Adafruit Adalogger FeatherWing RTC + microSD (2922)",
+   "category": "storage",
+   "width": 50.8,
+   "length": 22.86,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 5,
+   "padDiameter": 5.5,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 2.54,
+     "y": 20.32,
+     "diameter": 2.5
+    },
+    {
+     "x": 48.26,
+     "y": 2.54,
+     "diameter": 2.54
+    },
+    {
+     "x": 48.26,
+     "y": 20.32,
+     "diameter": 2.54
+    }
+   ],
+   "ports": [
+    {
+     "type": "microSd",
+     "edge": "right",
+     "offset": 10.11,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 12,
+     "height": 2,
+     "radius": 0.3,
+     "overhang": 0,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "adafruitMicroSdBff",
+   "name": "Adafruit microSD Card BFF for QT Py (5683)",
+   "category": "storage",
+   "width": 17.78,
+   "length": 20.7,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 1.5,
+   "padDiameter": 5,
+   "boreDiameter": 2,
+   "holes": [],
+   "ports": [
+    {
+     "type": "microSd",
+     "edge": "back",
+     "offset": 8.89,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 12,
+     "height": 2,
+     "radius": 0.3,
+     "overhang": 0,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "adafruitSpiFlashSdCard",
+   "name": "Adafruit SPI Flash SD Card XTSD (4899)",
+   "category": "storage",
+   "width": 21.59,
+   "length": 17.78,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 1.2,
+   "padDiameter": 5.5,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 15.24,
+     "diameter": 2.5
+    },
+    {
+     "x": 19.05,
+     "y": 15.24,
+     "diameter": 2.5
+    }
+   ],
+   "ports": []
+  },
+  {
+   "id": "sparkfunMicroSdTransflash",
+   "name": "SparkFun microSD Transflash Breakout (BOB-00544)",
+   "category": "storage",
+   "width": 21.59,
+   "length": 20.32,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 2,
+   "padDiameter": 5,
+   "boreDiameter": 2,
+   "holes": [],
+   "ports": [
+    {
+     "type": "microSd",
+     "edge": "back",
+     "offset": 9.74,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 12,
+     "height": 2,
+     "radius": 0.3,
+     "overhang": 0,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "sparkfunShiftingMicroSd",
+   "name": "SparkFun Level Shifting microSD Breakout (DEV-13743)",
+   "category": "storage",
+   "width": 17.78,
+   "length": 24.13,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 2,
+   "padDiameter": 5,
+   "boreDiameter": 2,
+   "holes": [],
+   "ports": [
+    {
+     "type": "microSd",
+     "edge": "back",
+     "offset": 10.34,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 12,
+     "height": 2,
+     "radius": 0.3,
+     "overhang": 0,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "sparkfunOpenLog",
+   "name": "SparkFun OpenLog (DEV-13712)",
+   "category": "storage",
+   "width": 15.24,
+   "length": 19.05,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 1.5,
+   "padDiameter": 5,
+   "boreDiameter": 2,
+   "holes": [],
+   "ports": []
+  },
+  {
+   "id": "sparkfunQwiicOpenLog",
+   "name": "SparkFun Qwiic OpenLog (DEV-15164)",
+   "category": "storage",
+   "width": 25.4,
+   "length": 26.67,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 3,
+   "padDiameter": 6.3,
+   "boreDiameter": 2.6,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 24.13,
+     "diameter": 3.302
+    },
+    {
+     "x": 22.86,
+     "y": 24.13,
+     "diameter": 3.302
+    }
+   ],
+   "ports": []
+  },
+  {
    "id": "sparkfunQwiicPir170ua",
    "name": "SparkFun Qwiic PIR - 170uA (EKMC4607112K)",
    "category": "motion",
