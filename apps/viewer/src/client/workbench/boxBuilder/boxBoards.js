@@ -23,8 +23,8 @@ const HEADROOM = 1;
 export const PORT_TYPE_IDS = Object.freeze(Object.keys(PORT_TYPES));
 
 function port(type, edge, offset, extra = {}) {
-  const { shape, width, height, radius, elevation } = PORT_TYPES[type];
-  return { type, edge, offset, elevation, shape, width, height, radius, overhang: 0, margin: 0.5, ...extra };
+  const { shape, width, height, radius, elevation, margin = 0.5 } = PORT_TYPES[type];
+  return { type, edge, offset, elevation, shape, width, height, radius, overhang: 0, margin, ...extra };
 }
 
 function holesAt(points, diameter) {
@@ -102,7 +102,8 @@ export function setPortType(target, type) {
     width: defaults.width,
     height: defaults.height,
     radius: defaults.radius,
-    elevation: defaults.elevation
+    elevation: defaults.elevation,
+    margin: defaults.margin ?? 0.5
   });
 }
 

@@ -59,7 +59,6 @@ import { buildBoxPlan } from "@/workbench/boxBuilder/boxPlan.js";
 import {
   BOARD_EDGES,
   BOARD_ROTATIONS,
-  CONNECTOR_HOLE_MARGIN,
   CONNECTOR_TYPES,
   HOLE_FACES,
   HOLE_SHAPES,
@@ -73,6 +72,7 @@ import {
   clampBoardPosition,
   clampHolePosition,
   connectorHole,
+  connectorHoleMargin,
   defaultBoxSpec,
   faceAxisLabels,
   faceRange,
@@ -458,7 +458,11 @@ function HoleItem({ builder, hole, index }) {
         </FileSheetFieldGrid>
       )}
       {hole.connector ? (
-        <FileSheetStatusText>{t("hole.connectorNote", { margin: formatNumber(CONNECTOR_HOLE_MARGIN) })}</FileSheetStatusText>
+        <FileSheetStatusText>
+          {connectorHoleMargin(hole.connector) > 0
+            ? t("hole.connectorNote", { margin: formatNumber(connectorHoleMargin(hole.connector)) })
+            : t("hole.connectorExact")}
+        </FileSheetStatusText>
       ) : null}
       <FileSheetFieldGrid columns={hole.shape === "circle" ? 2 : 3}>
         <NumberField label={labelU} value={hole.u} min={range.u[0]} max={range.u[1]} step={0.5} onCommit={(u) => patch({ u })} />
