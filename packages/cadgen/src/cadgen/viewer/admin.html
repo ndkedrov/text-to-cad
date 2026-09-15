@@ -125,14 +125,13 @@
         <button type="button" id="preset-new" data-t="presetNew">New preset</button>
         <button type="button" id="presets-json" data-t="presetsJson">Edit as JSON</button>
         <button type="button" id="presets-reset" data-t="presetsReset">Reset to defaults</button>
-        <button type="button" id="presets-publish" class="primary" data-t="presetsPublish" disabled>Publish</button>
       </div>
     </div>
     <p id="presets-status" class="status" role="status"></p>
     <div id="presets-json-box" hidden>
       <textarea id="presets-json-text" spellcheck="false" aria-label="JSON"></textarea>
       <div class="row">
-        <button type="button" id="presets-json-apply" class="primary" data-t="apply">Apply</button>
+        <button type="button" id="presets-json-apply" class="primary" data-t="saveList">Save and publish</button>
         <button type="button" id="presets-json-cancel" data-t="cancel">Cancel</button>
       </div>
     </div>
@@ -172,20 +171,21 @@
       r_bad_plan: "Invalid geometry", r_bad_name: "Invalid name", r_invalid: "Invalid request", r_unauthorized: "Not signed in",
       r_internal: "Internal error", r_unknown: "Unknown",
       presets: "Board presets", presetNew: "New preset", presetsJson: "Edit as JSON", presetsReset: "Reset to defaults",
-      presetsPublish: "Publish", apply: "Apply", cancel: "Cancel", presetsEdited: "Edited list · {n} presets",
-      presetsShipped: "Default list · {n} presets", presetsUnsaved: "Unpublished changes", presetsPublished: "Published.",
+      saveList: "Save and publish", cancel: "Cancel", presetsEdited: "Edited list · {n} presets",
+      presetsShipped: "Default list · {n} presets", saving: "Saving…", presetsPublished: "Saved. The builder offers it now.",
       presetsLoadError: "Could not load presets: {error}", presetsInvalidJson: "Not valid JSON: {error}",
       presetsJsonList: "The JSON must be a list of presets.", presetsConfirmReset: "Replace the list with the default presets for everyone?",
-      presetsConfirmDelete: "Delete “{name}”?", presetsLeave: "Unpublished preset changes will be lost.",
+      presetsConfirmDelete: "Delete “{name}”?", presetsDiscard: "This preset has unsaved changes. Discard them?",
+      draftUnsaved: "Unsaved changes: press “Save and publish”.",
       pName: "Name", pId: "ID", pSize: "Size, mm", pHoles: "Holes", pPorts: "Ports", noPresets: "No presets.",
       edit: "Edit", duplicate: "Copy", remove: "Delete", editorTitle: "Preset", editorNew: "New preset",
-      pickPreset: "Pick a preset to edit, or add a new one. Changes reach the builder once published.",
+      pickPreset: "Pick a preset to edit, or add a new one. Every save is published at once; an open builder picks it up when you return to its tab.",
       fWidth: "Width X, mm", fLength: "Length Y, mm", fThickness: "Thickness", fClearance: "Floor to board", fComponent: "Parts on top",
       fPad: "Pad ⌀", fBore: "Screw hole ⌀", holesTitle: "Mounting holes, from the board's lower-left corner", portsTitle: "Ports",
       addHole: "Add hole", addPort: "Add port", hX: "X", hY: "Y", hD: "⌀", portType: "Type", portEdge: "Edge", portShape: "Cut-out",
       portOffset: "Along edge", portElevation: "Above board", portWidth: "Width", portHeight: "Height", portRadius: "Radius",
       portOverhang: "Sticks out", portMargin: "Gap", edge_front: "Bottom (Y = 0)", edge_back: "Top", edge_left: "Left (X = 0)",
-      edge_right: "Right", shape_rect: "Rectangle", shape_circle: "Circle", applyPreset: "Apply to the list",
+      edge_right: "Right", shape_rect: "Rectangle", shape_circle: "Circle", applyPreset: "Save and publish",
       nameRequired: "Give the preset a name.", idTaken: "The ID “{id}” is already used.", ePresets: "Presets", presetsCount: "{n} presets",
       pt_usbC: "USB-C", pt_microUsb: "Micro-USB", pt_miniUsb: "Mini-USB", pt_usbA: "USB-A", pt_usbA2: "USB-A ×2", pt_usbB: "USB-B",
       pt_hdmi: "HDMI", pt_miniHdmi: "Mini-HDMI", pt_microHdmi: "Micro-HDMI", pt_rj45: "Ethernet", pt_dcJack: "DC jack",
@@ -216,20 +216,21 @@
       r_bad_plan: "Неправильна геометрія", r_bad_name: "Неправильна назва", r_invalid: "Неправильний запит", r_unauthorized: "Не увійшов",
       r_internal: "Внутрішня помилка", r_unknown: "Невідомо",
       presets: "Пресети плат", presetNew: "Новий пресет", presetsJson: "Редагувати як JSON", presetsReset: "Скинути до стандартних",
-      presetsPublish: "Опублікувати", apply: "Застосувати", cancel: "Скасувати", presetsEdited: "Змінений список · пресетів: {n}",
-      presetsShipped: "Стандартний список · пресетів: {n}", presetsUnsaved: "Є неопубліковані зміни", presetsPublished: "Опубліковано.",
+      saveList: "Зберегти й опублікувати", cancel: "Скасувати", presetsEdited: "Змінений список · пресетів: {n}",
+      presetsShipped: "Стандартний список · пресетів: {n}", saving: "Зберігаю…", presetsPublished: "Збережено. Конструктор уже пропонує цей список.",
       presetsLoadError: "Не вдалося завантажити пресети: {error}", presetsInvalidJson: "Некоректний JSON: {error}",
       presetsJsonList: "JSON має бути списком пресетів.", presetsConfirmReset: "Замінити список стандартними пресетами для всіх?",
-      presetsConfirmDelete: "Видалити «{name}»?", presetsLeave: "Неопубліковані зміни пресетів пропадуть.",
+      presetsConfirmDelete: "Видалити «{name}»?", presetsDiscard: "У цьому пресеті є незбережені зміни. Відкинути їх?",
+      draftUnsaved: "Є незбережені зміни: натисніть «Зберегти й опублікувати».",
       pName: "Назва", pId: "ID", pSize: "Розмір, мм", pHoles: "Отворів", pPorts: "Портів", noPresets: "Пресетів немає.",
       edit: "Змінити", duplicate: "Копія", remove: "Видалити", editorTitle: "Пресет", editorNew: "Новий пресет",
-      pickPreset: "Оберіть пресет для редагування або додайте новий. У конструкторі зміни з'являться після публікації.",
+      pickPreset: "Оберіть пресет для редагування або додайте новий. Кожне збереження публікується одразу; відкритий конструктор підхопить його, щойно ви повернетесь на його вкладку.",
       fWidth: "Ширина X, мм", fLength: "Довжина Y, мм", fThickness: "Товщина", fClearance: "Від дна до плати", fComponent: "Деталі зверху",
       fPad: "Опора ⌀", fBore: "Отвір під гвинт ⌀", holesTitle: "Отвори кріплення, від лівого нижнього кута плати", portsTitle: "Порти",
       addHole: "Додати отвір", addPort: "Додати порт", hX: "X", hY: "Y", hD: "⌀", portType: "Тип", portEdge: "Край", portShape: "Виріз",
       portOffset: "Вздовж краю", portElevation: "Над платою", portWidth: "Ширина", portHeight: "Висота", portRadius: "Радіус",
       portOverhang: "Виступ", portMargin: "Зазор", edge_front: "Нижній (Y = 0)", edge_back: "Верхній", edge_left: "Лівий (X = 0)",
-      edge_right: "Правий", shape_rect: "Прямокутник", shape_circle: "Коло", applyPreset: "Застосувати до списку",
+      edge_right: "Правий", shape_rect: "Прямокутник", shape_circle: "Коло", applyPreset: "Зберегти й опублікувати",
       nameRequired: "Вкажіть назву пресета.", idTaken: "ID «{id}» вже зайнятий.", ePresets: "Пресети", presetsCount: "пресетів: {n}",
       pt_usbC: "USB-C", pt_microUsb: "Micro-USB", pt_miniUsb: "Mini-USB", pt_usbA: "USB-A", pt_usbA2: "USB-A ×2", pt_usbB: "USB-B",
       pt_hdmi: "HDMI", pt_miniHdmi: "Mini-HDMI", pt_microHdmi: "Micro-HDMI", pt_rj45: "Ethernet", pt_dcJack: "Гніздо живлення",
@@ -556,10 +557,11 @@
   }
 
   // --- board presets ---------------------------------------------------------
-  // The list lives here until "Publish" sends it; the server checks every field.
-  // index: the preset being edited (-1 a new one, null none); draft: its working copy.
+  // Every change is sent at once and the list shown is always what the server
+  // holds; the server checks every field. index: the preset being edited (-1 a
+  // new one, null none); draft: its working copy until "Save and publish".
 
-  var presets = { boards: [], defaults: [], portTypes: {}, edited: false, dirty: false, loaded: false, index: null, draft: null };
+  var presets = { boards: [], defaults: [], portTypes: {}, edited: false, loaded: false, index: null, draft: null };
   var PORT_EDGES = ["front", "back", "left", "right"];
   var MAX_ITEMS = 8;
 
@@ -622,10 +624,18 @@
   function labelled(text, control) { return el("label", {}, [text, control]); }
 
   function updatePresetBar() {
-    document.getElementById("presets-state").textContent = presets.dirty
-      ? t("presetsUnsaved")
-      : t(presets.edited ? "presetsEdited" : "presetsShipped", { n: number(presets.boards.length) });
-    document.getElementById("presets-publish").disabled = !presets.dirty;
+    document.getElementById("presets-state").textContent = t(presets.edited ? "presetsEdited" : "presetsShipped", { n: number(presets.boards.length) });
+  }
+
+  // Whether the editor holds changes that were never saved.
+  function draftChanged() {
+    if (!presets.draft) { return false; }
+    var saved = presets.index === -1 ? blankPreset() : presets.boards[presets.index];
+    return JSON.stringify(presets.draft) !== JSON.stringify(saved);
+  }
+
+  function mayLeaveDraft() {
+    return !draftChanged() || window.confirm(t("presetsDiscard"));
   }
 
   function renderPresetList() {
@@ -650,6 +660,7 @@
   }
 
   function openEditor(index) {
+    if (!mayLeaveDraft()) { return; }
     presets.index = index;
     presets.draft = index === -1 ? blankPreset() : clone(presets.boards[index]);
     presetStatus("");
@@ -658,6 +669,7 @@
   }
 
   function closeEditor() {
+    if (!mayLeaveDraft()) { return; }
     presets.index = null;
     presets.draft = null;
     renderPresetList();
@@ -669,6 +681,8 @@
     var holder = document.getElementById("preset-preview");
     var draft = presets.draft;
     if (!holder || !draft) { return; }
+    var hint = document.getElementById("draft-hint");
+    if (hint) { hint.textContent = draftChanged() ? t("draftUnsaved") : ""; }
     var width = Math.max(Number(draft.width) || 1, 1); var length = Math.max(Number(draft.length) || 1, 1);
     var margin = 14; var scale = Math.min(520 / width, 200 / length);
     var svg = svgNode("svg", { viewBox: "0 0 " + (width * scale + margin * 2) + " " + (length * scale + margin * 2), role: "img" });
@@ -703,9 +717,9 @@
     var draft = presets.draft;
     if (!draft) { holder.replaceChildren(el("p", { class: "empty", text: t("pickPreset") })); return; }
     var nameInput = el("input", { type: "text", maxlength: "60", value: draft.name });
-    nameInput.addEventListener("input", function () { draft.name = nameInput.value; });
+    nameInput.addEventListener("input", function () { draft.name = nameInput.value; drawPreview(); });
     var idInput = el("input", { type: "text", maxlength: "40", value: draft.id, placeholder: "auto" });
-    idInput.addEventListener("input", function () { draft.id = idInput.value.trim(); });
+    idInput.addEventListener("input", function () { draft.id = idInput.value.trim(); drawPreview(); });
     var holeRows = draft.holes.map(function (hole, index) {
       return el("tr", {}, [
         el("td", {}, [numberInput(hole, "x", 0.1)]), el("td", {}, [numberInput(hole, "y", 0.1)]), el("td", {}, [numberInput(hole, "diameter", 0.1)]),
@@ -761,57 +775,62 @@
         draft.ports.push(port);
         renderEditor();
       }, draft.ports.length >= MAX_ITEMS)]),
-      el("div", { class: "row" }, [actionButton(t("applyPreset"), applyDraft, false, "primary"), actionButton(t("cancel"), closeEditor)])
+      el("div", { class: "row" }, [actionButton(t("applyPreset"), applyDraft, false, "primary"), actionButton(t("cancel"), closeEditor),
+        el("span", { class: "muted", id: "draft-hint" })])
     ]));
     drawPreview();
   }
 
   function applyDraft() {
-    var draft = presets.draft;
+    var draft = clone(presets.draft);
     draft.name = String(draft.name || "").trim();
     if (!draft.name) { presetStatus(t("nameRequired"), true); return; }
     var taken = presets.boards.filter(function (board, index) { return index !== presets.index; }).map(function (board) { return board.id; });
     if (!draft.id) { draft.id = slug(draft.name, taken); }
     if (taken.indexOf(draft.id) !== -1) { presetStatus(t("idTaken", { id: draft.id }), true); return; }
-    if (presets.index === -1) {
-      presets.boards.push(draft);
-      presets.index = presets.boards.length - 1;
-    } else {
-      presets.boards[presets.index] = draft;
-    }
-    presets.draft = clone(draft);
-    presets.dirty = true;
-    presetStatus("");
-    renderPresetList();
-    renderEditor();
+    var next = clone(presets.boards);
+    var position = presets.index === -1 ? next.length : presets.index;
+    next[position] = draft;
+    // A refused save keeps the editor as it is, so nothing typed is lost.
+    sendPresets({ boards: next }, function () {
+      presets.index = position;
+      presets.draft = clone(presets.boards[position]);
+    });
   }
 
   function movePreset(index, delta) {
     var target = index + delta;
     if (target < 0 || target >= presets.boards.length) { return; }
-    presets.boards.splice(target, 0, presets.boards.splice(index, 1)[0]);
-    if (presets.index === index) { presets.index = target; } else if (presets.index === target) { presets.index = index; }
-    presets.dirty = true;
-    renderPresetList();
+    var next = clone(presets.boards);
+    next.splice(target, 0, next.splice(index, 1)[0]);
+    var editing = presets.index;
+    sendPresets({ boards: next }, function () {
+      if (editing === index) { presets.index = target; } else if (editing === target) { presets.index = index; }
+    });
   }
 
   function duplicatePreset(index) {
-    var copy = clone(presets.boards[index]);
+    if (!mayLeaveDraft()) { return; }
+    var next = clone(presets.boards);
+    var copy = clone(next[index]);
     copy.name = (copy.name + " (2)").slice(0, 60);
-    copy.id = slug(copy.name, presets.boards.map(function (board) { return board.id; }));
-    presets.boards.splice(index + 1, 0, copy);
-    presets.dirty = true;
-    openEditor(index + 1);
+    copy.id = slug(copy.name, next.map(function (board) { return board.id; }));
+    next.splice(index + 1, 0, copy);
+    sendPresets({ boards: next }, function () {
+      presets.index = index + 1;
+      presets.draft = clone(presets.boards[index + 1]);
+    });
   }
 
   function removePreset(index) {
     if (!window.confirm(t("presetsConfirmDelete", { name: presets.boards[index].name }))) { return; }
-    presets.boards.splice(index, 1);
-    if (presets.index === index) { presets.index = null; presets.draft = null; }
-    else if (presets.index !== null && presets.index > index) { presets.index -= 1; }
-    presets.dirty = true;
-    renderPresetList();
-    renderEditor();
+    var next = clone(presets.boards);
+    next.splice(index, 1);
+    var editing = presets.index;
+    sendPresets({ boards: next }, function () {
+      if (editing === index) { presets.index = null; presets.draft = null; }
+      else if (editing !== null && editing > index) { presets.index = editing - 1; }
+    });
   }
 
   function takePresets(payload) {
@@ -819,11 +838,8 @@
     presets.defaults = Array.isArray(payload.defaults) ? payload.defaults : [];
     presets.portTypes = payload.portTypes || {};
     presets.edited = Boolean(payload.edited);
-    presets.dirty = false;
     presets.loaded = true;
     if (presets.index !== null && presets.index >= presets.boards.length) { presets.index = null; presets.draft = null; }
-    renderPresetList();
-    renderEditor();
   }
 
   function presetRequest(method, body) {
@@ -841,14 +857,25 @@
   }
 
   function loadPresets() {
-    presetRequest("GET").then(takePresets).catch(function (error) { presetStatus(t("presetsLoadError", { error: error.message }), true); });
+    presetRequest("GET")
+      .then(function (payload) { takePresets(payload); renderPresetList(); renderEditor(); })
+      .catch(function (error) { presetStatus(t("presetsLoadError", { error: error.message }), true); });
   }
 
-  function sendPresets(body) {
-    presetStatus(t("loading"));
-    presetRequest("POST", body)
-      .then(function (payload) { takePresets(payload); presetStatus(t("presetsPublished")); })
-      .catch(function (error) { presetStatus(error.message || String(error), true); });
+  // Sends the whole list (or a reset); on success the server's answer becomes the
+  // list shown, `onSaved` adjusts the editor to it, and both are drawn again.
+  function sendPresets(body, onSaved) {
+    presetStatus(t("saving"));
+    return presetRequest("POST", body)
+      .then(function (payload) {
+        takePresets(payload);
+        if (onSaved) { onSaved(); }
+        renderPresetList();
+        renderEditor();
+        presetStatus(t("presetsPublished"));
+        return true;
+      })
+      .catch(function (error) { presetStatus(error.message || String(error), true); return false; });
   }
 
   function showJson(open) {
@@ -858,12 +885,9 @@
   }
 
   document.getElementById("preset-new").addEventListener("click", function () { showJson(false); openEditor(-1); });
-  document.getElementById("presets-publish").addEventListener("click", function () { sendPresets({ boards: presets.boards }); });
   document.getElementById("presets-reset").addEventListener("click", function () {
     if (!window.confirm(t("presetsConfirmReset"))) { return; }
-    presets.index = null;
-    presets.draft = null;
-    sendPresets({ reset: true });
+    sendPresets({ reset: true }, function () { presets.index = null; presets.draft = null; });
   });
   document.getElementById("presets-json").addEventListener("click", function () { showJson(true); });
   document.getElementById("presets-json-cancel").addEventListener("click", function () { showJson(false); });
@@ -872,17 +896,10 @@
     try { parsed = JSON.parse(document.getElementById("presets-json-text").value); }
     catch (error) { presetStatus(t("presetsInvalidJson", { error: error.message }), true); return; }
     if (!Array.isArray(parsed)) { presetStatus(t("presetsJsonList"), true); return; }
-    presets.boards = parsed;
-    presets.index = null;
-    presets.draft = null;
-    presets.dirty = true;
-    presetStatus("");
-    showJson(false);
-    renderPresetList();
-    renderEditor();
+    sendPresets({ boards: parsed }, function () { presets.index = null; presets.draft = null; showJson(false); });
   });
   window.addEventListener("beforeunload", function (event) {
-    if (presets.dirty) { event.preventDefault(); event.returnValue = t("presetsLeave"); }
+    if (draftChanged()) { event.preventDefault(); event.returnValue = t("presetsDiscard"); }
   });
 
   document.getElementById("refresh").addEventListener("click", load);

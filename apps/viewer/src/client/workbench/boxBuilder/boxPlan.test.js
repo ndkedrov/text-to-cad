@@ -6,6 +6,7 @@ import {
   boxDimensions,
   boxSpecWarnings,
   clampStandoffPosition,
+  connectorHole,
   defaultBoxSpec,
   newHole,
   newStandoffGroup,
@@ -109,6 +110,20 @@ test("dragging keeps a standoff group inside the walls", () => {
   const clamped = clampStandoffPosition(dims, groupSpec, 500, -500);
   assert.equal(clamped.x, 48 - 13);
   assert.equal(clamped.y, -(33 - 3));
+});
+
+test("a connector hole is the connector's body plus a margin, and cuts as its shape", () => {
+  assert.deepEqual(connectorHole("usbC"), { connector: "usbC", shape: "rect", width: 10, height: 4.3, radius: 1.7 });
+  assert.deepEqual(connectorHole("audio"), { connector: "audio", shape: "circle", width: 7.5, height: 7.5, radius: 0 });
+  const spec = normalizeBoxSpec({
+    ...defaultBoxSpec(),
+    holes: [{ face: "front", u: 0, v: 10, ...connectorHole("rj45") }, { face: "floor", connector: "lightning" }]
+  });
+  assert.equal(spec.holes[0].connector, "rj45");
+  assert.deepEqual([spec.holes[0].width, spec.holes[0].height], [17, 14.5]);
+  assert.equal(spec.holes[1].connector, "", "an unknown connector is dropped");
+  const { base } = buildBoxPlan(spec);
+  assert.equal(findNodes(base, (node) => node.type === "rrect" && node.w === 17 && node.d === 14.5).length, 1);
 });
 
 test("warnings name standoffs outside the floor", () => {
