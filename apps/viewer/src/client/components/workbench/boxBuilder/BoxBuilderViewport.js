@@ -316,9 +316,22 @@ function boardPlateGeometry(board) {
   shape.lineTo(halfWidth, halfLength);
   shape.lineTo(-halfWidth, halfLength);
   shape.closePath();
+  // Triangulation breaks on a hole that touches the outline or another hole:
+  // draw only the ones clear of both (the standoffs are there either way).
+  const drawn = [];
   for (const hole of board.holes) {
+    const radius = hole.diameter / 2;
+    const clearOfEdges = hole.x - radius > 0.05 && hole.x + radius < board.width - 0.05 &&
+      hole.y - radius > 0.05 && hole.y + radius < board.length - 0.05;
+    const clearOfHoles = drawn.every((other) => (
+      Math.hypot(other.x - hole.x, other.y - hole.y) > other.diameter / 2 + radius + 0.05
+    ));
+    if (!clearOfEdges || !clearOfHoles) {
+      continue;
+    }
+    drawn.push(hole);
     const path = new THREE.Path();
-    path.absarc(hole.x - halfWidth, hole.y - halfLength, hole.diameter / 2, 0, Math.PI * 2, false);
+    path.absarc(hole.x - halfWidth, hole.y - halfLength, radius, 0, Math.PI * 2, false);
     shape.holes.push(path);
   }
   return new THREE.ExtrudeGeometry(shape, { depth: board.thickness, bevelEnabled: false, curveSegments: 20 });

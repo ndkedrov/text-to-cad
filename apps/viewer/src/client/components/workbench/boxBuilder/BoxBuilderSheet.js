@@ -47,6 +47,7 @@ import {
   newBoard,
   newBoardHole,
   newBoardPort,
+  resizeBoard,
   rotateBoard,
   setPortType,
   snapBoardToWalls,
@@ -804,8 +805,8 @@ function BoardItem({ builder, board, index }) {
         {selected ? (
           <>
             <FileSheetFieldGrid columns={3}>
-              <NumberField label={t("field.boardWidth")} value={board.width} min={5} max={400} step={0.5} onCommit={(width) => patch({ width })} />
-              <NumberField label={t("field.boardLength")} value={board.length} min={5} max={400} step={0.5} onCommit={(length) => patch({ length })} />
+              <NumberField label={t("field.boardWidth")} value={board.width} min={5} max={400} step={0.5} onCommit={(width) => run(resizeBoard, { width })} />
+              <NumberField label={t("field.boardLength")} value={board.length} min={5} max={400} step={0.5} onCommit={(length) => run(resizeBoard, { length })} />
               <NumberField label={t("field.thickness")} value={board.thickness} min={0.4} max={5} step={0.1} onCommit={(thickness) => patch({ thickness })} />
             </FileSheetFieldGrid>
             <FileSheetFieldGrid columns={2}>
@@ -827,8 +828,8 @@ function BoardItem({ builder, board, index }) {
               });
               return (
                 <FileSheetFieldGrid key={hole.id} columns={4} className="items-end">
-                  <NumberField label={`${holeIndex + 1} · X`} value={hole.x} min={0} max={board.width} step={0.5} onCommit={(x) => patchHole({ x })} />
-                  <NumberField label="Y" value={hole.y} min={0} max={board.length} step={0.5} onCommit={(y) => patchHole({ y })} />
+                  <NumberField label={`${holeIndex + 1} · X`} value={hole.x} min={hole.diameter / 2} max={board.width - hole.diameter / 2} step={0.5} onCommit={(x) => patchHole({ x })} />
+                  <NumberField label="Y" value={hole.y} min={hole.diameter / 2} max={board.length - hole.diameter / 2} step={0.5} onCommit={(y) => patchHole({ y })} />
                   <NumberField label="⌀" value={hole.diameter} min={0.5} max={12} step={0.1} onCommit={(diameter) => patchHole({ diameter })} />
                   <IconButton
                     icon={X}

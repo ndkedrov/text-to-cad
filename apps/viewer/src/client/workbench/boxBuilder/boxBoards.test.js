@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { fitBoxToBoard, mountBoard, newBoard, rotateBoard, snapBoardToWalls } from "./boxBoards.js";
+import { fitBoxToBoard, mountBoard, newBoard, resizeBoard, rotateBoard, snapBoardToWalls } from "./boxBoards.js";
 import { buildBoxPlan } from "./boxPlan.js";
 import {
   boardEdgeWall,
@@ -152,6 +152,18 @@ test("a port reaching into the lip's band cuts the lip too", () => {
   assert.ok(through.length >= 2, "the cutter reaches through wall, clearance and lip");
 });
 
+test("resizing a board keeps holes and ports at their distance from the nearer edge", () => {
+  const spec = mounted("custom", (draft, board) => {
+    board.ports.push({ id: "port-1", type: "usbC", edge: "front", offset: 40, width: 9, height: 3.3 });
+  });
+  const draft = JSON.parse(JSON.stringify(spec));
+  resizeBoard(draft, draft.boards[0].id, { width: 20 });
+  resizeBoard(draft, draft.boards[0].id, { length: 20 });
+  const board = normalizeBoxSpec(draft).boards[0];
+  assert.deepEqual(board.holes.map((hole) => [hole.x, hole.y]), [[3.5, 3.5], [16.5, 3.5], [3.5, 16.5], [16.5, 16.5]]);
+  assert.equal(board.ports[0].offset, 10);
+});
+
 test("normalizing keeps boards buildable", () => {
   const spec = normalizeBoxSpec({
     boards: [
@@ -162,7 +174,8 @@ test("normalizing keeps boards buildable", () => {
   assert.equal(spec.boards.length, 4);
   const [board] = spec.boards;
   assert.equal(board.rotation, 90);
-  assert.deepEqual([board.holes[0].x, board.holes[0].y], [20, 0]);
+  // Kept a radius inside the board (3.2 mm hole on a 20 x 10 board).
+  assert.deepEqual([board.holes[0].x, board.holes[0].y], [18.4, 1.6]);
   assert.equal(board.ports[0].offset, 10);
   assert.equal(board.ports[0].type, "custom");
   assert.equal(spec.boards[1].mounted, false);

@@ -194,11 +194,15 @@ function normalizeStandoffGroup(raw, used) {
 
 function normalizeBoardHole(raw, used, width, length) {
   const source = raw && typeof raw === "object" ? raw : {};
+  const diameter = numberIn(source.diameter, 3.2, 0.5, 12);
+  // A hole stays whole inside the board: its centre at least a radius from each edge.
+  const insetX = Math.min(diameter / 2, width / 2);
+  const insetY = Math.min(diameter / 2, length / 2);
   return {
     id: uniqueId(source.id, "mount", used),
-    x: numberIn(source.x, 3.5, 0, width),
-    y: numberIn(source.y, 3.5, 0, length),
-    diameter: numberIn(source.diameter, 3.2, 0.5, 12)
+    x: numberIn(source.x, 3.5, insetX, width - insetX),
+    y: numberIn(source.y, 3.5, insetY, length - insetY),
+    diameter
   };
 }
 
