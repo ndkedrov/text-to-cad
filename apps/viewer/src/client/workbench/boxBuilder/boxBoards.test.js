@@ -160,7 +160,7 @@ test("a board in a box follows its changed template unless it was edited since",
   assert.ok(boardTemplatesPending(untouched, shipped));
   assert.equal(syncBoardTemplates(untouched, shipped), true);
   const synced = normalizeBoxSpec(untouched).boards[0];
-  assert.deepEqual([synced.clamp, synced.holes.map(({ x, y }) => [x, y]), synced.mounted], [false, [[4.5, 1.5], [13.5, 1.5]], true]);
+  assert.deepEqual([synced.clamp, synced.holes.map(({ x, y }) => [x, y]), synced.mounted], [false, [[1.5, 4.5], [16.5, 4.5]], true]);
   assert.equal(boardTemplateState(synced, shipped).state, "current");
 
   const legacy = boxWith((board) => {
