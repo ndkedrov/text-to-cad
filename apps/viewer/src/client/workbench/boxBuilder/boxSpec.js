@@ -171,8 +171,30 @@ function normalizeHole(raw, used) {
     radius: numberIn(source.radius, 0, 0, Math.min(width, height) / 2),
     u: numberIn(source.u, 0, -2000, 2000),
     v: numberIn(source.v, 0, -2000, 2000),
-    rotation: numberIn(source.rotation, 0, -360, 360)
+    rotation: numberIn(source.rotation, 0, -360, 360),
+    // The connector this hole was sized for (see connectorHole), or "".
+    connector: CONNECTOR_TYPES.includes(source.connector) ? source.connector : ""
   };
+}
+
+// --- connector holes -----------------------------------------------------------
+
+// Connectors a hole can be cut for: every port type but "custom".
+export const CONNECTOR_TYPES = Object.freeze(Object.keys(PORT_TYPES).filter((type) => type !== "custom"));
+// Room left around a connector's body in its hole, on every side.
+export const CONNECTOR_HOLE_MARGIN = 0.5;
+
+// The shape and size of a hole for a connector: its body plus the margin all
+// round, a rounded rectangle or, for round connectors, a circle.
+export function connectorHole(type) {
+  const size = PORT_TYPES[type] || PORT_TYPES.custom;
+  const width = roundMm(size.width + 2 * CONNECTOR_HOLE_MARGIN, 3);
+  if (size.shape === "circle") {
+    return { connector: type, shape: "circle", width, height: width, radius: 0 };
+  }
+  const height = roundMm(size.height + 2 * CONNECTOR_HOLE_MARGIN, 3);
+  const radius = roundMm(Math.min(size.radius + CONNECTOR_HOLE_MARGIN, Math.min(width, height) / 2), 3);
+  return { connector: type, shape: "rect", width, height, radius };
 }
 
 function normalizeStandoffGroup(raw, used) {

@@ -1,29 +1,40 @@
 import { useEffect, useState } from "react";
 import { fetchBoardPresets } from "@/workbench/boxBuilder/boxApi.js";
 
-// The server's circuit-board templates, fetched once per page. A server without
-// the route, or a failed request, leaves only "Custom".
-let presetsPromise = null;
+// The server's circuit-board templates. Fetched whenever the board list is shown
+// and again whenever this tab comes back into view, so presets an admin publishes
+// in another tab are offered without a reload. Until an answer arrives (or when
+// the server has no such route) the last list seen on this page is used, which
+// starts empty: only "Custom".
+let lastPresets = [];
 
 export function useBoardPresets() {
-  const [presets, setPresets] = useState([]);
+  const [presets, setPresets] = useState(lastPresets);
   useEffect(() => {
     let cancelled = false;
-    if (!presetsPromise) {
-      presetsPromise = fetchBoardPresets()
-        .then((payload) => (Array.isArray(payload?.boards) ? payload.boards : []))
-        .catch(() => {
-          presetsPromise = null;
-          return [];
-        });
-    }
-    presetsPromise.then((boards) => {
-      if (!cancelled) {
-        setPresets(boards);
+    const refresh = () => {
+      fetchBoardPresets().then(
+        (payload) => {
+          if (!cancelled && Array.isArray(payload?.boards)) {
+            lastPresets = payload.boards;
+            setPresets(payload.boards);
+          }
+        },
+        () => {}
+      );
+    };
+    const refreshWhenShown = () => {
+      if (!document.hidden) {
+        refresh();
       }
-    });
+    };
+    refresh();
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refreshWhenShown);
     return () => {
       cancelled = true;
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refreshWhenShown);
     };
   }, []);
   return presets;

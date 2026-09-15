@@ -259,6 +259,8 @@ const EN = {
   "field.boxMm": "Millimetre grid on the box",
   "field.groundMm": "Millimetre grid on the table",
   "field.showBoards": "Show boards",
+  "shape.connectors": "Connectors",
+  "hole.connectorNote": "Sized for the connector's body with {margin} mm all round; change the size if yours differs.",
 
   "warning.boardOutside": "Board {n}: does not fit between the walls.",
   "warning.boardTall": "Board {n}: its parts rise above the walls.",
@@ -521,6 +523,8 @@ const UK = {
   "field.boxMm": "Міліметровка на коробці",
   "field.groundMm": "Міліметровка на столі",
   "field.showBoards": "Показувати плати",
+  "shape.connectors": "Роз'єми",
+  "hole.connectorNote": "Розмір корпусу роз'єму плюс {margin} мм з кожного боку; змініть розмір, якщо ваш роз'єм інший.",
 
   "warning.boardOutside": "Плата {n}: не вміщається між стінками.",
   "warning.boardTall": "Плата {n}: деталі вищі за стінки.",

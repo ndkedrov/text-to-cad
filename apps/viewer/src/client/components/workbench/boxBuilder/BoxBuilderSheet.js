@@ -57,6 +57,8 @@ import { buildBoxPlan } from "@/workbench/boxBuilder/boxPlan.js";
 import {
   BOARD_EDGES,
   BOARD_ROTATIONS,
+  CONNECTOR_HOLE_MARGIN,
+  CONNECTOR_TYPES,
   HOLE_FACES,
   HOLE_SHAPES,
   MAX_BOARDS,
@@ -68,6 +70,7 @@ import {
   boxDimensions,
   clampBoardPosition,
   clampHolePosition,
+  connectorHole,
   defaultBoxSpec,
   faceAxisLabels,
   faceRange,
@@ -402,9 +405,14 @@ function HoleItem({ builder, hole, index }) {
         />
         <FileSheetSelectRow
           label={t("field.shape")}
-          value={hole.shape}
-          onValueChange={(shape) => patch({ shape })}
-          options={HOLE_SHAPES.map((shape) => ({ value: shape, label: t(`shape.${shape}`) }))}
+          value={hole.connector ? `connector:${hole.connector}` : hole.shape}
+          onValueChange={(value) => patch(
+            value.startsWith("connector:") ? connectorHole(value.slice("connector:".length)) : { shape: value, connector: "" }
+          )}
+          options={[
+            ...HOLE_SHAPES.map((shape) => ({ value: shape, label: t(`shape.${shape}`) })),
+            ...CONNECTOR_TYPES.map((type) => ({ value: `connector:${type}`, label: t(`port.type.${type}`), group: t("shape.connectors") }))
+          ]}
         />
         {round ? (
           <NumberRow
@@ -413,17 +421,20 @@ function HoleItem({ builder, hole, index }) {
             min={0.3}
             max={500}
             step={0.5}
-            onCommit={(width) => patch({ width, height: width })}
+            onCommit={(width) => patch({ width, height: width, connector: "" })}
           />
         ) : (
           <FileSheetFieldGrid columns={hole.shape === "rect" ? 3 : 2}>
-            <NumberField label={sizeU} value={hole.width} min={0.3} max={500} step={0.5} onCommit={(width) => patch({ width })} />
-            <NumberField label={sizeV} value={hole.height} min={0.3} max={500} step={0.5} onCommit={(height) => patch({ height })} />
+            <NumberField label={sizeU} value={hole.width} min={0.3} max={500} step={0.5} onCommit={(width) => patch({ width, connector: "" })} />
+            <NumberField label={sizeV} value={hole.height} min={0.3} max={500} step={0.5} onCommit={(height) => patch({ height, connector: "" })} />
             {hole.shape === "rect" ? (
-              <NumberField label={t("field.radius")} value={hole.radius} min={0} max={Math.min(hole.width, hole.height) / 2} step={0.25} onCommit={(radius) => patch({ radius })} />
+              <NumberField label={t("field.radius")} value={hole.radius} min={0} max={Math.min(hole.width, hole.height) / 2} step={0.25} onCommit={(radius) => patch({ radius, connector: "" })} />
             ) : null}
           </FileSheetFieldGrid>
         )}
+        {hole.connector ? (
+          <FileSheetStatusText>{t("hole.connectorNote", { margin: formatNumber(CONNECTOR_HOLE_MARGIN) })}</FileSheetStatusText>
+        ) : null}
         <FileSheetFieldGrid columns={hole.shape === "circle" ? 2 : 3}>
           <NumberField label={labelU} value={hole.u} min={range.u[0]} max={range.u[1]} step={0.5} onCommit={(u) => patch({ u })} />
           <NumberField label={labelV} value={hole.v} min={range.v[0]} max={range.v[1]} step={0.5} onCommit={(v) => patch({ v })} />
