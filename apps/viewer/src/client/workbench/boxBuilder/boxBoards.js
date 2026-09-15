@@ -106,6 +106,22 @@ export function setPortType(target, type) {
   });
 }
 
+// The words of a name or a search: runs of letters and digits ("ESP32-S3 (N16R8)"
+// is esp32, s3, n16r8).
+function searchWords(text) {
+  return String(text || "").toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+}
+
+// Whether a board name answers a search. Every word typed must start a word of the
+// name, or a run of its words written together ("esp32s3" finds "ESP32-S3"); a
+// fragment inside a word does not count, so "es" finds ESP32 but not "Pressure".
+export function boardNameMatches(name, query) {
+  const words = searchWords(name);
+  return searchWords(query).every((term) => (
+    words.some((_, index) => words.slice(index).join("").startsWith(term))
+  ));
+}
+
 export function findBoard(spec, id) {
   return spec.boards.find((board) => board.id === id) || null;
 }
