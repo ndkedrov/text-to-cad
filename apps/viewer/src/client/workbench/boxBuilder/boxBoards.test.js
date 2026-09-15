@@ -87,6 +87,11 @@ test("board search matches the starts of words, not fragments inside them", () =
   assert.ok(boardNameMatches("ESP32-S3-DevKitC-1 (N16R8)", "s3 n16"));
   assert.ok(boardNameMatches("Raspberry Pi 4 B", "pi 4"));
   assert.ok(!boardNameMatches("Raspberry Pi 4 B", "berry"));
+  assert.ok(boardNameMatches("TTL-RS485 auto-direction module", "485"));
+  assert.ok(boardNameMatches("TTL-RS485 auto-direction module", "rs485 auto"));
+  assert.ok(boardNameMatches("SN65HVD230 CAN transceiver module", "230"));
+  assert.ok(!boardNameMatches("SN65HVD230 CAN transceiver module", "ceiver"));
+  assert.ok(found("485").some((name) => name.startsWith("TTL-RS485")));
   assert.equal(found("").length, SHIPPED.boards.length);
 });
 
