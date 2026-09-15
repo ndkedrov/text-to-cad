@@ -136,7 +136,10 @@
       </div>
     </div>
     <div id="presets-main" class="presets">
-      <div class="scroll"><table id="presets-list"></table></div>
+      <div>
+        <div class="row" id="presets-filter-row"></div>
+        <div class="scroll"><table id="presets-list"></table></div>
+      </div>
       <div id="preset-editor"></div>
     </div>
   </section>
@@ -189,7 +192,10 @@
       nameRequired: "Give the preset a name.", idTaken: "The ID “{id}” is already used.", ePresets: "Presets", presetsCount: "{n} presets",
       pt_usbC: "USB-C", pt_microUsb: "Micro-USB", pt_miniUsb: "Mini-USB", pt_usbA: "USB-A", pt_usbA2: "USB-A ×2", pt_usbB: "USB-B",
       pt_hdmi: "HDMI", pt_miniHdmi: "Mini-HDMI", pt_microHdmi: "Micro-HDMI", pt_rj45: "Ethernet", pt_dcJack: "DC jack",
-      pt_audio: "Audio 3.5 mm", pt_custom: "Custom"
+      pt_audio: "Audio 3.5 mm", pt_custom: "Custom", pCategory: "Type", filterAll: "All types",
+      cat_sbc: "Single-board computers", cat_mcu: "Microcontroller boards", cat_wireless: "Wi-Fi, Bluetooth, LoRa (ESP32…)",
+      cat_motion: "Motion and presence sensors", cat_sensor: "Other sensors", cat_voltage: "Voltage and current sensing",
+      cat_power: "Power: converters and chargers", cat_driver: "Motor drivers and relays", cat_display: "Displays"
     },
     uk: {
       title: "3D Maker · Адмінка", admin: "Адмінка", auto: "Автооновлення", refresh: "Оновити", back: "До конструктора",
@@ -234,7 +240,10 @@
       nameRequired: "Вкажіть назву пресета.", idTaken: "ID «{id}» вже зайнятий.", ePresets: "Пресети", presetsCount: "пресетів: {n}",
       pt_usbC: "USB-C", pt_microUsb: "Micro-USB", pt_miniUsb: "Mini-USB", pt_usbA: "USB-A", pt_usbA2: "USB-A ×2", pt_usbB: "USB-B",
       pt_hdmi: "HDMI", pt_miniHdmi: "Mini-HDMI", pt_microHdmi: "Micro-HDMI", pt_rj45: "Ethernet", pt_dcJack: "Гніздо живлення",
-      pt_audio: "Аудіо 3,5 мм", pt_custom: "Свій"
+      pt_audio: "Аудіо 3,5 мм", pt_custom: "Свій", pCategory: "Тип", filterAll: "Усі типи",
+      cat_sbc: "Одноплатні комп'ютери", cat_mcu: "Мікроконтролерні плати", cat_wireless: "Wi-Fi, Bluetooth, LoRa (ESP32…)",
+      cat_motion: "Датчики руху й присутності", cat_sensor: "Інші датчики", cat_voltage: "Вимірювання напруги й струму",
+      cat_power: "Живлення: перетворювачі й зарядки", cat_driver: "Драйвери двигунів і реле", cat_display: "Дисплеї"
     }
   };
 
@@ -561,7 +570,9 @@
   // holds; the server checks every field. index: the preset being edited (-1 a
   // new one, null none); draft: its working copy until "Save and publish".
 
-  var presets = { boards: [], defaults: [], portTypes: {}, edited: false, loaded: false, index: null, draft: null };
+  var presets = { boards: [], defaults: [], portTypes: {}, categories: [], filter: "all", edited: false, loaded: false, index: null, draft: null };
+
+  function categoryName(id) { return TEXT.en["cat_" + id] ? t("cat_" + id) : String(id); }
   var PORT_EDGES = ["front", "back", "left", "right"];
   var MAX_ITEMS = 8;
 
@@ -589,7 +600,8 @@
   }
 
   function blankPreset() {
-    return { id: "", name: "", width: 50, length: 30, thickness: 1.6, clearance: 5, componentHeight: 10, padDiameter: 6, boreDiameter: 2.5,
+    return { id: "", name: "", category: presets.categories[0] || "mcu", width: 50, length: 30, thickness: 1.6, clearance: 5,
+      componentHeight: 10, padDiameter: 6, boreDiameter: 2.5,
       holes: [[3.5, 3.5], [46.5, 3.5], [3.5, 26.5], [46.5, 26.5]].map(function (point) { return { x: point[0], y: point[1], diameter: 3.2 }; }),
       ports: [] };
   }
@@ -639,22 +651,40 @@
   }
 
   function renderPresetList() {
-    var rows = presets.boards.map(function (board, index) {
-      return [board.name, board.id, mm(board.width) + " × " + mm(board.length), number(board.holes.length), number(board.ports.length),
+    var counts = {};
+    presets.boards.forEach(function (board) { counts[board.category] = (counts[board.category] || 0) + 1; });
+    if (presets.filter !== "all" && !counts[presets.filter]) { presets.filter = "all"; }
+    var filter = selectInput(
+      [["all", t("filterAll") + " (" + number(presets.boards.length) + ")"]].concat(presets.categories
+        .filter(function (id) { return counts[id]; })
+        .map(function (id) { return [id, categoryName(id) + " (" + number(counts[id]) + ")"]; })),
+      presets.filter,
+      function (value) { presets.filter = value; renderPresetList(); }
+    );
+    filter.setAttribute("aria-label", t("pCategory"));
+    document.getElementById("presets-filter-row").replaceChildren(el("span", { class: "muted", text: t("pCategory") }), filter);
+    // Reordering only makes sense on the whole list.
+    var filtered = presets.filter !== "all";
+    var visible = [];
+    var rows = [];
+    presets.boards.forEach(function (board, index) {
+      if (filtered && board.category !== presets.filter) { return; }
+      visible.push(index);
+      rows.push([board.name, categoryName(board.category), mm(board.width) + " × " + mm(board.length), number(board.holes.length), number(board.ports.length),
         el("span", { class: "row-actions" }, [
           actionButton(t("edit"), function () { openEditor(index); }),
-          actionButton("↑", function () { movePreset(index, -1); }, index === 0),
-          actionButton("↓", function () { movePreset(index, 1); }, index === presets.boards.length - 1),
+          actionButton("↑", function () { movePreset(index, -1); }, filtered || index === 0),
+          actionButton("↓", function () { movePreset(index, 1); }, filtered || index === presets.boards.length - 1),
           actionButton(t("duplicate"), function () { duplicatePreset(index); }),
           actionButton(t("remove"), function () { removePreset(index); })
-        ])];
+        ])]);
     });
     table("presets-list", [
-      { label: t("pName") }, { label: t("pId") }, { label: t("pSize") }, { label: t("pHoles"), num: true },
+      { label: t("pName") }, { label: t("pCategory") }, { label: t("pSize") }, { label: t("pHoles"), num: true },
       { label: t("pPorts"), num: true }, { label: "" }
     ], rows, t("noPresets"));
-    Array.prototype.forEach.call(document.querySelectorAll("#presets-list tbody tr"), function (row, index) {
-      row.classList.toggle("selected", rows.length > 0 && index === presets.index);
+    Array.prototype.forEach.call(document.querySelectorAll("#presets-list tbody tr"), function (row, position) {
+      row.classList.toggle("selected", rows.length > 0 && visible[position] === presets.index);
     });
     updatePresetBar();
   }
@@ -755,6 +785,8 @@
       el("div", { class: "preview", id: "preset-preview" }),
       el("div", { class: "fields" }, [
         labelled(t("pName"), nameInput), labelled(t("pId"), idInput),
+        labelled(t("pCategory"), selectInput(presets.categories.map(function (id) { return [id, categoryName(id)]; }), draft.category,
+          function (value) { draft.category = value; drawPreview(); })),
         labelled(t("fWidth"), numberInput(draft, "width", 0.1)), labelled(t("fLength"), numberInput(draft, "length", 0.1)),
         labelled(t("fThickness"), numberInput(draft, "thickness", 0.1)), labelled(t("fClearance"), numberInput(draft, "clearance", 0.5)),
         labelled(t("fComponent"), numberInput(draft, "componentHeight", 0.5)), labelled(t("fPad"), numberInput(draft, "padDiameter", 0.5)),
@@ -837,6 +869,7 @@
     presets.boards = Array.isArray(payload.boards) ? payload.boards : [];
     presets.defaults = Array.isArray(payload.defaults) ? payload.defaults : [];
     presets.portTypes = payload.portTypes || {};
+    presets.categories = Array.isArray(payload.categories) ? payload.categories : [];
     presets.edited = Boolean(payload.edited);
     presets.loaded = true;
     if (presets.index !== null && presets.index >= presets.boards.length) { presets.index = null; presets.draft = null; }

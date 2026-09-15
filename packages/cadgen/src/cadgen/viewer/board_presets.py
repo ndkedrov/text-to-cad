@@ -30,8 +30,8 @@ __all__ = [
 
 PRESETS_DIRNAME = ".box-presets"
 BOARD_PRESETS_FILENAME = "board_presets.json"
-MAX_PRESET_REQUEST_BYTES = 256 * 1024
-MAX_PRESETS = 100
+MAX_PRESET_REQUEST_BYTES = 512 * 1024
+MAX_PRESETS = 200
 MAX_HOLES = 8
 MAX_PORTS = 8
 BOARD_EDGES = ("front", "back", "left", "right")
@@ -96,7 +96,7 @@ def _normalize_port(raw: Any, where: str, width: float, length: float, port_type
     }
 
 
-def normalize_board_presets(boards: Any, port_types) -> list[dict]:
+def normalize_board_presets(boards: Any, port_types, categories) -> list[dict]:
     """A clean copy of an admin's board list holding only known keys, or ``PresetError``."""
     if not isinstance(boards, list):
         raise PresetError("boards: expected a list")
@@ -116,6 +116,7 @@ def normalize_board_presets(boards: Any, port_types) -> list[dict]:
         name = source.get("name")
         if not isinstance(name, str) or not name.strip() or len(name.strip()) > 60 or _CONTROL.search(name):
             raise PresetError(f"{where}.name: 1 to 60 characters")
+        category = _choice(source, "category", where, tuple(categories))
         width = _number(source, "width", where, 5, 400)
         length = _number(source, "length", where, 5, 400)
         pad = _number(source, "padDiameter", where, 2, 30)
@@ -128,10 +129,11 @@ def normalize_board_presets(boards: Any, port_types) -> list[dict]:
         clean.append({
             "id": preset_id,
             "name": name.strip(),
+            "category": category,
             "width": width,
             "length": length,
             "thickness": _number(source, "thickness", where, 0.4, 5, 1.6),
-            "clearance": _number(source, "clearance", where, 1, 200),
+            "clearance": _number(source, "clearance", where, 0, 200),
             "componentHeight": _number(source, "componentHeight", where, 0, 200),
             "padDiameter": pad,
             "boreDiameter": _number(source, "boreDiameter", where, 0, pad - 0.8),
@@ -175,18 +177,25 @@ class BoardPresets:
     def port_types(self) -> dict:
         return self._shipped["portTypes"]
 
+    @property
+    def categories(self) -> list[str]:
+        """Board kinds in display order ("sbc", "wireless", "power", ...)."""
+        return self._shipped["categories"]
+
     def defaults(self) -> list[dict]:
-        return normalize_board_presets(self._shipped["boards"], self.port_types)
+        return normalize_board_presets(self._shipped["boards"], self.port_types, self.categories)
 
     def load(self) -> dict:
-        """``{"boards": [...], "edited": bool}``. An unreadable edited list reads as none."""
+        """``{"boards": [...], "categories": [...], "edited": bool}``. An unreadable edited list reads as none."""
         with self._lock:
             try:
                 stored = json.loads(self.path.read_text(encoding="utf-8", errors="replace"))
-                boards = normalize_board_presets(stored.get("boards") if isinstance(stored, dict) else None, self.port_types)
-                return {"boards": boards, "edited": True}
+                boards = normalize_board_presets(
+                    stored.get("boards") if isinstance(stored, dict) else None, self.port_types, self.categories
+                )
+                return {"boards": boards, "categories": self.categories, "edited": True}
             except (OSError, json.JSONDecodeError, PresetError):
-                return {"boards": self.defaults(), "edited": False}
+                return {"boards": self.defaults(), "categories": self.categories, "edited": False}
 
     def save(self, body: bytes) -> dict:
         """``{"boards": [...]}`` replaces the list; ``{"reset": true}`` goes back to the shipped one."""
@@ -203,7 +212,7 @@ class BoardPresets:
                 with contextlib.suppress(FileNotFoundError):
                     self.path.unlink()
             else:
-                boards = normalize_board_presets(payload.get("boards"), self.port_types)
+                boards = normalize_board_presets(payload.get("boards"), self.port_types, self.categories)
                 self.path.parent.mkdir(parents=True, exist_ok=True)
                 document = {"format": "cadgen-board-presets", "version": 1, "boards": boards}
                 _atomic_write(self.path, json.dumps(document, ensure_ascii=False, indent=1) + "\n")

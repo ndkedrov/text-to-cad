@@ -12,7 +12,7 @@ from cadgen.viewer.board_presets import BoardPresets, PresetError, normalize_boa
 class ShippedPresets(unittest.TestCase):
     def test_the_shipped_boards_are_valid_unique_and_kept_whole(self):
         shipped = shipped_presets()
-        boards = normalize_board_presets(shipped["boards"], shipped["portTypes"])
+        boards = normalize_board_presets(shipped["boards"], shipped["portTypes"], shipped["categories"])
         self.assertGreaterEqual(len(boards), 10)
         self.assertEqual(len({board["id"] for board in boards}), len(boards))
         self.assertEqual(boards, shipped["boards"], "normalizing changes nothing in the shipped set")
@@ -59,6 +59,7 @@ class EditedPresets(unittest.TestCase):
             "custom": [self.board(id="custom")],
             "twice": [self.board(), self.board()],
             "name": [self.board(name="")],
+            "category": [self.board(category="toaster")],
             "width": [self.board(width=1000)],
             "boreDiameter": [self.board(boreDiameter=50)],
             "holes": [self.board(holes=[{"x": 1, "y": 1, "diameter": 3}] * 9)],

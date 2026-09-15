@@ -381,6 +381,13 @@ function buildBoardVisuals(spec, dims) {
     const holder = new THREE.Group();
     holder.position.set(board.x, board.y, boardLevels(dims, board).bottom);
     holder.rotation.z = THREE.MathUtils.degToRad(board.rotation);
+    // Upside down: turned over about the board's own Y axis, underside kept at `bottom`.
+    const body = new THREE.Group();
+    if (board.flipped) {
+      body.rotation.y = Math.PI;
+      body.position.z = board.thickness;
+    }
+    holder.add(body);
     const plate = new THREE.Mesh(boardPlateGeometry(board), new THREE.MeshStandardMaterial({
       color: BOARD_COLOR,
       roughness: 0.6,
@@ -393,7 +400,7 @@ function buildBoardVisuals(spec, dims) {
     for (const part of parts) {
       part.userData.feature = feature;
       part.userData.boardPart = true;
-      holder.add(part);
+      body.add(part);
     }
     root.add(holder);
   }

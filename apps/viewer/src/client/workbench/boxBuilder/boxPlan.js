@@ -150,8 +150,11 @@ function standoffNodes(groupSpec, dims) {
 }
 
 // A mounted board stands on one pad under each of its holes, as tall as its
-// clearance above the floor.
+// clearance above the floor; with no clearance it lies on the floor itself.
 function boardStandoffNodes(board, dims) {
+  if (board.clearance <= 0) {
+    return [];
+  }
   return padNodes(
     boardHolePoints(board),
     { outerDiameter: board.padDiameter, holeDiameter: board.boreDiameter, height: board.clearance },
