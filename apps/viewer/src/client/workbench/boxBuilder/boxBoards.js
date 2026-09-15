@@ -113,11 +113,18 @@ function searchWords(text) {
   return String(text || "").toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
 }
 
+// The words of a board name, with letters and digits apart ("TTL-RS485" is ttl,
+// rs, 485), so a model number is found without the letters stuck to it.
+function nameWords(name) {
+  return searchWords(name).flatMap((word) => word.match(/\p{L}+|\p{N}+/gu));
+}
+
 // Whether a board name answers a search. Every word typed must start a word of the
-// name, or a run of its words written together ("esp32s3" finds "ESP32-S3"); a
-// fragment inside a word does not count, so "es" finds ESP32 but not "Pressure".
+// name, or a run of its words written together ("esp32s3" finds "ESP32-S3", "485"
+// finds "RS485"); a fragment inside a word does not count, so "es" finds ESP32 but
+// not "Pressure".
 export function boardNameMatches(name, query) {
-  const words = searchWords(name);
+  const words = nameWords(name);
   return searchWords(query).every((term) => (
     words.some((_, index) => words.slice(index).join("").startsWith(term))
   ));
