@@ -144,7 +144,13 @@ class Response:
         """Status plus ``content-length: 0`` and nothing else."""
         self._begin(status, [*extra_headers, ("content-length", 0)])
 
-    def stream_file(self, file_path, stat_result: os.stat_result, content_type: str = "") -> None:
+    def stream_file(
+        self,
+        file_path,
+        stat_result: os.stat_result,
+        content_type: str = "",
+        extra_headers: Iterable[tuple[str, Any]] = (),
+    ) -> None:
         """Always 200, chunked, never buffered whole.
 
         A 500MB GLB must not become 500MB of RSS, and 200 concurrent asset GETs
@@ -158,6 +164,7 @@ class Response:
         ]
         if content_type:
             headers.append(("content-type", content_type))
+        headers.extend(extra_headers)
         self._begin(200, headers)
         if self._head_only:
             return

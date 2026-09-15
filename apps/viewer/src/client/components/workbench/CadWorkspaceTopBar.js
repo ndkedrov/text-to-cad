@@ -6,6 +6,8 @@ import {
   Copy,
   Folder,
   LoaderCircle,
+  Package,
+  Send,
   SlidersHorizontal
 } from "lucide-react";
 import EntryIcon from "./EntryIcon";
@@ -61,6 +63,7 @@ import {
   ellipsisBreadcrumbMenuDirectory
 } from "@/workbench/breadcrumbs";
 import viewerPackage from "../../../../package.json";
+import { useBoxLanguage } from "./boxBuilder/useBoxLanguage";
 
 function fileSheetLabel(fileSheetKind) {
   if (fileSheetKind === "dxf") {
@@ -990,14 +993,23 @@ export default function CadWorkspaceTopBar({
   onToggleFileSheet,
   themeEditing = false,
   onToggleThemeEditor,
+  boxBuilderAvailable = false,
+  boxBuilderOpen = false,
+  onToggleBoxBuilder,
+  accountEmail = "",
+  signOutHref = "",
+  languageToggle = false,
+  projectLinks = null,
   navigationAvailable = true
 }) {
   const viewerVersion = String(viewerPackage.version || "").trim();
+  const { language: boxLanguage, setLanguage: setBoxLanguage, t: translateBox } = useBoxLanguage();
   const discordUrl = normalizeViewerDiscordUrl(import.meta.env?.VIEWER_DISCORD_URL);
   const githubUrl = normalizeViewerGithubUrl(import.meta.env?.VIEWER_GITHUB_URL);
   const releaseUrl = viewerGithubReleaseUrl(viewerVersion, githubUrl);
   const latestReleaseUrl = viewerGithubLatestReleaseUrl(githubUrl);
-  const latestReleaseApiUrl = previewMode ? "" : viewerGithubLatestReleaseApiUrl(githubUrl);
+  // A deployment that names its own project links is not tracking upstream releases.
+  const latestReleaseApiUrl = previewMode || projectLinks ? "" : viewerGithubLatestReleaseApiUrl(githubUrl);
   const mockLatestVersion = import.meta.env.DEV
     ? String(import.meta.env?.VIEWER_MOCK_LATEST_VERSION || "").trim()
     : "";
@@ -1139,35 +1151,131 @@ export default function CadWorkspaceTopBar({
 
       <TooltipProvider delayDuration={250}>
         <div className="flex shrink-0 items-center gap-1.5">
-          <VersionReleaseLink
-            version={viewerVersion}
-            releaseUrl={releaseUrl}
-            releaseCheck={releaseCheck}
-          />
-          <Button
-            asChild
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Join the text-to-cad Discord"
-            title="Join the text-to-cad Discord"
-            className={topBarIconButtonClasses}
-          >
-            <a href={discordUrl} target="_blank" rel="noreferrer">
-              <DiscordMark className={topBarIconClasses} />
-            </a>
-          </Button>
-          {githubUrl ? (
+          {projectLinks ? (
+            <>
+              {projectLinks.sourceVersion ? (
+                <a
+                  href={projectLinks.sourceVersionUrl || projectLinks.sourceUrl || undefined}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={translateBox("links.version")}
+                  className="hidden rounded-md px-1.5 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground sm:inline"
+                >
+                  {projectLinks.sourceVersion}
+                </a>
+              ) : null}
+              {projectLinks.telegramUrl ? (
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={translateBox("links.telegram")}
+                  title={translateBox("links.telegram")}
+                  className={topBarIconButtonClasses}
+                >
+                  <a href={projectLinks.telegramUrl} target="_blank" rel="noreferrer">
+                    <Send className={topBarIconClasses} strokeWidth={2} aria-hidden="true" />
+                  </a>
+                </Button>
+              ) : null}
+              {projectLinks.sourceUrl ? (
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={translateBox("links.source")}
+                  title={translateBox("links.source")}
+                  className={topBarIconButtonClasses}
+                >
+                  <a href={projectLinks.sourceUrl} target="_blank" rel="noreferrer">
+                    <GitHubMark className={topBarIconClasses} />
+                  </a>
+                </Button>
+              ) : null}
+            </>
+          ) : (
+            <>
+            <VersionReleaseLink
+              version={viewerVersion}
+              releaseUrl={releaseUrl}
+              releaseCheck={releaseCheck}
+            />
             <Button
               asChild
               variant="ghost"
               size="icon-sm"
-              aria-label="Open GitHub repository"
-              title="Open GitHub repository"
+              aria-label="Join the text-to-cad Discord"
+              title="Join the text-to-cad Discord"
               className={topBarIconButtonClasses}
             >
-              <a href={githubUrl} target="_blank" rel="noreferrer">
-                <GitHubMark className={topBarIconClasses} />
+              <a href={discordUrl} target="_blank" rel="noreferrer">
+                <DiscordMark className={topBarIconClasses} />
               </a>
+            </Button>
+            {githubUrl ? (
+              <Button
+                asChild
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Open GitHub repository"
+                title="Open GitHub repository"
+                className={topBarIconButtonClasses}
+              >
+                <a href={githubUrl} target="_blank" rel="noreferrer">
+                  <GitHubMark className={topBarIconClasses} />
+                </a>
+              </Button>
+            ) : null}
+            </>
+          )}
+
+          {languageToggle ? (
+            <div
+              className="flex items-center gap-0.5 rounded-md border border-sidebar-border p-0.5"
+              role="group"
+              aria-label={translateBox("language.label")}
+            >
+              {[["uk", "УКР", "Українська"], ["en", "ENG", "English"]].map(([code, short, full]) => (
+                <button
+                  key={code}
+                  type="button"
+                  lang={code}
+                  title={full}
+                  aria-pressed={boxLanguage === code}
+                  onClick={() => setBoxLanguage(code)}
+                  className={cn(
+                    "h-6 rounded px-1.5 text-[10px] font-semibold tracking-wide text-muted-foreground transition-colors hover:text-foreground",
+                    boxLanguage === code && "bg-accent text-accent-foreground"
+                  )}
+                >
+                  {short}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {accountEmail ? (
+            <span className="hidden max-w-48 truncate text-xs text-muted-foreground sm:inline" title={accountEmail}>
+              {accountEmail}
+            </span>
+          ) : null}
+          {signOutHref ? (
+            <Button asChild variant="ghost" size="sm" className="h-8 px-2 text-xs">
+              <a href={signOutHref}>{translateBox("account.signOut")}</a>
+            </Button>
+          ) : null}
+
+          {boxBuilderAvailable && typeof onToggleBoxBuilder === "function" ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={boxBuilderOpen ? translateBox("builder.close") : translateBox("builder.open")}
+              title={boxBuilderOpen ? translateBox("builder.close") : translateBox("builder.open")}
+              aria-pressed={boxBuilderOpen}
+              onClick={onToggleBoxBuilder}
+              className={`${topBarIconButtonClasses} ${boxBuilderOpen ? activeIconButtonClasses : ""}`}
+            >
+              <Package className={topBarIconClasses} strokeWidth={2} aria-hidden="true" />
             </Button>
           ) : null}
 

@@ -1,0 +1,54 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { boxSpecWarnings, defaultBoxSpec, newHole, newStandoffGroup, normalizeBoxSpec } from "./boxSpec.js";
+import { BOX_MESSAGES, detectLanguage, formatWarning, translate } from "./i18n.js";
+
+test("both languages carry exactly the same keys", () => {
+  const english = Object.keys(BOX_MESSAGES.en).sort();
+  const ukrainian = Object.keys(BOX_MESSAGES.uk).sort();
+  assert.deepEqual(ukrainian, english);
+  for (const [key, text] of Object.entries(BOX_MESSAGES.uk)) {
+    assert.ok(text.trim(), `uk ${key} is empty`);
+  }
+});
+
+test("Ukrainian only when the browser's first language is Ukrainian", () => {
+  assert.equal(detectLanguage("uk"), "uk");
+  assert.equal(detectLanguage("uk-UA"), "uk");
+  assert.equal(detectLanguage("en-US"), "en");
+  assert.equal(detectLanguage("ru-UA"), "en");
+  assert.equal(detectLanguage("de"), "en");
+  assert.equal(detectLanguage(""), "en");
+  assert.equal(detectLanguage(undefined), "en");
+});
+
+test("placeholders are filled and unknown keys fall back", () => {
+  assert.equal(translate("en", "item.hole", { n: 3 }), "Hole 3");
+  assert.equal(translate("uk", "item.hole", { n: 3 }), "Отвір 3");
+  assert.equal(translate("fr", "tab.lid"), "Lid");
+  assert.equal(translate("uk", "no.such.key"), "no.such.key");
+  assert.equal(translate("en", "quota.new", { used: 1 }), "new 1/{limit}");
+});
+
+test("every warning the spec produces has a sentence in both languages", () => {
+  let spec = normalizeBoxSpec(defaultBoxSpec());
+  spec.standoffs.push({ ...newStandoffGroup(spec), x: 40, height: 400 });
+  spec.holes.push({ ...newHole(spec, "front"), u: 49 });
+  spec.walls.enabled = false;
+  spec = normalizeBoxSpec(spec);
+  spec.walls.enabled = true;
+  spec.lid.enabled = false;
+  spec.holes.push({ ...newHole(spec, "lid") });
+  const warnings = boxSpecWarnings(spec);
+  assert.ok(warnings.length >= 3);
+  for (const language of ["en", "uk"]) {
+    for (const warning of warnings) {
+      const sentence = formatWarning(language, warning);
+      assert.ok(!sentence.includes("{"), `${language}: ${sentence}`);
+      assert.notEqual(sentence, warning.key);
+    }
+  }
+  const off = warnings.find((warning) => warning.key === "warning.holeFaceOff");
+  assert.equal(formatWarning("en", off), "Hole 2: the lid is off, so the hole does nothing.");
+});
