@@ -8,6 +8,7 @@ import {
   clampStandoffPosition,
   connectorHole,
   defaultBoxSpec,
+  lidScrewPoints,
   newHole,
   newStandoffGroup,
   normalizeBoxSpec,
@@ -133,6 +134,28 @@ test("a keystone hole is its exact cut-out and needs a thin enough wall", () => 
   assert.deepEqual(keystoneWarning()?.params, { n: 1, thickness: 2 });
   spec.walls.thickness = 1.6;
   assert.equal(keystoneWarning(), undefined);
+});
+
+test("lid screws: corner bosses hang from the wall top, and the lid and its lip make room", () => {
+  const defaults = defaultBoxSpec();
+  const spec = normalizeBoxSpec({ ...defaults, lid: { ...defaults.lid, screws: true, screwDepth: 8 } });
+  const dims = boxDimensions(spec);
+  const { base, lid } = buildBoxPlan(spec);
+  // Inside 96 x 66 with 2 mm inner corners: a 7 mm boss touches both walls, 0.3 mm into them.
+  const points = lidScrewPoints(dims);
+  assert.deepEqual(points, [[44.8, 29.8], [-44.8, 29.8], [-44.8, -29.8], [44.8, -29.8]]);
+  const posts = findNodes(base, (node) => node.type === "cyl" && node.r === 3.5);
+  assert.deepEqual(posts.map((post) => [post.pos, post.h]), points.map(([x, y]) => [[x, y, 24], 8]));
+  // The pilot holes run the boss's 8 mm and 1 mm past its top.
+  assert.equal(findNodes(base, (node) => node.type === "cyl" && node.r === 1.25 && node.h === 9).length, 4, "a pilot hole in each");
+  const narrowest = findNodes(base, (node) => node.type === "cyl" && node.r === 0.5);
+  assert.equal(narrowest.length, 4, "each taper narrows to half a millimetre");
+  assert.ok(narrowest.every((step) => step.pos[2] > dims.floorTop), "the taper stays clear of the floor");
+  assert.equal(findNodes(lid, (node) => node.type === "cyl" && node.r === 1.7).length, 4, "a hole in the lid over each");
+  assert.equal(findNodes(lid, (node) => node.type === "cyl" && node.r === 3.75).length, 4, "the lip steps round each boss");
+  assert.deepEqual(boxSpecWarnings(spec), []);
+  const tiny = normalizeBoxSpec({ ...spec, base: { ...spec.base, width: 20, depth: 20, radius: 2 }, lid: { ...spec.lid, screwDiameter: 12 } });
+  assert.ok(boxSpecWarnings(tiny).some((warning) => warning.key === "warning.lidScrewsTight"));
 });
 
 test("warnings name standoffs outside the floor", () => {

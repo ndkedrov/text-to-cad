@@ -14,6 +14,8 @@ import {
   clampStemLength,
   faceFrame,
   isWallFace,
+  lidScrewCorner,
+  lidScrewPoints,
   roundMm,
   standoffPoints
 } from "./boxSpec.js";
@@ -234,6 +236,39 @@ function clampPieceNode(piece) {
   return group([difference(body, holes)], { pos: [piece.x, 0, 0] });
 }
 
+// How much a lid screw boss's taper narrows per step; each step is as tall as
+// the boss's far edge retreats, so the underside stays at 45 degrees.
+const SCREW_TAPER_STEP = 0.25;
+const SCREW_TAPER_MIN_RADIUS = 0.5;
+
+// A post in each inner corner, fused to the walls, its top flush with them and
+// `screwDepth` tall, with a pilot hole for the lid screw. Under it, cylinders that
+// shrink into the corner step by step make a 45-degree taper, so it prints
+// without supports.
+function lidScrewBossNodes(dims) {
+  if (!dims.lidScrews) {
+    return [];
+  }
+  const radius = dims.screwDiameter / 2;
+  const bossBottom = Math.max(dims.wallTop - dims.screwDepth, dims.floorTop);
+  const [cx, cy] = lidScrewCorner(dims, radius);
+  const stepHeight = SCREW_TAPER_STEP * (1 + Math.SQRT2);
+  return [[1, 1], [-1, 1], [-1, -1], [1, -1]].map(([sx, sy]) => {
+    const pieces = [cylinder(radius, dims.wallTop - bossBottom, { pos: [sx * cx, sy * cy, bossBottom] })];
+    let top = bossBottom;
+    let stepRadius = radius;
+    while (stepRadius - SCREW_TAPER_STEP >= SCREW_TAPER_MIN_RADIUS - 1e-9 && top > dims.floorTop + 1e-6) {
+      stepRadius -= SCREW_TAPER_STEP;
+      const bottom = Math.max(top - stepHeight, dims.floorTop - FUSE_OVERLAP);
+      const [tx, ty] = lidScrewCorner(dims, stepRadius);
+      pieces.push(cylinder(stepRadius, top - bottom + FUSE_OVERLAP, { pos: [sx * tx, sy * ty, bottom] }));
+      top = bottom;
+    }
+    const pilot = cylinder(dims.screwPilot / 2, dims.wallTop - bossBottom + CUT_MARGIN, { pos: [sx * cx, sy * cy, bossBottom] });
+    return difference(union(pieces), [pilot]);
+  });
+}
+
 // Wall cut-outs for the ports of every mounted board.
 export function boardPortCutouts(spec, dims) {
   if (!dims.wallsEnabled) {
@@ -268,7 +303,7 @@ function basePlan(spec, dims) {
     ...boardClampPostNodes(board, dims)
   ]);
   const clamps = clampPieces(spec, dims).map(clampPieceNode);
-  return union([shell, ...standoffs, ...boardSupports, ...clamps]);
+  return union([shell, ...standoffs, ...boardSupports, ...lidScrewBossNodes(dims), ...clamps]);
 }
 
 function lidPlan(spec, dims) {
@@ -280,6 +315,12 @@ function lidPlan(spec, dims) {
   if (dims.lipEnabled && dims.lipWidth > 2 * dims.lipThickness && dims.lipDepth > 2 * dims.lipThickness) {
     const bottom = dims.wallTop - dims.lipHeight;
     const ringHeight = dims.lipHeight + dims.lidThickness / 2;
+    // The lip steps round each screw boss, with the lid's clearance.
+    const bossCutters = lidScrewPoints(dims).map(([x, y]) => cylinder(
+      dims.screwDiameter / 2 + dims.clearance,
+      ringHeight + 2 * CUT_MARGIN,
+      { pos: [x, y, bottom - CUT_MARGIN] }
+    ));
     lip = difference(
       roundedPrism(dims.lipWidth, dims.lipDepth, ringHeight, dims.lipRadius, { pos: [0, 0, bottom] }),
       [roundedPrism(
@@ -288,12 +329,18 @@ function lidPlan(spec, dims) {
         ringHeight + 2 * CUT_MARGIN,
         Math.max(dims.lipRadius - dims.lipThickness, 0),
         { pos: [0, 0, bottom - CUT_MARGIN] }
-      )]
+      ), ...bossCutters]
     );
   }
-  const cutters = spec.holes
-    .filter((hole) => hole.face === "lid")
-    .map((hole) => holeCutter(hole, dims));
+  const screwHoles = lidScrewPoints(dims).map(([x, y]) => cylinder(
+    dims.screwHole / 2,
+    dims.lidThickness + 2 * CUT_MARGIN,
+    { pos: [x, y, dims.wallTop - CUT_MARGIN] }
+  ));
+  const cutters = [
+    ...spec.holes.filter((hole) => hole.face === "lid").map((hole) => holeCutter(hole, dims)),
+    ...screwHoles
+  ];
   // A port cut-out that reaches up into the lip's band goes through the lip too,
   // or the closed lid would cover the connector from the inside.
   const lipBottom = dims.wallTop - dims.lipHeight;
