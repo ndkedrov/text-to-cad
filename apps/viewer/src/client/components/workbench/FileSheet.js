@@ -1,11 +1,12 @@
 import { Children, useEffect, useRef, useState } from "react";
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/ui/utils";
 import {
   AccordionContent,
   AccordionItem,
   AccordionTrigger
 } from "../ui/accordion";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../ui/collapsible";
 import { ColorPicker } from "../ui/color-picker";
 import {
   DropdownMenu,
@@ -218,6 +219,51 @@ export function FileSheetItemGroup({ label, children, className }) {
         {children}
       </div>
     </div>
+  );
+}
+
+// A block that folds to its label line (settings-ui.md "Folding blocks"): an
+// item of a long list, or a group of rows needed only now and then. The label
+// line is the toggle — chevron, item-weight label, and an optional muted summary
+// on the control axis that says what is inside while it is folded. Controlled
+// through `open`/`onOpenChange`, or left to itself from `defaultOpen`.
+export function FileSheetDisclosure({
+  label,
+  summary,
+  open,
+  defaultOpen = false,
+  onOpenChange,
+  children,
+  className
+}) {
+  return (
+    <Collapsible
+      open={open}
+      defaultOpen={defaultOpen}
+      onOpenChange={onOpenChange}
+      className={cn("[&:not(:first-child)]:mt-1", className)}
+      data-file-sheet-disclosure=""
+    >
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          className="group flex min-h-7 w-full min-w-0 items-center gap-1.5 rounded-md px-2 text-left outline-none transition-colors hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-ring/50"
+        >
+          <ChevronRight
+            className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90"
+            strokeWidth={2}
+            aria-hidden="true"
+          />
+          <span className="min-w-0 truncate text-[11px] font-medium leading-4 text-sidebar-foreground">{label}</span>
+          {summary ? (
+            <span className="ml-auto min-w-0 shrink truncate pl-2 text-right text-[10px] leading-4 text-muted-foreground">{summary}</span>
+          ) : null}
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className={cn(FILE_SHEET_ROW_STACK_CLASSES, "pb-2 pt-2")} data-file-sheet-row-stack="">
+        {children}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 

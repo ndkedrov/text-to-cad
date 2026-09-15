@@ -90,10 +90,10 @@ import FileSheet, {
   FileSheetBooleanToggle,
   FileSheetButtonRow,
   FileSheetControlRow,
+  FileSheetDisclosure,
   FileSheetField,
   FileSheetFieldGrid,
   FileSheetInlineControlRow,
-  FileSheetItemGroup,
   FileSheetSelectRow,
   FileSheetStatusText,
   FileSheetSubsection,
@@ -192,7 +192,11 @@ function CompactButton({ icon: Icon, children, className, ...props }) {
   );
 }
 
-function SelectableItem({ selected, onSelect, children }) {
+// One item of a list (a hole, a standoff group, a board): folded to its label
+// line with a summary, unfolded while it is selected. Opening it selects it and
+// closing it clears the selection; picking it in the viewport opens it and
+// scrolls it into view.
+function ListItem({ selected, label, summary, onSelectedChange, children }) {
   const ref = useRef(null);
   useEffect(() => {
     if (selected) {
@@ -203,21 +207,28 @@ function SelectableItem({ selected, onSelect, children }) {
     <div
       ref={ref}
       data-selected={selected ? "true" : undefined}
-      className={cn("rounded-md py-1 transition-colors [&:not(:first-child)]:mt-3", selected && "bg-sidebar-accent/70")}
-      onPointerDownCapture={() => {
-        if (!selected) {
-          onSelect();
-        }
-      }}
-      onFocusCapture={() => {
-        if (!selected) {
-          onSelect();
-        }
-      }}
+      className={cn("rounded-md transition-colors", selected && "bg-sidebar-accent/70")}
     >
-      {children}
+      <FileSheetDisclosure label={label} summary={summary} open={selected} onOpenChange={onSelectedChange}>
+        {children}
+      </FileSheetDisclosure>
     </div>
   );
+}
+
+function holeSummary(hole, t) {
+  const kind = hole.connector ? t(`port.type.${hole.connector}`) : t(`shape.${hole.shape}`);
+  const size = hole.shape === "circle" || hole.shape === "hex"
+    ? `⌀${formatNumber(hole.width)}`
+    : `${formatNumber(hole.width)}×${formatNumber(hole.height)}`;
+  return `${t(`face.${hole.face}`)} · ${kind} ${size}`;
+}
+
+function standoffSummary(group, t) {
+  const spacing = group.pattern === "line"
+    ? formatNumber(group.spacingX)
+    : `${formatNumber(group.spacingX)}×${formatNumber(group.spacingY)}`;
+  return `${t(`pattern.${group.pattern}`)} · ${spacing} ${t("unit.mm")}`;
 }
 
 function ItemActions({ builder, selection }) {
@@ -300,22 +311,30 @@ function BodyTab({ builder }) {
           />
         ) : null}
       </FileSheetSubsection>
-      <FileSheetSubsection title={t("section.view")}>
-        <FileSheetToggleRow
-          label={t("field.boxMm")}
-          checked={builder.display.boxMm}
-          onCheckedChange={(boxMm) => builder.setDisplay({ boxMm })}
-        />
-        <FileSheetToggleRow
-          label={t("field.groundMm")}
-          checked={builder.display.groundMm}
-          onCheckedChange={(groundMm) => builder.setDisplay({ groundMm })}
-        />
-        <FileSheetToggleRow
-          label={t("field.showBoards")}
-          checked={builder.display.boards}
-          onCheckedChange={(boards) => builder.setDisplay({ boards })}
-        />
+      <FileSheetSubsection>
+        <FileSheetDisclosure
+          label={t("section.view")}
+          summary={t("view.summary", {
+            on: [builder.display.boxMm, builder.display.groundMm, builder.display.boards].filter(Boolean).length,
+            total: 3
+          })}
+        >
+          <FileSheetToggleRow
+            label={t("field.boxMm")}
+            checked={builder.display.boxMm}
+            onCheckedChange={(boxMm) => builder.setDisplay({ boxMm })}
+          />
+          <FileSheetToggleRow
+            label={t("field.groundMm")}
+            checked={builder.display.groundMm}
+            onCheckedChange={(groundMm) => builder.setDisplay({ groundMm })}
+          />
+          <FileSheetToggleRow
+            label={t("field.showBoards")}
+            checked={builder.display.boards}
+            onCheckedChange={(boards) => builder.setDisplay({ boards })}
+          />
+        </FileSheetDisclosure>
       </FileSheetSubsection>
     </div>
   );
@@ -392,59 +411,62 @@ function HoleItem({ builder, hole, index }) {
   });
 
   return (
-    <SelectableItem selected={selected} onSelect={() => setSelection(itemSelection)}>
-      <FileSheetItemGroup label={t("item.hole", { n: index + 1 })} className="!mt-0">
-        <FileSheetSelectRow
-          label={t("field.face")}
-          value={hole.face}
-          onValueChange={changeFace}
-          options={HOLE_FACES.map((face) => ({
-            value: face,
-            label: holeAvailable(dims, face) ? t(`face.${face}`) : t("face.off", { face: t(`face.${face}`) })
-          }))}
-        />
-        <FileSheetSelectRow
-          label={t("field.shape")}
-          value={hole.connector ? `connector:${hole.connector}` : hole.shape}
-          onValueChange={(value) => patch(
-            value.startsWith("connector:") ? connectorHole(value.slice("connector:".length)) : { shape: value, connector: "" }
-          )}
-          options={[
-            ...HOLE_SHAPES.map((shape) => ({ value: shape, label: t(`shape.${shape}`) })),
-            ...CONNECTOR_TYPES.map((type) => ({ value: `connector:${type}`, label: t(`port.type.${type}`), group: t("shape.connectors") }))
-          ]}
-        />
-        {round ? (
-          <NumberRow
-            label={hole.shape === "hex" ? t("field.acrossFlats") : t("field.diameter")}
-            value={hole.width}
-            min={0.3}
-            max={500}
-            step={0.5}
-            onCommit={(width) => patch({ width, height: width, connector: "" })}
-          />
-        ) : (
-          <FileSheetFieldGrid columns={hole.shape === "rect" ? 3 : 2}>
-            <NumberField label={sizeU} value={hole.width} min={0.3} max={500} step={0.5} onCommit={(width) => patch({ width, connector: "" })} />
-            <NumberField label={sizeV} value={hole.height} min={0.3} max={500} step={0.5} onCommit={(height) => patch({ height, connector: "" })} />
-            {hole.shape === "rect" ? (
-              <NumberField label={t("field.radius")} value={hole.radius} min={0} max={Math.min(hole.width, hole.height) / 2} step={0.25} onCommit={(radius) => patch({ radius, connector: "" })} />
-            ) : null}
-          </FileSheetFieldGrid>
+    <ListItem
+      selected={selected}
+      label={t("item.hole", { n: index + 1 })}
+      summary={holeSummary(hole, t)}
+      onSelectedChange={(open) => setSelection(open ? itemSelection : null)}
+  >
+      <FileSheetSelectRow
+        label={t("field.face")}
+        value={hole.face}
+        onValueChange={changeFace}
+        options={HOLE_FACES.map((face) => ({
+          value: face,
+          label: holeAvailable(dims, face) ? t(`face.${face}`) : t("face.off", { face: t(`face.${face}`) })
+        }))}
+      />
+      <FileSheetSelectRow
+        label={t("field.shape")}
+        value={hole.connector ? `connector:${hole.connector}` : hole.shape}
+        onValueChange={(value) => patch(
+          value.startsWith("connector:") ? connectorHole(value.slice("connector:".length)) : { shape: value, connector: "" }
         )}
-        {hole.connector ? (
-          <FileSheetStatusText>{t("hole.connectorNote", { margin: formatNumber(CONNECTOR_HOLE_MARGIN) })}</FileSheetStatusText>
-        ) : null}
-        <FileSheetFieldGrid columns={hole.shape === "circle" ? 2 : 3}>
-          <NumberField label={labelU} value={hole.u} min={range.u[0]} max={range.u[1]} step={0.5} onCommit={(u) => patch({ u })} />
-          <NumberField label={labelV} value={hole.v} min={range.v[0]} max={range.v[1]} step={0.5} onCommit={(v) => patch({ v })} />
-          {hole.shape !== "circle" ? (
-            <NumberField label={t("field.rotation")} unit="°" digits={1} value={hole.rotation} min={-360} max={360} step={15} onCommit={(rotation) => patch({ rotation })} />
+        options={[
+          ...HOLE_SHAPES.map((shape) => ({ value: shape, label: t(`shape.${shape}`) })),
+          ...CONNECTOR_TYPES.map((type) => ({ value: `connector:${type}`, label: t(`port.type.${type}`), group: t("shape.connectors") }))
+        ]}
+      />
+      {round ? (
+        <NumberRow
+          label={hole.shape === "hex" ? t("field.acrossFlats") : t("field.diameter")}
+          value={hole.width}
+          min={0.3}
+          max={500}
+          step={0.5}
+          onCommit={(width) => patch({ width, height: width, connector: "" })}
+        />
+      ) : (
+        <FileSheetFieldGrid columns={hole.shape === "rect" ? 3 : 2}>
+          <NumberField label={sizeU} value={hole.width} min={0.3} max={500} step={0.5} onCommit={(width) => patch({ width, connector: "" })} />
+          <NumberField label={sizeV} value={hole.height} min={0.3} max={500} step={0.5} onCommit={(height) => patch({ height, connector: "" })} />
+          {hole.shape === "rect" ? (
+            <NumberField label={t("field.radius")} value={hole.radius} min={0} max={Math.min(hole.width, hole.height) / 2} step={0.25} onCommit={(radius) => patch({ radius, connector: "" })} />
           ) : null}
         </FileSheetFieldGrid>
-        <ItemActions builder={builder} selection={itemSelection} />
-      </FileSheetItemGroup>
-    </SelectableItem>
+      )}
+      {hole.connector ? (
+        <FileSheetStatusText>{t("hole.connectorNote", { margin: formatNumber(CONNECTOR_HOLE_MARGIN) })}</FileSheetStatusText>
+      ) : null}
+      <FileSheetFieldGrid columns={hole.shape === "circle" ? 2 : 3}>
+        <NumberField label={labelU} value={hole.u} min={range.u[0]} max={range.u[1]} step={0.5} onCommit={(u) => patch({ u })} />
+        <NumberField label={labelV} value={hole.v} min={range.v[0]} max={range.v[1]} step={0.5} onCommit={(v) => patch({ v })} />
+        {hole.shape !== "circle" ? (
+          <NumberField label={t("field.rotation")} unit="°" digits={1} value={hole.rotation} min={-360} max={360} step={15} onCommit={(rotation) => patch({ rotation })} />
+        ) : null}
+      </FileSheetFieldGrid>
+      <ItemActions builder={builder} selection={itemSelection} />
+    </ListItem>
   );
 }
 
@@ -468,52 +490,54 @@ function ArraySection({ builder, kind }) {
   const planned = planArray(spec, selection, options);
   const itemLabel = kind === "hole" ? t("item.hole", { n: index + 1 }) : t("item.standoffs", { n: index + 1 });
   return (
-    <FileSheetSubsection title={t("section.array", { item: itemLabel })}>
-      <FileSheetSelectRow
-        label={t("field.direction")}
-        value={direction}
-        onValueChange={setDirection}
-        options={ARRAY_DIRECTIONS.map((value) => ({ value, label: t(`array.dir.${onWall ? "wall" : "plane"}.${value}`) }))}
-      />
-      <FileSheetSelectRow
-        label={t("field.arrayMode")}
-        value={mode}
-        onValueChange={setMode}
-        options={ARRAY_MODES.map((value) => ({ value, label: t(`array.mode.${value}`) }))}
-      />
-      {mode === "fill" ? null : (
-        <NumberRow
-          label={mode === "even" ? t("field.rowCount") : t("field.copies")}
-          unit=""
-          digits={0}
-          value={count}
-          min={mode === "even" ? 2 : 1}
-          max={100}
-          step={1}
-          onCommit={(value) => setCount(Math.round(value))}
+    <FileSheetSubsection>
+      <FileSheetDisclosure label={t("section.array", { item: itemLabel })}>
+        <FileSheetSelectRow
+          label={t("field.direction")}
+          value={direction}
+          onValueChange={setDirection}
+          options={ARRAY_DIRECTIONS.map((value) => ({ value, label: t(`array.dir.${onWall ? "wall" : "plane"}.${value}`) }))}
         />
-      )}
-      {mode === "even" ? null : (
-        <NumberRow label={t("field.step")} value={step} min={0.5} max={500} step={0.5} onCommit={setStep} />
-      )}
-      {mode === "even" && planned.spacing ? (
-        <FileSheetControlRow label={t("field.arraySpacing")} value={`${formatNumber(planned.spacing)} mm`} />
-      ) : null}
-      <FileSheetControlRow label={t("field.arrayResult")} value={t("array.result", { count: planned.positions.length })} />
-      {planned.skipped ? (
-        <FileSheetStatusText tone="error">{t("array.skipped", { count: planned.skipped })}</FileSheetStatusText>
-      ) : null}
-      <FileSheetButtonRow>
-        <CompactButton
-          icon={Copy}
-          disabled={!planned.positions.length}
-          onClick={() => edit((draft) => {
-            applyArray(draft, selection, options);
-          })}
-        >
-          {t("action.createArray")}
-        </CompactButton>
-      </FileSheetButtonRow>
+        <FileSheetSelectRow
+          label={t("field.arrayMode")}
+          value={mode}
+          onValueChange={setMode}
+          options={ARRAY_MODES.map((value) => ({ value, label: t(`array.mode.${value}`) }))}
+        />
+        {mode === "fill" ? null : (
+          <NumberRow
+            label={mode === "even" ? t("field.rowCount") : t("field.copies")}
+            unit=""
+            digits={0}
+            value={count}
+            min={mode === "even" ? 2 : 1}
+            max={100}
+            step={1}
+            onCommit={(value) => setCount(Math.round(value))}
+          />
+        )}
+        {mode === "even" ? null : (
+          <NumberRow label={t("field.step")} value={step} min={0.5} max={500} step={0.5} onCommit={setStep} />
+        )}
+        {mode === "even" && planned.spacing ? (
+          <FileSheetControlRow label={t("field.arraySpacing")} value={`${formatNumber(planned.spacing)} mm`} />
+        ) : null}
+        <FileSheetControlRow label={t("field.arrayResult")} value={t("array.result", { count: planned.positions.length })} />
+        {planned.skipped ? (
+          <FileSheetStatusText tone="error">{t("array.skipped", { count: planned.skipped })}</FileSheetStatusText>
+        ) : null}
+        <FileSheetButtonRow>
+          <CompactButton
+            icon={Copy}
+            disabled={!planned.positions.length}
+            onClick={() => edit((draft) => {
+              applyArray(draft, selection, options);
+            })}
+          >
+            {t("action.createArray")}
+          </CompactButton>
+        </FileSheetButtonRow>
+      </FileSheetDisclosure>
     </FileSheetSubsection>
   );
 }
@@ -548,7 +572,7 @@ function HolesTab({ builder }) {
         </FileSheetButtonRow>
       </FileSheetSubsection>
       <ArraySection builder={builder} kind="hole" />
-      <FileSheetSubsection title={t("section.holes")}>
+      <FileSheetSubsection title={t("section.holes")} contentClassName="space-y-0.5">
         {spec.holes.length ? (
           spec.holes.map((hole, index) => (
             <HoleItem key={hole.id} builder={builder} hole={hole} index={index} />
@@ -574,42 +598,45 @@ function StandoffItem({ builder, group, index }) {
   });
   const spacingLabels = group.pattern === "triangle" ? ["spacing.base", "spacing.apex"] : ["spacing.x", "spacing.y"];
   return (
-    <SelectableItem selected={selected} onSelect={() => setSelection(itemSelection)}>
-      <FileSheetItemGroup label={t("item.standoffs", { n: index + 1 })} className="!mt-0">
-        <FileSheetSelectRow
-          label={t("field.pattern")}
-          value={group.pattern}
-          onValueChange={(pattern) => patch({ pattern })}
-          options={STANDOFF_PATTERNS.map((pattern) => ({ value: pattern, label: t(`pattern.${pattern}`) }))}
-        />
-        {group.pattern === "line" ? (
-          <NumberRow label={t("field.spacing")} value={group.spacingX} min={0} max={1000} step={0.5} onCommit={(spacingX) => patch({ spacingX })} />
-        ) : (
-          <FileSheetFieldGrid columns={2}>
-            <NumberField
-              label={t("field.spacingFirst", { axis: t(spacingLabels[0]).toLowerCase() })}
-              value={group.spacingX}
-              min={0}
-              max={1000}
-              step={0.5}
-              onCommit={(spacingX) => patch({ spacingX })}
-            />
-            <NumberField label={t(spacingLabels[1])} value={group.spacingY} min={0} max={1000} step={0.5} onCommit={(spacingY) => patch({ spacingY })} />
-          </FileSheetFieldGrid>
-        )}
-        <FileSheetFieldGrid columns={3}>
-          <NumberField label={t("field.holeDiameter")} value={group.holeDiameter} min={0} max={group.outerDiameter - 0.4} step={0.1} onCommit={(holeDiameter) => patch({ holeDiameter })} />
-          <NumberField label={t("field.padDiameter")} value={group.outerDiameter} min={1} max={200} step={0.5} onCommit={(outerDiameter) => patch({ outerDiameter })} />
-          <NumberField label={t("field.height")} value={group.height} min={0.5} max={500} step={0.5} onCommit={(height) => patch({ height })} />
+    <ListItem
+      selected={selected}
+      label={t("item.standoffs", { n: index + 1 })}
+      summary={standoffSummary(group, t)}
+      onSelectedChange={(open) => setSelection(open ? itemSelection : null)}
+  >
+      <FileSheetSelectRow
+        label={t("field.pattern")}
+        value={group.pattern}
+        onValueChange={(pattern) => patch({ pattern })}
+        options={STANDOFF_PATTERNS.map((pattern) => ({ value: pattern, label: t(`pattern.${pattern}`) }))}
+      />
+      {group.pattern === "line" ? (
+        <NumberRow label={t("field.spacing")} value={group.spacingX} min={0} max={1000} step={0.5} onCommit={(spacingX) => patch({ spacingX })} />
+      ) : (
+        <FileSheetFieldGrid columns={2}>
+          <NumberField
+            label={t("field.spacingFirst", { axis: t(spacingLabels[0]).toLowerCase() })}
+            value={group.spacingX}
+            min={0}
+            max={1000}
+            step={0.5}
+            onCommit={(spacingX) => patch({ spacingX })}
+          />
+          <NumberField label={t(spacingLabels[1])} value={group.spacingY} min={0} max={1000} step={0.5} onCommit={(spacingY) => patch({ spacingY })} />
         </FileSheetFieldGrid>
-        <FileSheetFieldGrid columns={3}>
-          <NumberField label={t("field.centerX")} value={group.x} min={-2000} max={2000} step={0.5} onCommit={(x) => patch({ x })} />
-          <NumberField label={t("field.centerY")} value={group.y} min={-2000} max={2000} step={0.5} onCommit={(y) => patch({ y })} />
-          <NumberField label={t("field.rotation")} unit="°" digits={1} value={group.rotation} min={-360} max={360} step={15} onCommit={(rotation) => patch({ rotation })} />
-        </FileSheetFieldGrid>
-        <ItemActions builder={builder} selection={itemSelection} />
-      </FileSheetItemGroup>
-    </SelectableItem>
+      )}
+      <FileSheetFieldGrid columns={3}>
+        <NumberField label={t("field.holeDiameter")} value={group.holeDiameter} min={0} max={group.outerDiameter - 0.4} step={0.1} onCommit={(holeDiameter) => patch({ holeDiameter })} />
+        <NumberField label={t("field.padDiameter")} value={group.outerDiameter} min={1} max={200} step={0.5} onCommit={(outerDiameter) => patch({ outerDiameter })} />
+        <NumberField label={t("field.height")} value={group.height} min={0.5} max={500} step={0.5} onCommit={(height) => patch({ height })} />
+      </FileSheetFieldGrid>
+      <FileSheetFieldGrid columns={3}>
+        <NumberField label={t("field.centerX")} value={group.x} min={-2000} max={2000} step={0.5} onCommit={(x) => patch({ x })} />
+        <NumberField label={t("field.centerY")} value={group.y} min={-2000} max={2000} step={0.5} onCommit={(y) => patch({ y })} />
+        <NumberField label={t("field.rotation")} unit="°" digits={1} value={group.rotation} min={-360} max={360} step={15} onCommit={(rotation) => patch({ rotation })} />
+      </FileSheetFieldGrid>
+      <ItemActions builder={builder} selection={itemSelection} />
+    </ListItem>
   );
 }
 
@@ -634,7 +661,7 @@ function StandoffsTab({ builder }) {
         </FileSheetButtonRow>
       </FileSheetSubsection>
       <ArraySection builder={builder} kind="standoff" />
-      <FileSheetSubsection title={t("section.standoffs")}>
+      <FileSheetSubsection title={t("section.standoffs")} contentClassName="space-y-0.5">
         {spec.standoffs.length ? (
           spec.standoffs.map((group, index) => (
             <StandoffItem key={group.id} builder={builder} group={group} index={index} />
@@ -673,10 +700,6 @@ function boardLabel(board, t) {
   return text === key ? board.preset : text;
 }
 
-function SubHeading({ children }) {
-  return <FileSheetStatusText className="font-medium text-sidebar-foreground">{children}</FileSheetStatusText>;
-}
-
 function BoardPortEditor({ builder, board, port, index, update }) {
   const { t } = useBoxLanguage();
   const { dims } = builder;
@@ -694,16 +717,10 @@ function BoardPortEditor({ builder, board, port, index, update }) {
   const circle = port.shape === "circle";
   const cutout = board.mounted && dims.wallsEnabled ? boardPortCutout(dims, board, port) : null;
   return (
-    <>
-      <FileSheetInlineControlRow label={t("item.port", { n: index + 1 })}>
-        <IconButton
-          icon={X}
-          label={t("action.removePort")}
-          onClick={() => update((target) => {
-            target.ports = target.ports.filter((entry) => entry.id !== port.id);
-          })}
-        />
-      </FileSheetInlineControlRow>
+    <FileSheetDisclosure
+      label={t("item.port", { n: index + 1 })}
+      summary={`${t(`port.type.${port.type}`)} · ${t(`edge.${port.edge}`)}`}
+    >
       <FileSheetSelectRow
         label={t("field.portType")}
         value={port.type}
@@ -748,7 +765,17 @@ function BoardPortEditor({ builder, board, port, index, update }) {
           })}
         />
       ) : null}
-    </>
+      <FileSheetButtonRow>
+        <CompactButton
+          icon={X}
+          onClick={() => update((target) => {
+            target.ports = target.ports.filter((entry) => entry.id !== port.id);
+          })}
+        >
+          {t("action.removePort")}
+        </CompactButton>
+      </FileSheetButtonRow>
+    </FileSheetDisclosure>
   );
 }
 
@@ -768,133 +795,121 @@ function BoardItem({ builder, board, index }) {
   const moveTo = (x, y) => update((target, draft) => {
     Object.assign(target, clampBoardPosition(boxDimensions(draft), target, x, y));
   });
-  const summary = t("board.summary", {
-    width: formatNumber(board.width),
-    length: formatNumber(board.length),
-    holes: board.holes.length,
-    ports: board.ports.length
-  });
+  const mm = t("unit.mm");
+  const count = (items) => (items.length ? String(items.length) : t("summary.none"));
 
   return (
-    <SelectableItem selected={selected} onSelect={() => setSelection(itemSelection)}>
-      <FileSheetItemGroup
-        label={t("item.board", { n: index + 1, name: boardLabel(board, t) })}
-        className="!mt-0"
+    <ListItem
+      selected={selected}
+      label={t("item.board", { n: index + 1, name: boardLabel(board, t) })}
+      summary={`${board.mounted ? t("board.mounted") : t("board.notMounted")} · ${formatNumber(board.width)}×${formatNumber(board.length)} ${mm}`}
+      onSelectedChange={(open) => setSelection(open ? itemSelection : null)}
+    >
+      {board.mounted ? (
+        <>
+          <FileSheetFieldGrid columns={2}>
+            <NumberField label={t("field.centerX")} value={board.x} min={-2000} max={2000} step={0.5} onCommit={(x) => moveTo(x, board.y)} />
+            <NumberField label={t("field.centerY")} value={board.y} min={-2000} max={2000} step={0.5} onCommit={(y) => moveTo(board.x, y)} />
+          </FileSheetFieldGrid>
+          <FileSheetSelectRow
+            label={t("field.rotation")}
+            value={String(board.rotation)}
+            onValueChange={(value) => run(rotateBoard, Number(value))}
+            options={BOARD_ROTATIONS.map((rotation) => ({ value: String(rotation), label: `${rotation}°` }))}
+          />
+          <FileSheetButtonRow columns={3}>
+            <CompactButton icon={Magnet} disabled={!board.ports.length} onClick={() => run(snapBoardToWalls)}>
+              {t("action.snapBoard")}
+            </CompactButton>
+            <CompactButton icon={Maximize2} onClick={() => run(fitBoxToBoard)}>{t("action.fitBox")}</CompactButton>
+            <CompactButton icon={ArrowUpFromLine} onClick={() => run(unmountBoard)}>{t("action.unmountBoard")}</CompactButton>
+          </FileSheetButtonRow>
+        </>
+      ) : (
+        <FileSheetButtonRow>
+          <Button type="button" size="sm" className="h-7 text-[11px]" onClick={() => run(mountBoard)}>
+            <ArrowDownToLine className="size-3.5" aria-hidden="true" />
+            {t("action.mountBoard")}
+          </Button>
+        </FileSheetButtonRow>
+      )}
+
+      <FileSheetDisclosure
+        label={t("board.part.size")}
+        summary={`${formatNumber(board.width)}×${formatNumber(board.length)} ${mm} · ${t("board.clearanceShort", { value: formatNumber(board.clearance) })}`}
       >
-        <FileSheetControlRow label={board.mounted ? t("board.mounted") : t("board.notMounted")} value={summary} />
-        {board.mounted ? (
-          selected ? (
-            <>
-              <FileSheetFieldGrid columns={2}>
-                <NumberField label={t("field.centerX")} value={board.x} min={-2000} max={2000} step={0.5} onCommit={(x) => moveTo(x, board.y)} />
-                <NumberField label={t("field.centerY")} value={board.y} min={-2000} max={2000} step={0.5} onCommit={(y) => moveTo(board.x, y)} />
-              </FileSheetFieldGrid>
-              <FileSheetSelectRow
-                label={t("field.rotation")}
-                value={String(board.rotation)}
-                onValueChange={(value) => run(rotateBoard, Number(value))}
-                options={BOARD_ROTATIONS.map((rotation) => ({ value: String(rotation), label: `${rotation}°` }))}
+        <FileSheetFieldGrid columns={3}>
+          <NumberField label={t("field.boardWidth")} value={board.width} min={boardMinimumSize(board, "x")} max={400} step={0.5} onCommit={(width) => run(resizeBoard, { width })} />
+          <NumberField label={t("field.boardLength")} value={board.length} min={boardMinimumSize(board, "y")} max={400} step={0.5} onCommit={(length) => run(resizeBoard, { length })} />
+          <NumberField label={t("field.thickness")} value={board.thickness} min={0.4} max={5} step={0.1} onCommit={(thickness) => patch({ thickness })} />
+        </FileSheetFieldGrid>
+        <FileSheetFieldGrid columns={2}>
+          <NumberField label={t("field.boardClearance")} value={board.clearance} min={1} max={200} step={0.5} onCommit={(clearance) => patch({ clearance })} />
+          <NumberField label={t("field.componentHeight")} value={board.componentHeight} min={0} max={200} step={0.5} onCommit={(componentHeight) => patch({ componentHeight })} />
+        </FileSheetFieldGrid>
+        <FileSheetFieldGrid columns={2}>
+          <NumberField label={t("field.padDiameter")} value={board.padDiameter} min={2} max={30} step={0.5} onCommit={(padDiameter) => patch({ padDiameter })} />
+          <NumberField label={t("field.boreDiameter")} value={board.boreDiameter} min={0} max={board.padDiameter - 0.8} step={0.1} onCommit={(boreDiameter) => patch({ boreDiameter })} />
+        </FileSheetFieldGrid>
+      </FileSheetDisclosure>
+
+      <FileSheetDisclosure label={t("board.part.holes")} summary={count(board.holes)}>
+        <FileSheetStatusText>{t("board.holesHint")}</FileSheetStatusText>
+        {board.holes.map((hole, holeIndex) => {
+          const patchHole = (values) => update((target) => {
+            const entry = target.holes.find((candidate) => candidate.id === hole.id);
+            if (entry) {
+              Object.assign(entry, values);
+            }
+          });
+          return (
+            <FileSheetFieldGrid key={hole.id} columns={4} className="items-end">
+              <NumberField label={`${holeIndex + 1} · X`} value={hole.x} min={hole.diameter / 2} max={board.width - hole.diameter / 2} step={0.5} onCommit={(x) => patchHole({ x })} />
+              <NumberField label="Y" value={hole.y} min={hole.diameter / 2} max={board.length - hole.diameter / 2} step={0.5} onCommit={(y) => patchHole({ y })} />
+              <NumberField label="⌀" value={hole.diameter} min={0.5} max={12} step={0.1} onCommit={(diameter) => patchHole({ diameter })} />
+              <IconButton
+                icon={X}
+                label={t("action.removeHole")}
+                onClick={() => update((target) => {
+                  target.holes = target.holes.filter((entry) => entry.id !== hole.id);
+                })}
               />
-              <FileSheetButtonRow columns={3}>
-                <CompactButton icon={Magnet} disabled={!board.ports.length} onClick={() => run(snapBoardToWalls)}>
-                  {t("action.snapBoard")}
-                </CompactButton>
-                <CompactButton icon={Maximize2} onClick={() => run(fitBoxToBoard)}>{t("action.fitBox")}</CompactButton>
-                <CompactButton icon={ArrowUpFromLine} onClick={() => run(unmountBoard)}>{t("action.unmountBoard")}</CompactButton>
-              </FileSheetButtonRow>
-            </>
-          ) : null
-        ) : (
-          <>
-            <FileSheetButtonRow>
-              <Button
-                type="button"
-                size="sm"
-                className="h-7 text-[11px]"
-                onClick={() => {
-                  run(mountBoard);
-                  setSelection(itemSelection);
-                }}
-              >
-                <ArrowDownToLine className="size-3.5" aria-hidden="true" />
-                {t("action.mountBoard")}
-              </Button>
-            </FileSheetButtonRow>
-            {selected ? <FileSheetStatusText>{t("boards.mountHint")}</FileSheetStatusText> : null}
-          </>
-        )}
-
-        {selected ? (
-          <>
-            <FileSheetFieldGrid columns={3}>
-              <NumberField label={t("field.boardWidth")} value={board.width} min={boardMinimumSize(board, "x")} max={400} step={0.5} onCommit={(width) => run(resizeBoard, { width })} />
-              <NumberField label={t("field.boardLength")} value={board.length} min={boardMinimumSize(board, "y")} max={400} step={0.5} onCommit={(length) => run(resizeBoard, { length })} />
-              <NumberField label={t("field.thickness")} value={board.thickness} min={0.4} max={5} step={0.1} onCommit={(thickness) => patch({ thickness })} />
             </FileSheetFieldGrid>
-            <FileSheetFieldGrid columns={2}>
-              <NumberField label={t("field.boardClearance")} value={board.clearance} min={1} max={200} step={0.5} onCommit={(clearance) => patch({ clearance })} />
-              <NumberField label={t("field.componentHeight")} value={board.componentHeight} min={0} max={200} step={0.5} onCommit={(componentHeight) => patch({ componentHeight })} />
-            </FileSheetFieldGrid>
-            <FileSheetFieldGrid columns={2}>
-              <NumberField label={t("field.padDiameter")} value={board.padDiameter} min={2} max={30} step={0.5} onCommit={(padDiameter) => patch({ padDiameter })} />
-              <NumberField label={t("field.boreDiameter")} value={board.boreDiameter} min={0} max={board.padDiameter - 0.8} step={0.1} onCommit={(boreDiameter) => patch({ boreDiameter })} />
-            </FileSheetFieldGrid>
-
-            <SubHeading>{t("section.boardHoles")}</SubHeading>
-            {board.holes.map((hole, holeIndex) => {
-              const patchHole = (values) => update((target) => {
-                const entry = target.holes.find((candidate) => candidate.id === hole.id);
-                if (entry) {
-                  Object.assign(entry, values);
-                }
-              });
-              return (
-                <FileSheetFieldGrid key={hole.id} columns={4} className="items-end">
-                  <NumberField label={`${holeIndex + 1} · X`} value={hole.x} min={hole.diameter / 2} max={board.width - hole.diameter / 2} step={0.5} onCommit={(x) => patchHole({ x })} />
-                  <NumberField label="Y" value={hole.y} min={hole.diameter / 2} max={board.length - hole.diameter / 2} step={0.5} onCommit={(y) => patchHole({ y })} />
-                  <NumberField label="⌀" value={hole.diameter} min={0.5} max={12} step={0.1} onCommit={(diameter) => patchHole({ diameter })} />
-                  <IconButton
-                    icon={X}
-                    label={t("action.removeHole")}
-                    onClick={() => update((target) => {
-                      target.holes = target.holes.filter((entry) => entry.id !== hole.id);
-                    })}
-                  />
-                </FileSheetFieldGrid>
-              );
+          );
+        })}
+        <FileSheetButtonRow>
+          <CompactButton
+            icon={Plus}
+            disabled={board.holes.length >= MAX_BOARD_HOLES}
+            onClick={() => update((target) => {
+              target.holes.push(newBoardHole(target));
             })}
-            <FileSheetButtonRow>
-              <CompactButton
-                icon={Plus}
-                disabled={board.holes.length >= MAX_BOARD_HOLES}
-                onClick={() => update((target) => {
-                  target.holes.push(newBoardHole(target));
-                })}
-              >
-                {t("action.addHole")}
-              </CompactButton>
-            </FileSheetButtonRow>
+          >
+            {t("action.addHole")}
+          </CompactButton>
+        </FileSheetButtonRow>
+      </FileSheetDisclosure>
 
-            <SubHeading>{t("section.ports")}</SubHeading>
-            {board.ports.map((port, portIndex) => (
-              <BoardPortEditor key={port.id} builder={builder} board={board} port={port} index={portIndex} update={update} />
-            ))}
-            <FileSheetButtonRow>
-              <CompactButton
-                icon={Plus}
-                disabled={board.ports.length >= MAX_BOARD_PORTS}
-                onClick={() => update((target) => {
-                  target.ports.push(newBoardPort(target));
-                })}
-              >
-                {t("action.addPort")}
-              </CompactButton>
-            </FileSheetButtonRow>
-            <ItemActions builder={builder} selection={itemSelection} />
-          </>
-        ) : null}
-      </FileSheetItemGroup>
-    </SelectableItem>
+      <FileSheetDisclosure label={t("board.part.ports")} summary={count(board.ports)}>
+        <FileSheetStatusText>{t("board.portsHint")}</FileSheetStatusText>
+        {board.ports.map((port, portIndex) => (
+          <BoardPortEditor key={port.id} builder={builder} board={board} port={port} index={portIndex} update={update} />
+        ))}
+        <FileSheetButtonRow>
+          <CompactButton
+            icon={Plus}
+            disabled={board.ports.length >= MAX_BOARD_PORTS}
+            onClick={() => update((target) => {
+              target.ports.push(newBoardPort(target));
+            })}
+          >
+            {t("action.addPort")}
+          </CompactButton>
+        </FileSheetButtonRow>
+      </FileSheetDisclosure>
+
+      <ItemActions builder={builder} selection={itemSelection} />
+    </ListItem>
   );
 }
 
@@ -937,7 +952,7 @@ function BoardsTab({ builder }) {
         {full ? <FileSheetStatusText>{t("boards.full", { max: MAX_BOARDS })}</FileSheetStatusText> : null}
         {!full && preset ? <FileSheetStatusText>{t("boards.presetNote")}</FileSheetStatusText> : null}
       </FileSheetSubsection>
-      <FileSheetSubsection title={t("section.boards")}>
+      <FileSheetSubsection title={t("section.boards")} contentClassName="space-y-0.5">
         {spec.boards.length ? (
           spec.boards.map((board, index) => (
             <BoardItem key={board.id} builder={builder} board={board} index={index} />

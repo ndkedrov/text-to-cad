@@ -33,7 +33,9 @@ Tab body                    px-0, vertical stack of sections
   buttons (Reset, Flip, Play) takes no label.
 - Everyday settings stay visible. Progressive disclosure is allowed only when a
   gate switch turns a whole feature off (Floor, Grid, Environment, a light):
-  the switch stays, the dependent rows unmount.
+  the switch stays, the dependent rows unmount. The one other case is a panel
+  that edits a user-built list (the box builder's holes, standoffs and boards):
+  see Folding blocks.
 - A gate reaches every row it owns. Whether they unmount (Floor, Grid) or go
   disabled (Kinematics, Animation), the section picks one and applies it to all
   of them: one live control under an off switch reads as a control that still
@@ -228,6 +230,20 @@ an index to a concept and fills the panel with rules.
   row, the item label *is* that row's label (`Bend 2` on a slider row, its
   direction toggle inline beside the value box) and `FileSheetItemGroup` is not
   used. The group form exists for items that genuinely need several rows.
+
+### Folding blocks — `FileSheetDisclosure`
+
+A panel that edits a list the user builds up (the box builder's holes, standoff
+groups, boards and each board's ports) would otherwise grow into a wall of rows.
+There, each item folds to one label line — chevron, item label, and a muted
+summary on the control axis naming what is inside ("Front wall · USB-C 10×4.3")
+— and only the selected item is unfolded. The same block folds a group of rows
+needed only now and then (an array tool, view toggles, a board's hole list).
+
+- Folded items sit tight (`space-y-0.5`); an unfolded item shows its rows on the
+  standard 12px rhythm.
+- A folded block's summary is a state readout, never a sentence.
+- Settings used on every visit stay unfolded; fold only lists and occasional groups.
 
 ### 4. Field grid — `FileSheetFieldGrid` + `FileSheetField`
 
