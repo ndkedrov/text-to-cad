@@ -101,7 +101,13 @@ export function defaultBoxSpec() {
       lip: true,
       lipHeight: 4,
       lipThickness: 1.6,
-      clearance: 0.25
+      clearance: 0.25,
+      // Screw bosses in the inner corners, hanging `screwDepth` down from the wall top.
+      screws: false,
+      screwDepth: 10,
+      screwDiameter: 7,
+      screwPilot: 2.5,
+      screwHole: 3.4
     },
     holes: [],
     standoffs: [],
@@ -151,8 +157,40 @@ export function boxDimensions(spec) {
     lipWidth: innerWidth - 2 * lid.clearance,
     lipDepth: innerDepth - 2 * lid.clearance,
     lipRadius: Math.max(innerRadius - lid.clearance, 0),
+    lidScrews: lidEnabled && lid.screws,
+    screwDepth: lid.screwDepth,
+    screwDiameter: lid.screwDiameter,
+    screwPilot: lid.screwPilot,
+    screwHole: lid.screwHole,
     totalHeight: lidEnabled ? lidTop : wallTop
   };
+}
+
+// --- lid screws ----------------------------------------------------------------
+
+// How far a screw boss sinks into the walls it is fused to.
+const LID_SCREW_FUSE = 0.3;
+
+// The centre of a boss of this radius in the back-right inner corner (the other
+// corners mirror it): against both walls, or inside a corner rounded wider than it.
+export function lidScrewCorner(dims, radius) {
+  const halfX = dims.innerWidth / 2;
+  const halfY = dims.innerDepth / 2;
+  const inner = dims.innerRadius;
+  if (inner <= radius) {
+    return [halfX - radius + LID_SCREW_FUSE, halfY - radius + LID_SCREW_FUSE];
+  }
+  const along = (inner - radius + LID_SCREW_FUSE) / Math.SQRT2;
+  return [halfX - inner + along, halfY - inner + along];
+}
+
+// Box coordinates of the four lid screws: back-right, back-left, front-left, front-right.
+export function lidScrewPoints(dims) {
+  if (!dims.lidScrews) {
+    return [];
+  }
+  const [x, y] = lidScrewCorner(dims, dims.screwDiameter / 2);
+  return [[x, y], [-x, y], [-x, -y], [x, -y]].map(([px, py]) => [roundMm(px, 4), roundMm(py, 4)]);
 }
 
 function uniqueId(candidate, prefix, used) {
@@ -384,6 +422,14 @@ export function normalizeBoxSpec(raw) {
     ),
     clearance
   };
+  const screwDiameter = numberIn(sourceLid.screwDiameter, defaults.lid.screwDiameter, 4, 20);
+  Object.assign(lid, {
+    screws: booleanOr(sourceLid.screws, defaults.lid.screws),
+    screwDepth: numberIn(sourceLid.screwDepth, defaults.lid.screwDepth, 2, walls.height),
+    screwDiameter,
+    screwPilot: numberIn(sourceLid.screwPilot, defaults.lid.screwPilot, 0.5, screwDiameter - 2),
+    screwHole: numberIn(sourceLid.screwHole, defaults.lid.screwHole, 0.5, screwDiameter)
+  });
 
   const holeIds = new Set();
   const holes = (Array.isArray(source.holes) ? source.holes : [])
@@ -754,6 +800,13 @@ export function wallFlatHalf(dims, face) {
 export function boxSpecWarnings(spec) {
   const dims = boxDimensions(spec);
   const warnings = [];
+  if (dims.lidScrews) {
+    const radius = dims.screwDiameter / 2;
+    const [x, y] = lidScrewCorner(dims, radius);
+    if (x < radius + 0.5 || y < radius + 0.5) {
+      warnings.push({ key: "warning.lidScrewsTight", params: {} });
+    }
+  }
   spec.standoffs.forEach((group, index) => {
     const n = index + 1;
     const radius = group.outerDiameter / 2;

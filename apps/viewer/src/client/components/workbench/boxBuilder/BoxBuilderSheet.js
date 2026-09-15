@@ -395,6 +395,22 @@ function LidTab({ builder }) {
           ) : null}
         </FileSheetSubsection>
       ) : null}
+      {spec.lid.enabled ? (
+        <FileSheetSubsection
+          title={t("section.lidScrews")}
+          trailing={<FileSheetBooleanToggle checked={spec.lid.screws} onCheckedChange={set("screws")} ariaLabel={t("section.lidScrews")} />}
+        >
+          {spec.lid.screws ? (
+            <>
+              <FileSheetStatusText>{t("lid.screwsHint")}</FileSheetStatusText>
+              <NumberRow label={t("field.screwDepth")} value={spec.lid.screwDepth} min={2} max={spec.walls.height} step={0.5} onCommit={set("screwDepth")} />
+              <NumberRow label={t("field.screwDiameter")} value={spec.lid.screwDiameter} min={4} max={20} step={0.5} onCommit={set("screwDiameter")} />
+              <NumberRow label={t("field.screwPilot")} value={spec.lid.screwPilot} min={0.5} max={spec.lid.screwDiameter - 2} step={0.1} onCommit={set("screwPilot")} />
+              <NumberRow label={t("field.screwHole")} value={spec.lid.screwHole} min={0.5} max={spec.lid.screwDiameter} step={0.1} onCommit={set("screwHole")} />
+            </>
+          ) : null}
+        </FileSheetSubsection>
+      ) : null}
     </div>
   );
 }
