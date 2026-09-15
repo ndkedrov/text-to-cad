@@ -21,6 +21,8 @@ import {
   faceAxisLabels,
   faceFrame,
   holeAvailable,
+  holeLift,
+  isWallFace,
   roundMm,
   standoffPoints
 } from "@/workbench/boxBuilder/boxSpec.js";
@@ -763,7 +765,8 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
             }
           });
           const [labelU, labelV] = faceAxisLabels(item.face).map((key) => latestRef.current.t(key));
-          text = `${labelU} ${formatMm(target.u)} · ${labelV} ${formatMm(target.v)} ${latestRef.current.t("unit.mm")}`;
+          const shownV = isWallFace(item.face) ? holeLift(current.dims, { ...item, v: target.v }) : target.v;
+          text = `${labelU} ${formatMm(target.u)} · ${labelV} ${formatMm(shownV)} ${latestRef.current.t("unit.mm")}`;
         }
         setReadout({ x: event.clientX, y: event.clientY, text });
         return;

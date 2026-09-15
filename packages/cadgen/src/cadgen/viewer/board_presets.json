@@ -2011,6 +2011,541 @@
    ]
   },
   {
+   "id": "adafruitCanPal",
+   "name": "Adafruit CAN Pal TJA1051T/3",
+   "category": "interface",
+   "width": 20.32,
+   "length": 20.32,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 10,
+   "padDiameter": 5.5,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 17.78,
+     "diameter": 2.5
+    },
+    {
+     "x": 17.78,
+     "y": 17.78,
+     "diameter": 2.5
+    }
+   ],
+   "ports": [
+    {
+     "type": "custom",
+     "edge": "back",
+     "offset": 10.16,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 10.5,
+     "height": 8.5,
+     "radius": 0,
+     "overhang": 0,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "adafruitCanFeatherWing",
+   "name": "Adafruit CAN Bus FeatherWing MCP2515",
+   "category": "interface",
+   "width": 50.8,
+   "length": 22.86,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 10,
+   "padDiameter": 5.5,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 2.54,
+     "y": 20.32,
+     "diameter": 2.5
+    },
+    {
+     "x": 48.26,
+     "y": 2.54,
+     "diameter": 2.54
+    },
+    {
+     "x": 48.26,
+     "y": 20.32,
+     "diameter": 2.54
+    }
+   ],
+   "ports": [
+    {
+     "type": "custom",
+     "edge": "left",
+     "offset": 11.43,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 10.5,
+     "height": 8.5,
+     "radius": 0,
+     "overhang": 0,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "sparkfunCanBusShield",
+   "name": "SparkFun CAN-BUS Shield",
+   "category": "interface",
+   "width": 53.34,
+   "length": 59.69,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 12.5,
+   "padDiameter": 5,
+   "boreDiameter": 2,
+   "holes": [],
+   "ports": [
+    {
+     "type": "db9",
+     "edge": "back",
+     "offset": 26.67,
+     "elevation": 0.5,
+     "shape": "rect",
+     "width": 19.5,
+     "height": 11.5,
+     "radius": 1,
+     "overhang": 0.61,
+     "margin": 0.5
+    },
+    {
+     "type": "microSd",
+     "edge": "front",
+     "offset": 22.01,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 12,
+     "height": 2,
+     "radius": 0.3,
+     "overhang": 0,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "sparkfunRs485Breakout",
+   "name": "SparkFun Transceiver Breakout RS-485",
+   "category": "interface",
+   "width": 22.86,
+   "length": 27.94,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 13.5,
+   "padDiameter": 6.3,
+   "boreDiameter": 2.6,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 2.54,
+     "diameter": 3.302
+    },
+    {
+     "x": 20.32,
+     "y": 2.54,
+     "diameter": 3.302
+    },
+    {
+     "x": 2.54,
+     "y": 25.4,
+     "diameter": 3.302
+    },
+    {
+     "x": 20.32,
+     "y": 25.4,
+     "diameter": 3.302
+    }
+   ],
+   "ports": [
+    {
+     "type": "rj45",
+     "edge": "right",
+     "offset": 13.97,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 16,
+     "height": 13.5,
+     "radius": 0.5,
+     "overhang": 0.46,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "sparkfunUsbRs485",
+   "name": "SparkFun USB to RS-485 Converter",
+   "category": "interface",
+   "width": 39.37,
+   "length": 22.86,
+   "thickness": 1.6,
+   "clearance": 5,
+   "componentHeight": 13.5,
+   "padDiameter": 6.3,
+   "boreDiameter": 2.6,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 2.54,
+     "diameter": 3.302
+    },
+    {
+     "x": 24.13,
+     "y": 2.54,
+     "diameter": 3.302
+    },
+    {
+     "x": 2.54,
+     "y": 20.32,
+     "diameter": 3.302
+    },
+    {
+     "x": 24.13,
+     "y": 20.32,
+     "diameter": 3.302
+    }
+   ],
+   "ports": [
+    {
+     "type": "miniUsb",
+     "edge": "left",
+     "offset": 11.43,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 7.8,
+     "height": 4,
+     "radius": 0.5,
+     "overhang": 0.82,
+     "margin": 0.5
+    },
+    {
+     "type": "rj45",
+     "edge": "right",
+     "offset": 11.43,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 16,
+     "height": 13.5,
+     "radius": 0.5,
+     "overhang": 0.46,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "adafruitRs232FullPinout",
+   "name": "Adafruit RS-232 Full Pinout Level Shifter",
+   "category": "interface",
+   "width": 31.75,
+   "length": 29.337,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 12.5,
+   "padDiameter": 6,
+   "boreDiameter": 2.2,
+   "holes": [
+    {
+     "x": 3.81,
+     "y": 11.43,
+     "diameter": 3.0
+    },
+    {
+     "x": 27.94,
+     "y": 11.43,
+     "diameter": 3.0
+    }
+   ],
+   "ports": [
+    {
+     "type": "db9",
+     "edge": "back",
+     "offset": 15.875,
+     "elevation": 0.5,
+     "shape": "rect",
+     "width": 19.5,
+     "height": 11.5,
+     "radius": 1,
+     "overhang": 0.25,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "sparkfunRs232ShifterSmd",
+   "name": "SparkFun RS232 Shifter SMD",
+   "category": "interface",
+   "width": 22.86,
+   "length": 30.48,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 12.5,
+   "padDiameter": 5,
+   "boreDiameter": 2,
+   "holes": [],
+   "ports": [
+    {
+     "type": "db9",
+     "edge": "left",
+     "offset": 15.24,
+     "elevation": 0.5,
+     "shape": "rect",
+     "width": 19.5,
+     "height": 11.5,
+     "radius": 1,
+     "overhang": 0,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "adafruitCp2104Friend",
+   "name": "Adafruit CP2104 Friend USB to Serial",
+   "category": "interface",
+   "width": 17.78,
+   "length": 27.94,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 2.6,
+   "padDiameter": 5.2,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.032,
+     "y": 25.908,
+     "diameter": 2.2
+    },
+    {
+     "x": 15.748,
+     "y": 25.908,
+     "diameter": 2.2
+    }
+   ],
+   "ports": [
+    {
+     "type": "microUsb",
+     "edge": "back",
+     "offset": 8.89,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 8,
+     "height": 3,
+     "radius": 0.6,
+     "overhang": 1.3,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "adafruitFt232hUsbC",
+   "name": "Adafruit FT232H Breakout USB-C",
+   "category": "interface",
+   "width": 38.1,
+   "length": 22.86,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 3.3,
+   "padDiameter": 5.5,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 35.56,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 2.54,
+     "y": 20.32,
+     "diameter": 2.5
+    },
+    {
+     "x": 35.56,
+     "y": 20.32,
+     "diameter": 2.5
+    }
+   ],
+   "ports": [
+    {
+     "type": "usbC",
+     "edge": "left",
+     "offset": 11.43,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 9,
+     "height": 3.3,
+     "radius": 1.2,
+     "overhang": 0.64,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "sparkfunSerialBasicCh340c",
+   "name": "SparkFun Serial Basic CH340C USB-C",
+   "category": "interface",
+   "width": 21.59,
+   "length": 16.51,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 3.3,
+   "padDiameter": 5,
+   "boreDiameter": 2,
+   "holes": [],
+   "ports": [
+    {
+     "type": "usbC",
+     "edge": "left",
+     "offset": 8.26,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 9,
+     "height": 3.3,
+     "radius": 1.2,
+     "overhang": 1.35,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "sparkfunFtdiBasic5v",
+   "name": "SparkFun FTDI Basic Breakout 5V",
+   "category": "interface",
+   "width": 22.86,
+   "length": 17.272,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 4,
+   "padDiameter": 5,
+   "boreDiameter": 2,
+   "holes": [],
+   "ports": [
+    {
+     "type": "miniUsb",
+     "edge": "right",
+     "offset": 8.64,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 7.8,
+     "height": 4,
+     "radius": 0.5,
+     "overhang": 1.33,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "adafruitBss138LevelShifter",
+   "name": "Adafruit 4-ch I2C-safe Level Shifter BSS138",
+   "category": "interface",
+   "width": 15.24,
+   "length": 20.447,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 1.5,
+   "padDiameter": 5,
+   "boreDiameter": 2,
+   "holes": [],
+   "ports": []
+  },
+  {
+   "id": "adafruitIso1540Isolator",
+   "name": "Adafruit ISO1540 I2C Isolator",
+   "category": "interface",
+   "width": 25.4,
+   "length": 17.78,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 3,
+   "padDiameter": 5.5,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 22.86,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 2.54,
+     "y": 15.24,
+     "diameter": 2.5
+    },
+    {
+     "x": 22.86,
+     "y": 15.24,
+     "diameter": 2.5
+    }
+   ],
+   "ports": []
+  },
+  {
+   "id": "adafruitEthernetFeatherWing",
+   "name": "Adafruit Ethernet FeatherWing W5500",
+   "category": "interface",
+   "width": 55.88,
+   "length": 22.86,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 13.5,
+   "padDiameter": 5.5,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 2.54,
+     "y": 20.32,
+     "diameter": 2.5
+    },
+    {
+     "x": 48.26,
+     "y": 2.54,
+     "diameter": 2.54
+    },
+    {
+     "x": 48.26,
+     "y": 20.32,
+     "diameter": 2.54
+    }
+   ],
+   "ports": [
+    {
+     "type": "rj45",
+     "edge": "right",
+     "offset": 11.4,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 16,
+     "height": 13.5,
+     "radius": 0.5,
+     "overhang": 3.7,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
    "id": "adafruitMicroSdBreakoutPlus",
    "name": "Adafruit MicroSD Card Breakout Board+ (254)",
    "category": "storage",
