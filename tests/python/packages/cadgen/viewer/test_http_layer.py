@@ -195,7 +195,7 @@ class ServerInfo(HttpLayerTestCase):
         self.assertEqual(info["app"], "cad-viewer")
         self.assertEqual(info["backend"], "local-fs")
         self.assertEqual(info["serverMode"], "serve")
-        self.assertEqual(info["serverFeatures"], ["path-directory"])
+        self.assertEqual(info["serverFeatures"], ["path-directory", "box-builder"])
         self.assertEqual(info["stepArtifactGenerationAvailable"], False)
         self.assertEqual(info["pid"], os.getpid())
         self.assertEqual(info["port"], self.fixture.port)

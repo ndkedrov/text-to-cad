@@ -21,13 +21,17 @@ preflight fail. Do not add them.
 
 from __future__ import annotations
 
+import base64
+import hmac
 import os
 import stat
 import threading
 import time
 from pathlib import Path
 
-from .backend import ForbiddenAssetError, LocalAssetBackend
+from .backend import CAD_CATALOG_SCHEMA_VERSION, ForbiddenAssetError, LocalAssetBackend
+from .boxes import BOX_OUTPUT_CONTENT_TYPES, BoxBuilder, BoxError, BoxLimits
+from .boxes import MAX_REQUEST_BYTES as BOX_MAX_REQUEST_BYTES
 from .cadgen_ops import create_cadgen_ops
 from .content_types import content_type_for_static_asset
 from .encoding import UriError, strict_decode_uri_component
@@ -49,8 +53,12 @@ __all__ = [
 ]
 
 POST_GUARD_HEADER = "x-cadgen-viewer"
-LOCAL_SERVER_FEATURES = ["path-directory"]
+LOCAL_SERVER_FEATURES = ["path-directory", "box-builder"]
 _LOOPBACK_NAMES = frozenset({"127.0.0.1", "localhost", "::1"})
+
+# Hosted mode: the viewer sits behind an authenticating proxy that names the
+# signed-in account in this request header (oauth2-proxy: X-Forwarded-Email).
+HOSTED_USER_HEADER = "x-forwarded-email"
 
 TESS_CACHE_ROUTE_PREFIX = "/__tess_cache/"
 TESS_CACHE_BATCH_PATH = "/__tess_cache/batch"
@@ -162,6 +170,14 @@ def identity_token() -> str:
     return f"{read_viewer_version()}:{newest}"
 
 
+def _https_url(value) -> str:
+    """``value`` if it is an absolute https URL, else ``""``: a link the client renders."""
+    text = str(value or "").strip()
+    if len(text) > 500 or not text.lower().startswith("https://") or any(ch.isspace() for ch in text):
+        return ""
+    return text
+
+
 def _is_ascii_digits(value: str) -> bool:
     """JS ``/^\\d+$/``: ASCII only.
 
@@ -195,6 +211,30 @@ class CadApp:
         self.started_at = time.time()
         self.lock = threading.Lock()
         self.ops = create_cadgen_ops(root_path)
+        # CADGEN_VIEWER_HOSTED=1: an internet-facing box builder for signed-in
+        # accounts. Only the client and the box routes exist; every file, store,
+        # catalog, compile and cache route of the local viewer is absent. It
+        # trusts the account header, so it must be reachable ONLY through the
+        # proxy that sets it.
+        self.hosted = os.environ.get("CADGEN_VIEWER_HOSTED", "").strip().lower() in {"1", "true", "yes"}
+        self.user_header = HOSTED_USER_HEADER
+        # Proof a request came through the sign-in proxy (oauth2-proxy sends it as the
+        # Basic-auth password). Without it, anything that reaches this process
+        # directly could name any account in the header above.
+        self.proxy_secret = os.environ.get("CADGEN_VIEWER_PROXY_SECRET", "")
+        # The deployment's own project links, shown by the client in place of the
+        # upstream ones. Only https URLs are passed on.
+        self.source_url = _https_url(os.environ.get("CADGEN_VIEWER_SOURCE_URL"))
+        self.source_version = str(os.environ.get("CADGEN_VIEWER_SOURCE_VERSION") or "").strip()[:64]
+        self.source_version_url = _https_url(os.environ.get("CADGEN_VIEWER_SOURCE_VERSION_URL"))
+        self.telegram_url = _https_url(os.environ.get("CADGEN_VIEWER_TELEGRAM_URL"))
+        # The box builder: the one writer into the root (boxes/...), whose kernel
+        # work runs in bounded child processes, never in this server.
+        self.boxes = BoxBuilder(
+            root_path,
+            limits=BoxLimits.from_env(hosted=self.hosted),
+            expose_paths=not self.hosted,
+        )
 
     # --- server info ------------------------------------------------------
 
@@ -311,6 +351,10 @@ class CadApp:
         pathname = request.path
         query = request.query
 
+        if self.hosted:
+            self._handle_hosted(request, response)
+            return
+
         if method == "GET":
             if self._rejected_by_host_check(request, response):
                 return
@@ -327,7 +371,7 @@ class CadApp:
                 return
             try:
                 if pathname == "/__cad/server":
-                    response.send_json(200, self.server_info())
+                    response.send_json(200, self._server_info_for(request))
                 elif pathname == "/__cad/catalog":
                     self._handle_catalog(request, response)
                 elif pathname == "/__cad/artifact":
@@ -336,6 +380,14 @@ class CadApp:
                     self._handle_store_asset(request, response, query)
                 elif pathname == "/__cad/asset":
                     self._handle_asset(request, response, query)
+                elif pathname == "/__cad/boxes":
+                    self._box_call(response, lambda: self.boxes.list_boxes(None))
+                elif pathname == "/__cad/boxes/spec":
+                    self._box_call(response, lambda: self.boxes.load(query.get("name"), None))
+                elif pathname == "/__cad/boxes/status":
+                    self._box_call(response, lambda: self.boxes.status(query.get("name"), None))
+                elif pathname == "/__cad/boxes/file":
+                    self._handle_box_file(response, query, None)
                 else:
                     # An unrecognised /__cad/* path is a bad API call, not a
                     # page. Falling through to the SPA answered typo'd and
@@ -358,6 +410,8 @@ class CadApp:
             try:
                 if pathname == "/__cad/artifact":
                     self._handle_artifact_build(request, response, query)
+                elif pathname == "/__cad/boxes/save":
+                    self._handle_box_save(request, response, query, None)
                 elif pathname == TESS_CACHE_BATCH_PATH:
                     # Matched BEFORE the prefix branch: /__tess_cache/batch
                     # matches both.
@@ -379,6 +433,125 @@ class CadApp:
         response.send_empty(405, [("allow", "GET, HEAD, POST")])
 
     # --- placeholders filled by later steps of the port -------------------
+
+    # --- box builder --------------------------------------------------------
+
+    def _server_info_for(self, request) -> dict:
+        info = self.server_info()
+        box_builder = {
+            "mode": "hosted" if self.hosted else "local",
+            "dailyNewBoxes": self.boxes.limits.daily_new_boxes,
+            "dailyBuilds": self.boxes.limits.daily_builds,
+            "sourceUrl": self.source_url,
+            "sourceVersion": self.source_version,
+            "sourceVersionUrl": self.source_version_url,
+            "telegramUrl": self.telegram_url,
+        }
+        if self.hosted:
+            # Nothing about the machine goes to the internet; the client needs none of it.
+            info.update(
+                rootPath="", rootName="3dmaker", packageDir="", pid=0, identityToken="",
+                url="", port=0, viewerVersion="", startedAt=0,
+            )
+            box_builder["account"] = request.header(self.user_header).strip() or None
+        info["boxBuilder"] = box_builder
+        return info
+
+    def _box_call(self, response, call) -> None:
+        try:
+            payload = call()
+        except BoxError as error:
+            response.send_json(error.status, {"ok": False, "error": str(error), "code": error.code})
+            return
+        response.send_json(200, payload)
+
+    def _handle_box_save(self, request, response, query, owner) -> None:
+        # Refused on the declared length, before a byte of the body is read.
+        try:
+            declared = int(request.header("content-length") or 0)
+        except ValueError:
+            declared = 0
+        if declared > BOX_MAX_REQUEST_BYTES:
+            response.send_json(413, {"ok": False, "error": "box request is too large", "code": "too_large"})
+            return
+        self._box_call(response, lambda: self.boxes.save(query.get("name"), request.body(), owner=owner))
+
+    def _handle_box_file(self, response, query, owner) -> None:
+        try:
+            path = self.boxes.output_file(query.get("name"), query.get("part"), query.get("format"), owner)
+            stat_result = os.stat(path)
+        except BoxError as error:
+            response.send_json(error.status, {"ok": False, "error": str(error), "code": error.code})
+            return
+        except OSError:
+            response.send_json(404, {"ok": False, "error": "no such file", "code": "not_found"})
+            return
+        response.stream_file(
+            str(path),
+            stat_result,
+            BOX_OUTPUT_CONTENT_TYPES[path.suffix[1:].lower()],
+            extra_headers=[("content-disposition", f'attachment; filename="{path.name}"')],
+        )
+
+    def _came_through_proxy(self, request) -> bool:
+        scheme, _, token = request.header("authorization").strip().partition(" ")
+        if scheme.lower() != "basic" or not token.strip():
+            return False
+        try:
+            decoded = base64.b64decode(token.strip(), validate=True).decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            return False
+        _, _, password = decoded.partition(":")
+        return hmac.compare_digest(password.encode("utf-8"), self.proxy_secret.encode("utf-8"))
+
+    def _handle_hosted(self, request, response) -> None:
+        """The internet-facing surface: the client, and the box builder for the
+        account the authenticating proxy names. No host check (the proxy's Host is
+        the public name), no catalog walk, no file/store/compile/cache routes, and
+        no server detail in any error."""
+        method = request.method
+        pathname = request.path
+        query = request.query
+        if self.proxy_secret and not self._came_through_proxy(request):
+            response.send_json(401, {"ok": False, "error": "sign in required", "code": "unauthorized"})
+            return
+        if method == "POST" and self._rejected_as_cross_site_post(request, response):
+            return
+        if not (pathname.startswith("/__cad/") or pathname.startswith(TESS_CACHE_ROUTE_PREFIX)):
+            if method == "GET":
+                self._serve_dist(request, response)
+            else:
+                response.send_empty(405, [("allow", "GET")])
+            return
+        if method == "GET" and pathname == "/__cad/server":
+            response.send_json(200, self._server_info_for(request))
+            return
+        if method == "GET" and pathname == "/__cad/catalog":
+            response.send_json(200, {"schemaVersion": CAD_CATALOG_SCHEMA_VERSION, "entries": []})
+            return
+        box_reads = {"/__cad/boxes", "/__cad/boxes/spec", "/__cad/boxes/status", "/__cad/boxes/file"}
+        is_box_read = method == "GET" and pathname in box_reads
+        is_box_save = method == "POST" and pathname == "/__cad/boxes/save"
+        if not (is_box_read or is_box_save):
+            response.send_json(404, {"error": "Not found"})
+            return
+        owner = request.header(self.user_header).strip()
+        if not owner:
+            response.send_json(401, {"ok": False, "error": "sign in required", "code": "unauthorized"})
+            return
+        try:
+            if pathname == "/__cad/boxes":
+                self._box_call(response, lambda: self.boxes.list_boxes(owner))
+            elif pathname == "/__cad/boxes/spec":
+                self._box_call(response, lambda: self.boxes.load(query.get("name"), owner))
+            elif pathname == "/__cad/boxes/status":
+                self._box_call(response, lambda: self.boxes.status(query.get("name"), owner))
+            elif pathname == "/__cad/boxes/file":
+                self._handle_box_file(response, query, owner)
+            else:
+                self._handle_box_save(request, response, query, owner)
+        except Exception:  # noqa: BLE001 - never a server detail to the internet
+            response.send_json(500, {"ok": False, "error": "internal error", "code": "internal"})
 
     def _handle_catalog(self, request, response):
         response.send_json(200, self.backend.read_catalog())

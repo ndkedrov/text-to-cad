@@ -72,7 +72,8 @@ launch without asking; `--new` remains the escape for forcing a second instance 
 SAME code.
 
 Deliberately NOT adopted from the Jupyter model it parallels: **no auth token** (this
-server executes nothing and serves read-only inside one root; the Host-header
+server serves read-only inside one root, and its one writer, the box builder below,
+accepts numbers in a fixed grammar, never code; the Host-header
 rebinding guard and the preflight-forcing POST header cover the actual threat model),
 and **no HTTP shutdown route** (`stop`'s identity-probed signal can never kill a
 port-squatter, which is stronger than an authenticated endpoint).
@@ -198,6 +199,36 @@ client badge renders), and the status route serves it through the same reader
 used for CLI builds (`build_progress_snapshot` in `build_progress.py`). One reader,
 every producer.
 
+## Box builder
+
+The client's box builder (parametric printable boxes: floor, walls, a lid with a
+locating lip, through-holes, PCB standoffs) keeps ONE geometry description. The
+client turns its spec into a CSG plan (`src/client/workbench/boxBuilder/boxPlan.js`),
+previews that plan in the browser with manifold, and saves the same plan here.
+`cadgen.viewer.boxes` checks it against the plan grammar (`cadgen.box_plan`),
+writes `boxes/<name>/<name>.box.json` plus one generated model script per part,
+and builds each script as a child process (`python <script>`, with a wall-clock
+timeout that kills the process tree, CPU and file-size rlimits, and at most
+`CADGEN_BOX_MAX_BUILDS` at once behind a bounded queue). The scripts evaluate the
+plan with build123d (`cadgen.box_csg`) and write STEP/STL/3MF beside themselves,
+the lid laid plate-down for printing. The server process never loads the kernel.
+
+**Hosted mode** (`CADGEN_VIEWER_HOSTED=1`) runs the builder on the internet behind
+an authenticating proxy such as oauth2-proxy:
+
+- Only the client and the box routes exist. The catalog is always empty; asset,
+  store, artifact and tessellation-cache routes answer 404.
+- The account is `X-Forwarded-Email`. With `CADGEN_VIEWER_PROXY_SECRET` set, every
+  request must carry that secret as its Basic-auth password, so the process has to
+  be reachable only through the proxy.
+- Each account gets `boxes/u-<sha256 of the e-mail>/`. Daily limits apply
+  (`CADGEN_BOX_DAILY_NEW`, `CADGEN_BOX_DAILY_BUILDS`, `CADGEN_BOX_GLOBAL_DAILY_NEW`),
+  as do a per-account disk budget, a free-disk floor, one active build per account
+  and a throwaway cadgen cache per build.
+- `/__cad/server` carries no machine detail. `CADGEN_VIEWER_SOURCE_URL`,
+  `CADGEN_VIEWER_SOURCE_VERSION`, `CADGEN_VIEWER_SOURCE_VERSION_URL` and
+  `CADGEN_VIEWER_TELEGRAM_URL` (https only) are the project links the client shows.
+
 ## Routes
 
 - `GET /__cad/server`
@@ -205,6 +236,9 @@ every producer.
 - `GET /__cad/asset?file=...`
 - `GET /__cad/artifact?file=...` (status)
 - `POST /__cad/artifact?file=...` (build; `&force=1` to rebuild)
+- `GET /__cad/boxes`, `GET /__cad/boxes/spec?name=...`, `GET /__cad/boxes/status?name=...`,
+  `GET /__cad/boxes/file?name=...&part=base|lid&format=step|stl|3mf`,
+  `POST /__cad/boxes/save?name=...`: the box builder (above)
 - `GET /__tess_cache/<key>.tess`, `POST /__tess_cache/<key>.tess`,
   `POST /__tess_cache/batch` — the shared component-tessellation cache
   (`<cache root>/meshes`, the same store the export CLI and the snapshot host

@@ -303,7 +303,11 @@ export function FileSheetValueInput({
   ariaLabel,
   inputMode = "decimal",
   className,
-  style
+  style,
+  // Optional ArrowUp/ArrowDown stepping (Shift x10), committed live and clamped.
+  step,
+  min,
+  max
 }) {
   const inputRef = useRef(null);
   const displayValue = String(value ?? "");
@@ -383,6 +387,20 @@ export function FileSheetValueInput({
         onValueCommit?.(draftValue);
       }}
       onKeyDown={(event) => {
+        if ((event.key === "ArrowUp" || event.key === "ArrowDown") && Number(step) > 0) {
+          event.preventDefault();
+          const currentValue = parseFileSheetNumberInput(draftValue, {
+            fallback: parseFileSheetNumberInput(displayValue)
+          });
+          const increment = Number(step) * (event.shiftKey ? 10 : 1) * (event.key === "ArrowUp" ? 1 : -1);
+          const nextValue = parseFileSheetNumberInput(
+            String(Math.round((currentValue + increment) * 1e6) / 1e6),
+            { min, max }
+          );
+          setDraftValue(String(nextValue));
+          onValueCommit?.(String(nextValue));
+          return;
+        }
         if (event.key === "Enter") {
           event.currentTarget.blur();
         }

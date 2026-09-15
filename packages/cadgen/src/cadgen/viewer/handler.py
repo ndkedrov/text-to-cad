@@ -70,6 +70,11 @@ def make_handler_class(app):
         # carries an explicit content-length.
         protocol_version = "HTTP/1.1"
 
+        # A connection that stays silent this long is dropped: without a timeout a
+        # client that opens a socket and never finishes its request holds a thread
+        # for good. handle_one_request already treats socket.timeout as a hang-up.
+        timeout = 60
+
         # No Server header is emitted anywhere: every response goes through
         # send_response_only + explicit send_header, and version_string() feeds
         # only send_response(), which is never called. Node sends none either.

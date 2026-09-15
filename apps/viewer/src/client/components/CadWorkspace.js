@@ -52,6 +52,9 @@ import {
 } from "@/workbench/artifactProgress.js";
 import FloatingToolBar from "./workbench/FloatingToolBar";
 import CadWorkspaceTopBar from "./workbench/CadWorkspaceTopBar";
+import BoxBuilderSheet from "./workbench/boxBuilder/BoxBuilderSheet";
+import BoxBuilderViewport from "./workbench/boxBuilder/BoxBuilderViewport";
+import { useBoxBuilder } from "./workbench/boxBuilder/useBoxBuilder";
 import CadWorkspaceHome from "./workbench/CadWorkspaceHome";
 import { useCadAssets } from "./workbench/hooks/useCadAssets";
 import {
@@ -261,7 +264,7 @@ import {
   URDF_JOINT_ANIMATION_EPSILON,
   URDF_JOINT_ANIMATION_FOLLOW_MS
 } from "cadgen-js/lib/urdf/jointAnimation";
-import { requestArtifactStatus } from "../workbench/cadManifestStore.js";
+import { refreshCadCatalog, requestArtifactStatus } from "../workbench/cadManifestStore.js";
 import {
   FILE_STATUS_LEVELS,
   buildFileStatusItems,
@@ -1122,6 +1125,28 @@ export default function CadWorkspace({
   const themeSettings = themeState.settings;
   const themeId = themeState.themeId;
   const [themeEditing, setThemeEditing] = useState(false);
+  // The box builder takes over the viewport and the right-hand panel while open.
+  // It is the landing page when no file is asked for; after that the tab's
+  // session remembers whether it was open, so a reload lands back where it was.
+  const [boxBuilderOpen, setBoxBuilderOpen] = useState(() => {
+    try {
+      const remembered = window.sessionStorage.getItem("cad-viewer:box-builder:open");
+      if (remembered === "1" || remembered === "0") {
+        return remembered === "1";
+      }
+      return !new URLSearchParams(window.location.search).get("file");
+    } catch {
+      return false;
+    }
+  });
+  const boxBuilder = useBoxBuilder();
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem("cad-viewer:box-builder:open", boxBuilderOpen ? "1" : "0");
+    } catch {
+      // Session storage blocked: the builder simply starts closed next time.
+    }
+  }, [boxBuilderOpen]);
   // Which way a drawing is being looked at. Session state on purpose: it is a way of looking
   // at the model open right now, not a preference worth outliving the tab.
   const [drawingViewMode, setDrawingViewMode] = useState("3d");
@@ -2695,6 +2720,7 @@ export default function CadWorkspace({
   // on the 3D viewport. Anything that sizes or offsets the panel uses this.
   const desktopRightPanelOpen = isDesktop && !previewMode && (
     themeEditing ||
+    boxBuilderOpen ||
     (tabToolsOpen && !!selectedFileSheetKind && selectedFileSheetHasSections)
   );
   const effectiveSidebarOpen = sidebarOpen && !previewMode;
@@ -6599,10 +6625,43 @@ export default function CadWorkspace({
       writeCadParam(cadFileParamForEntry(entry), { history: "push" });
     }
     activateEntryTab(key);
+    setBoxBuilderOpen(false);
     if (!isDesktop) {
       setSidebarOpen(false);
     }
   }, [activateEntryTab, entryMap, isDesktop, writeCadParam]);
+
+  const handleToggleBoxBuilder = useCallback(() => {
+    setBoxBuilderOpen((current) => {
+      if (!current) {
+        setThemeEditing(false);
+        setViewerAlertOpen(false);
+      }
+      return !current;
+    });
+  }, []);
+
+  // A file the box builder wrote: selected as soon as the catalog lists it.
+  const [pendingBoxFile, setPendingBoxFile] = useState("");
+  const handleOpenBoxFile = useCallback((file) => {
+    setPendingBoxFile(String(file || "").replace(/\\/g, "/"));
+    refreshCadCatalog();
+  }, []);
+  useEffect(() => {
+    if (!pendingBoxFile) {
+      return;
+    }
+    const entry = catalogEntries.find((candidate) => {
+      const rootRelative = String(candidate?.rootRelativeFile || "").replace(/\\/g, "/");
+      const absolute = String(candidate?.file || "").replace(/\\/g, "/");
+      return rootRelative === pendingBoxFile || absolute.endsWith(`/${pendingBoxFile}`);
+    });
+    if (!entry) {
+      return;
+    }
+    setPendingBoxFile("");
+    handleSelectEntry(fileKey(entry));
+  }, [catalogEntries, handleSelectEntry, pendingBoxFile]);
 
   const handleRevealEntryInExplorerView = useCallback((entry) => {
     const targetKey = fileKey(entry);
@@ -6946,7 +7005,7 @@ export default function CadWorkspace({
     activeReferenceTreeNodeId;
   const canUndoDrawing = drawingUndoStack.length > 0;
   const canRedoDrawing = drawingRedoStack.length > 0;
-  const fileSheetOpen = !!selectedFileSheetKind && selectedFileSheetHasSections && tabToolsOpen && !previewMode && !themeEditing;
+  const fileSheetOpen = !!selectedFileSheetKind && selectedFileSheetHasSections && tabToolsOpen && !previewMode && !themeEditing && !boxBuilderOpen;
   const activeSidebarWidth = desktopSidebarOpen
     ? resolvedDesktopPanelWidths.sidebarWidth
     : 0;
@@ -6968,6 +7027,23 @@ export default function CadWorkspace({
         sheetMaxWidth: DESKTOP_TAB_TOOLS_MAX_WIDTH
       }).sidebarWidth
     : DEFAULT_SIDEBAR_WIDTH;
+  const boxBuilderAvailable = Array.isArray(viewerServerInfo?.serverFeatures) &&
+    viewerServerInfo.serverFeatures.includes("box-builder");
+  const boxBuilderHosted = viewerServerInfo?.boxBuilder?.mode === "hosted";
+  const boxBuilderAccount = boxBuilderHosted ? String(viewerServerInfo?.boxBuilder?.account || "") : "";
+  useEffect(() => {
+    // A hosted viewer IS the box builder: no files to browse, nothing to close it into.
+    if (boxBuilderHosted) {
+      setBoxBuilderOpen(true);
+      setSidebarOpen(false);
+    }
+  }, [boxBuilderHosted]);
+  useEffect(() => {
+    // A server without the box builder (an older cadgen) cannot save boxes.
+    if (Array.isArray(viewerServerInfo?.serverFeatures) && !boxBuilderAvailable) {
+      setBoxBuilderOpen(false);
+    }
+  }, [boxBuilderAvailable, viewerServerInfo]);
   const viewportFrameInsets = {
     top: previewMode ? 0 : CAD_WORKSPACE_TOP_BAR_HEIGHT,
     right: activeSheetWidth,
@@ -7113,6 +7189,15 @@ export default function CadWorkspace({
           handleCopySelection={handleCopySelection}
           handleScreenshotCopy={handleScreenshotCopy}
         />
+        {boxBuilderOpen && !previewMode ? (
+          <div className="absolute inset-0 z-40">
+            <BoxBuilderViewport
+              builder={boxBuilder}
+              insets={viewportFrameInsets}
+              sourceUrl={String(viewerServerInfo?.boxBuilder?.sourceUrl || "")}
+            />
+          </div>
+        ) : null}
       </div>
 
       <SidebarInset className="pointer-events-none relative z-10 h-svh min-w-0 overflow-hidden bg-transparent">
@@ -7135,11 +7220,24 @@ export default function CadWorkspace({
           canCopyFileAssetPaths={filePathCopyAvailable}
           onRevealInExplorerView={handleRevealEntryInExplorerView}
           onCopyFileAssetReference={handleCopyFileAssetReference}
-          fileSheetKind={selectedFileSheetHasSections ? selectedFileSheetKind : ""}
+          fileSheetKind={selectedFileSheetHasSections && !boxBuilderOpen ? selectedFileSheetKind : ""}
           fileSheetOpen={fileSheetOpen}
           onToggleFileSheet={handleToggleFileSheet}
           themeEditing={themeEditing}
           onToggleThemeEditor={handleToggleThemeEditor}
+          boxBuilderAvailable={boxBuilderAvailable && !boxBuilderHosted}
+          boxBuilderOpen={boxBuilderOpen}
+          onToggleBoxBuilder={handleToggleBoxBuilder}
+          accountEmail={boxBuilderAccount}
+          signOutHref={boxBuilderHosted ? "/oauth2/sign_out?rd=%2F" : ""}
+          navigationAvailable={!boxBuilderHosted}
+          languageToggle={boxBuilderAvailable}
+          projectLinks={boxBuilderHosted ? {
+            sourceUrl: String(viewerServerInfo?.boxBuilder?.sourceUrl || ""),
+            sourceVersion: String(viewerServerInfo?.boxBuilder?.sourceVersion || ""),
+            sourceVersionUrl: String(viewerServerInfo?.boxBuilder?.sourceVersionUrl || ""),
+            telegramUrl: String(viewerServerInfo?.boxBuilder?.telegramUrl || "")
+          } : null}
         />
 
         <div className="pointer-events-none relative min-h-0 flex-1 overflow-hidden">
@@ -7173,7 +7271,7 @@ export default function CadWorkspace({
             />
 
             <div className="pointer-events-none relative min-w-0 flex-1 overflow-hidden">
-              <FloatingToolBar
+              {boxBuilderOpen ? null : <FloatingToolBar
                 previewMode={previewMode}
                 selectedEntry={selectedEntry}
                 renderFormat={effectiveRenderFormat}
@@ -7212,9 +7310,9 @@ export default function CadWorkspace({
                 handleEnterPreviewMode={handleEnterPreviewMode}
                 handleExitPreviewMode={handleExitPreviewMode}
                 handleScreenshotCopy={handleScreenshotCopy}
-              />
+              />}
 
-              {!previewMode && !selectedEntry && !missingFileRef && !fileParamSelectionPending ? (
+              {!boxBuilderOpen && !previewMode && !selectedEntry && !missingFileRef && !fileParamSelectionPending ? (
                 <CadWorkspaceHome
                   entries={catalogEntries}
                   onSelectEntry={handleSelectEntry}
@@ -7225,7 +7323,7 @@ export default function CadWorkspace({
               ) : null}
 
               <ViewerLoadingOverlay
-                viewerLoading={effectiveViewerLoading}
+                viewerLoading={effectiveViewerLoading && !boxBuilderOpen}
                 previewMode={previewMode}
                 progress={selectedLoadProgress}
               />
@@ -7424,6 +7522,23 @@ export default function CadWorkspace({
                 onMeasurementActivate={setActiveMeasureId}
                 onMeasurementDelete={handleMeasureDelete}
                 onMeasurementsClear={handleMeasureClear}
+              />
+            ) : null}
+
+            {boxBuilderOpen && !themeEditing && !previewMode ? (
+              <BoxBuilderSheet
+                open
+                isDesktop={isDesktop}
+                width={activeSheetWidth || tabToolsWidth}
+                onOpenChange={(nextOpen) => {
+                  if (!nextOpen) {
+                    setBoxBuilderOpen(false);
+                  }
+                }}
+                onStartResize={handleStartFileSheetResize}
+                builder={boxBuilder}
+                onOpenFile={handleOpenBoxFile}
+                hosted={boxBuilderHosted}
               />
             ) : null}
 
