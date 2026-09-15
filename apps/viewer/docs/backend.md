@@ -205,7 +205,8 @@ The client's box builder (parametric printable boxes: floor, walls, a lid with a
 locating lip, through-holes, PCB standoffs, circuit boards mounted on generated
 standoffs with wall cut-outs for their ports) keeps ONE geometry description. A
 board itself is only drawn in the preview; the plan carries its standoffs and
-cut-outs, never the board. The
+cut-outs, never the board. Board templates ship as `board_presets.json`; an admin's
+edited list replaces them in `.box-presets/boards.json` under the root, which no route serves. The
 client turns its spec into a CSG plan (`src/client/workbench/boxBuilder/boxPlan.js`),
 previews that plan in the browser with manifold, and saves the same plan here.
 `cadgen.viewer.boxes` checks it against the plan grammar (`cadgen.box_plan`),
@@ -246,7 +247,9 @@ an authenticating proxy such as oauth2-proxy:
 - `GET /__cad/boxes`, `GET /__cad/boxes/spec?name=...`, `GET /__cad/boxes/status?name=...`,
   `GET /__cad/boxes/file?name=...&part=base|lid&format=step|stl|3mf`,
   `POST /__cad/boxes/save?name=...`: the box builder (above)
-- `GET /admin`, `GET /__cad/admin/stats`: the hosted builder's admin dashboard (admins only)
+- `GET /__cad/boxes/presets`: the builder's circuit-board templates (`cadgen.viewer.board_presets`)
+- `GET /admin`, `GET /__cad/admin/stats`, `GET`/`POST /__cad/admin/presets`: the hosted builder's
+  admin dashboard and its board-template editor (admins only)
 - `GET /__tess_cache/<key>.tess`, `POST /__tess_cache/<key>.tess`,
   `POST /__tess_cache/batch` — the shared component-tessellation cache
   (`<cache root>/meshes`, the same store the export CLI and the snapshot host

@@ -79,6 +79,11 @@ export async function fetchBoxStatus(name) {
   return readJson(await fetch(boxUrl("/status", name), { cache: "no-store" }));
 }
 
+// The circuit-board templates "Add board" offers: { boards: [...], edited }.
+export async function fetchBoardPresets() {
+  return readJson(await fetch("/__cad/boxes/presets", { cache: "no-store" }));
+}
+
 export async function saveBox(name, { spec, plan }) {
   return readJson(await fetch(boxUrl("/save", name), {
     method: "POST",

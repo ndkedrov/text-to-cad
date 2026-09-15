@@ -30,6 +30,7 @@ import time
 from pathlib import Path
 
 from .backend import CAD_CATALOG_SCHEMA_VERSION, ForbiddenAssetError, LocalAssetBackend
+from .board_presets import MAX_PRESET_REQUEST_BYTES, BoardPresets, PresetError
 from .box_analytics import BoxAnalytics
 from .boxes import BOX_OUTPUT_CONTENT_TYPES, BoxBuilder, BoxError, BoxLimits
 from .boxes import MAX_REQUEST_BYTES as BOX_MAX_REQUEST_BYTES
@@ -240,6 +241,8 @@ class CadApp:
             expose_paths=not self.hosted,
             observer=self.analytics.record if self.analytics is not None else None,
         )
+        # The circuit-board templates the builder offers; admins edit them from /admin.
+        self.board_presets = BoardPresets(root_path)
         # Accounts that may open /admin (CADGEN_VIEWER_ADMIN_EMAILS, comma-separated).
         self.admin_emails = frozenset(
             address.strip().lower()
@@ -399,6 +402,8 @@ class CadApp:
                     self._box_call(response, lambda: self.boxes.status(query.get("name"), None))
                 elif pathname == "/__cad/boxes/file":
                     self._handle_box_file(response, query, None)
+                elif pathname == "/__cad/boxes/presets":
+                    response.send_json(200, self.board_presets.load())
                 else:
                     # An unrecognised /__cad/* path is a bad API call, not a
                     # page. Falling through to the SPA answered typo'd and
@@ -536,6 +541,33 @@ class CadApp:
         }
         return stats
 
+    def _handle_admin_presets(self, request, response, account) -> None:
+        """GET: the board templates in use, the shipped ones and the connector types.
+        POST ``{boards}`` replaces the list, ``{reset: true}`` returns to the shipped one."""
+        try:
+            if request.method == "POST":
+                try:
+                    declared = int(request.header("content-length") or 0)
+                except ValueError:
+                    declared = 0
+                if declared > MAX_PRESET_REQUEST_BYTES:
+                    response.send_json(413, {"ok": False, "error": "the preset list is too large", "code": "too_large"})
+                    return
+                result = self.board_presets.save(request.body())
+                if self.analytics is not None:
+                    self.analytics.record("presets", account, count=len(result["boards"]), edited=result["edited"])
+            else:
+                result = self.board_presets.load()
+            response.send_json(200, {
+                **result,
+                "defaults": self.board_presets.defaults(),
+                "portTypes": self.board_presets.port_types,
+            })
+        except PresetError as error:
+            response.send_json(400, {"ok": False, "error": str(error), "code": "invalid"})
+        except Exception:  # noqa: BLE001 - never a server detail to the internet
+            response.send_json(500, {"ok": False, "error": "internal error", "code": "internal"})
+
     def _came_through_proxy(self, request) -> bool:
         scheme, _, token = request.header("authorization").strip().partition(" ")
         if scheme.lower() != "basic" or not token.strip():
@@ -577,6 +609,12 @@ class CadApp:
             except Exception:  # noqa: BLE001 - never a server detail to the internet
                 response.send_json(500, {"ok": False, "error": "internal error", "code": "internal"})
             return
+        if pathname == "/__cad/admin/presets":
+            if method not in ("GET", "POST") or not self._is_admin(account):
+                response.send_json(404, {"error": "Not found"})
+                return
+            self._handle_admin_presets(request, response, account)
+            return
         if not (pathname.startswith("/__cad/") or pathname.startswith(TESS_CACHE_ROUTE_PREFIX)):
             if method == "GET":
                 self._serve_dist(request, response)
@@ -591,7 +629,7 @@ class CadApp:
         if method == "GET" and pathname == "/__cad/catalog":
             response.send_json(200, {"schemaVersion": CAD_CATALOG_SCHEMA_VERSION, "entries": []})
             return
-        box_reads = {"/__cad/boxes", "/__cad/boxes/spec", "/__cad/boxes/status", "/__cad/boxes/file"}
+        box_reads = {"/__cad/boxes", "/__cad/boxes/spec", "/__cad/boxes/status", "/__cad/boxes/file", "/__cad/boxes/presets"}
         is_box_read = method == "GET" and pathname in box_reads
         is_box_save = method == "POST" and pathname == "/__cad/boxes/save"
         if not (is_box_read or is_box_save):
@@ -612,6 +650,8 @@ class CadApp:
                 self._box_call(response, lambda: self.boxes.status(query.get("name"), owner))
             elif pathname == "/__cad/boxes/file":
                 self._handle_box_file(response, query, owner)
+            elif pathname == "/__cad/boxes/presets":
+                response.send_json(200, self.board_presets.load())
             else:
                 self._handle_box_save(request, response, query, owner)
         except Exception:  # noqa: BLE001 - never a server detail to the internet

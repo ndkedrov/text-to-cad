@@ -252,6 +252,43 @@ class HostedSurface(unittest.TestCase):
         self.assertIn("reject", kinds)
         self.assertEqual(stats["service"]["sourceVersion"], "0.5.1-box.abc1234")
 
+    def test_board_presets_are_read_by_accounts_and_edited_only_by_admins(self):
+        self.assertEqual(self.server.json("GET", "/__cad/boxes/presets")[0], 401)
+        status, payload = self.server.json("GET", "/__cad/boxes/presets", account="alice@example.com")
+        self.assertEqual(status, 200)
+        self.assertFalse(payload["edited"])
+        self.assertIn("rpi4", [board["id"] for board in payload["boards"]])
+
+        body = json.dumps({"boards": [dict(payload["boards"][0], id="my-board", name="My board")]})
+        for account in (None, "alice@example.com"):
+            with self.subTest(account=account):
+                self.assertEqual(self.server.request("GET", "/__cad/admin/presets", account=account)[0], 404)
+                self.assertEqual(
+                    self.server.request("POST", "/__cad/admin/presets", account=account, headers=GUARD, body=body)[0], 404,
+                )
+        self.assertEqual(self.server.request(
+            "POST", "/__cad/admin/presets", account="owner@example.com",
+            headers={"content-type": "application/json"}, body=body,
+        )[0], 403)
+
+        status, saved = self.server.json("POST", "/__cad/admin/presets", account="owner@example.com", headers=GUARD, body=body)
+        self.assertEqual(status, 200, saved)
+        self.assertEqual(([board["id"] for board in saved["boards"]], saved["edited"]), (["my-board"], True))
+        self.assertIn("usbC", saved["portTypes"])
+        self.assertGreaterEqual(len(saved["defaults"]), 10)
+        status, payload = self.server.json("GET", "/__cad/boxes/presets", account="alice@example.com")
+        self.assertEqual([board["name"] for board in payload["boards"]], ["My board"])
+
+        wide = json.dumps({"boards": [dict(saved["boards"][0], width=9000)]})
+        status, refused = self.server.json("POST", "/__cad/admin/presets", account="owner@example.com", headers=GUARD, body=wide)
+        self.assertEqual((status, refused["code"]), (400, "invalid"))
+        self.assertIn("width", refused["error"])
+
+        reset = json.dumps({"reset": True})
+        status, restored = self.server.json("POST", "/__cad/admin/presets", account="owner@example.com", headers=GUARD, body=reset)
+        self.assertEqual((status, restored["edited"]), (200, False))
+        self.assertIn("rpi4", [board["id"] for board in restored["boards"]])
+
 
 if __name__ == "__main__":
     unittest.main()
