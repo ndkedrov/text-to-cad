@@ -1,4 +1,4 @@
-import { Children, useEffect, useRef, useState } from "react";
+import { Children, Fragment, useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/ui/utils";
 import {
@@ -7,6 +7,7 @@ import {
   AccordionTrigger
 } from "../ui/accordion";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../ui/collapsible";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { ColorPicker } from "../ui/color-picker";
 import {
   DropdownMenu,
@@ -796,6 +797,135 @@ export function FileSheetSelectRow({
   return (
     <FileSheetInlineControlRow label={label} className={className}>
       {select}
+    </FileSheetInlineControlRow>
+  );
+}
+
+// A select you type into, for a long list of named things people look for by name
+// (board templates). The trigger reads like an inline select; opening it puts the
+// cursor in a search field that narrows the list as you type, grouped like
+// FileSheetSelectRow's options. Arrow keys move, Enter picks, Escape closes.
+// `matches(option, query)` decides what a query keeps (default: label contains it).
+export function FileSheetComboboxRow({
+  label,
+  value,
+  options,
+  onValueChange,
+  matches,
+  searchPlaceholder,
+  emptyText,
+  ariaLabel,
+  className
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [active, setActive] = useState(0);
+  const inputRef = useRef(null);
+  const listRef = useRef(null);
+  const selected = options.find((option) => option.value === value);
+  const keeps = matches || ((option, text) => option.label.toLowerCase().includes(text.trim().toLowerCase()));
+  const shown = query.trim() ? options.filter((option) => keeps(option, query)) : options;
+
+  useEffect(() => {
+    setActive(0);
+  }, [query, open]);
+  useEffect(() => {
+    listRef.current?.querySelector(`[data-index="${active}"]`)?.scrollIntoView?.({ block: "nearest" });
+  }, [active]);
+
+  const close = () => {
+    setOpen(false);
+    setQuery("");
+  };
+  const choose = (option) => {
+    onValueChange(option.value);
+    close();
+  };
+  const onKeyDown = (event) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActive((index) => Math.min(index + 1, shown.length - 1));
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActive((index) => Math.max(index - 1, 0));
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      if (shown[active]) {
+        choose(shown[active]);
+      }
+    }
+  };
+
+  let lastGroup;
+  const rows = shown.map((option, index) => {
+    const heading = option.group && option.group !== lastGroup ? (
+      <div className="px-2 pb-0.5 pt-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">{option.group}</div>
+    ) : null;
+    lastGroup = option.group;
+    return (
+      <Fragment key={option.value}>
+        {heading}
+        <div
+          role="option"
+          data-index={index}
+          aria-selected={option.value === value}
+          onMouseEnter={() => setActive(index)}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => choose(option)}
+          className={cn(
+            "relative flex cursor-default items-center rounded-sm py-1.5 pl-2 pr-8 text-xs outline-none select-none",
+            index === active && "bg-accent text-accent-foreground"
+          )}
+        >
+          <span className="min-w-0 truncate">{option.label}</span>
+          {option.value === value ? <Check className="absolute right-2 size-3.5" aria-hidden="true" /> : null}
+        </div>
+      </Fragment>
+    );
+  });
+
+  return (
+    <FileSheetInlineControlRow label={label} className={className}>
+      <Popover open={open} onOpenChange={(next) => (next ? setOpen(true) : close())}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            role="combobox"
+            aria-expanded={open}
+            aria-label={ariaLabel || (typeof label === "string" ? label : undefined)}
+            className={cn(
+              "flex items-center justify-between gap-2 rounded-md border border-input bg-transparent text-foreground shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30 dark:hover:bg-input/50",
+              FILE_SHEET_INLINE_SELECT_TRIGGER_CLASSES
+            )}
+          >
+            <span className="min-w-0 truncate">{selected ? selected.label : ""}</span>
+            <ChevronDown className="size-3.5 shrink-0 opacity-50" aria-hidden="true" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          align="end"
+          className="w-72 max-w-[calc(100vw-1rem)] p-1"
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            inputRef.current?.focus();
+          }}
+        >
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder={searchPlaceholder}
+            aria-label={searchPlaceholder || ariaLabel || (typeof label === "string" ? label : undefined)}
+            spellCheck={false}
+            autoComplete="off"
+            className="mb-1 h-7 w-full rounded-md border border-input bg-transparent px-2 text-[11px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
+          />
+          <div ref={listRef} role="listbox" className="max-h-72 overflow-y-auto">
+            {rows.length ? rows : <div className="px-2 py-1.5 text-[11px] text-muted-foreground">{emptyText}</div>}
+          </div>
+        </PopoverContent>
+      </Popover>
     </FileSheetInlineControlRow>
   );
 }
