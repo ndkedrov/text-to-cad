@@ -60,6 +60,25 @@
   dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 0; font-size: 13px; }
   dt { color: var(--muted); } dd { margin: 0; font-variant-numeric: tabular-nums; }
   .empty { color: var(--muted); font-size: 13px; }
+  [hidden] { display: none !important; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button:disabled { opacity: .5; cursor: default; }
+  .presets { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 16px; align-items: start; }
+  @media (max-width: 960px) { .presets { grid-template-columns: 1fr; } }
+  .row-actions { display: flex; gap: 4px; }
+  #presets-list td button, .editor td button { padding: 2px 7px; font-size: 12px; }
+  tr.selected td { background: var(--soft); }
+  .editor { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 10px; min-width: 0; }
+  .editor h3 { font-size: 13px; margin: 4px 0 0; }
+  .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px 10px; }
+  .fields label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
+  .editor input, .editor select, textarea { font: inherit; font-size: 13px; padding: 4px 7px; border-radius: 6px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--ink); width: 100%; min-width: 0; }
+  .editor td input, .editor td select { min-width: 70px; }
+  .editor td { padding: 3px 4px; }
+  .preview svg { width: 100%; max-height: 240px; display: block; }
+  textarea { min-height: 380px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; margin-bottom: 8px; }
 </style>
 </head>
 <body>
@@ -98,6 +117,30 @@
     <h2 data-t="recent">Recent activity</h2>
     <div class="scroll"><table id="recent"></table></div>
   </section>
+  <section class="panel" id="presets-panel">
+    <div class="panel-head">
+      <h2 data-t="presets">Board presets</h2>
+      <div class="row">
+        <span id="presets-state" class="muted"></span>
+        <button type="button" id="preset-new" data-t="presetNew">New preset</button>
+        <button type="button" id="presets-json" data-t="presetsJson">Edit as JSON</button>
+        <button type="button" id="presets-reset" data-t="presetsReset">Reset to defaults</button>
+        <button type="button" id="presets-publish" class="primary" data-t="presetsPublish" disabled>Publish</button>
+      </div>
+    </div>
+    <p id="presets-status" class="status" role="status"></p>
+    <div id="presets-json-box" hidden>
+      <textarea id="presets-json-text" spellcheck="false" aria-label="JSON"></textarea>
+      <div class="row">
+        <button type="button" id="presets-json-apply" class="primary" data-t="apply">Apply</button>
+        <button type="button" id="presets-json-cancel" data-t="cancel">Cancel</button>
+      </div>
+    </div>
+    <div id="presets-main" class="presets">
+      <div class="scroll"><table id="presets-list"></table></div>
+      <div id="preset-editor"></div>
+    </div>
+  </section>
 </main>
 <script>
 (function () {
@@ -127,7 +170,26 @@
       r_busy_account: "Previous box still building", r_quota_global: "Service-wide daily limit", r_quota_disk: "Account storage full",
       r_quota_unavailable: "Limits unavailable", r_disk_full: "Server disk low", r_too_large: "Request too large",
       r_bad_plan: "Invalid geometry", r_bad_name: "Invalid name", r_invalid: "Invalid request", r_unauthorized: "Not signed in",
-      r_internal: "Internal error", r_unknown: "Unknown"
+      r_internal: "Internal error", r_unknown: "Unknown",
+      presets: "Board presets", presetNew: "New preset", presetsJson: "Edit as JSON", presetsReset: "Reset to defaults",
+      presetsPublish: "Publish", apply: "Apply", cancel: "Cancel", presetsEdited: "Edited list · {n} presets",
+      presetsShipped: "Default list · {n} presets", presetsUnsaved: "Unpublished changes", presetsPublished: "Published.",
+      presetsLoadError: "Could not load presets: {error}", presetsInvalidJson: "Not valid JSON: {error}",
+      presetsJsonList: "The JSON must be a list of presets.", presetsConfirmReset: "Replace the list with the default presets for everyone?",
+      presetsConfirmDelete: "Delete “{name}”?", presetsLeave: "Unpublished preset changes will be lost.",
+      pName: "Name", pId: "ID", pSize: "Size, mm", pHoles: "Holes", pPorts: "Ports", noPresets: "No presets.",
+      edit: "Edit", duplicate: "Copy", remove: "Delete", editorTitle: "Preset", editorNew: "New preset",
+      pickPreset: "Pick a preset to edit, or add a new one. Changes reach the builder once published.",
+      fWidth: "Width X, mm", fLength: "Length Y, mm", fThickness: "Thickness", fClearance: "Floor to board", fComponent: "Parts on top",
+      fPad: "Pad ⌀", fBore: "Screw hole ⌀", holesTitle: "Mounting holes, from the board's lower-left corner", portsTitle: "Ports",
+      addHole: "Add hole", addPort: "Add port", hX: "X", hY: "Y", hD: "⌀", portType: "Type", portEdge: "Edge", portShape: "Cut-out",
+      portOffset: "Along edge", portElevation: "Above board", portWidth: "Width", portHeight: "Height", portRadius: "Radius",
+      portOverhang: "Sticks out", portMargin: "Gap", edge_front: "Bottom (Y = 0)", edge_back: "Top", edge_left: "Left (X = 0)",
+      edge_right: "Right", shape_rect: "Rectangle", shape_circle: "Circle", applyPreset: "Apply to the list",
+      nameRequired: "Give the preset a name.", idTaken: "The ID “{id}” is already used.", ePresets: "Presets", presetsCount: "{n} presets",
+      pt_usbC: "USB-C", pt_microUsb: "Micro-USB", pt_miniUsb: "Mini-USB", pt_usbA: "USB-A", pt_usbA2: "USB-A ×2", pt_usbB: "USB-B",
+      pt_hdmi: "HDMI", pt_miniHdmi: "Mini-HDMI", pt_microHdmi: "Micro-HDMI", pt_rj45: "Ethernet", pt_dcJack: "DC jack",
+      pt_audio: "Audio 3.5 mm", pt_custom: "Custom"
     },
     uk: {
       title: "3D Maker · Адмінка", admin: "Адмінка", auto: "Автооновлення", refresh: "Оновити", back: "До конструктора",
@@ -152,7 +214,26 @@
       r_busy_account: "Попередня коробка ще збирається", r_quota_global: "Денний ліміт сервісу", r_quota_disk: "Місце акаунта вичерпано",
       r_quota_unavailable: "Ліміти недоступні", r_disk_full: "Мало місця на сервері", r_too_large: "Завеликий запит",
       r_bad_plan: "Неправильна геометрія", r_bad_name: "Неправильна назва", r_invalid: "Неправильний запит", r_unauthorized: "Не увійшов",
-      r_internal: "Внутрішня помилка", r_unknown: "Невідомо"
+      r_internal: "Внутрішня помилка", r_unknown: "Невідомо",
+      presets: "Пресети плат", presetNew: "Новий пресет", presetsJson: "Редагувати як JSON", presetsReset: "Скинути до стандартних",
+      presetsPublish: "Опублікувати", apply: "Застосувати", cancel: "Скасувати", presetsEdited: "Змінений список · пресетів: {n}",
+      presetsShipped: "Стандартний список · пресетів: {n}", presetsUnsaved: "Є неопубліковані зміни", presetsPublished: "Опубліковано.",
+      presetsLoadError: "Не вдалося завантажити пресети: {error}", presetsInvalidJson: "Некоректний JSON: {error}",
+      presetsJsonList: "JSON має бути списком пресетів.", presetsConfirmReset: "Замінити список стандартними пресетами для всіх?",
+      presetsConfirmDelete: "Видалити «{name}»?", presetsLeave: "Неопубліковані зміни пресетів пропадуть.",
+      pName: "Назва", pId: "ID", pSize: "Розмір, мм", pHoles: "Отворів", pPorts: "Портів", noPresets: "Пресетів немає.",
+      edit: "Змінити", duplicate: "Копія", remove: "Видалити", editorTitle: "Пресет", editorNew: "Новий пресет",
+      pickPreset: "Оберіть пресет для редагування або додайте новий. У конструкторі зміни з'являться після публікації.",
+      fWidth: "Ширина X, мм", fLength: "Довжина Y, мм", fThickness: "Товщина", fClearance: "Від дна до плати", fComponent: "Деталі зверху",
+      fPad: "Опора ⌀", fBore: "Отвір під гвинт ⌀", holesTitle: "Отвори кріплення, від лівого нижнього кута плати", portsTitle: "Порти",
+      addHole: "Додати отвір", addPort: "Додати порт", hX: "X", hY: "Y", hD: "⌀", portType: "Тип", portEdge: "Край", portShape: "Виріз",
+      portOffset: "Вздовж краю", portElevation: "Над платою", portWidth: "Ширина", portHeight: "Висота", portRadius: "Радіус",
+      portOverhang: "Виступ", portMargin: "Зазор", edge_front: "Нижній (Y = 0)", edge_back: "Верхній", edge_left: "Лівий (X = 0)",
+      edge_right: "Правий", shape_rect: "Прямокутник", shape_circle: "Коло", applyPreset: "Застосувати до списку",
+      nameRequired: "Вкажіть назву пресета.", idTaken: "ID «{id}» вже зайнятий.", ePresets: "Пресети", presetsCount: "пресетів: {n}",
+      pt_usbC: "USB-C", pt_microUsb: "Micro-USB", pt_miniUsb: "Mini-USB", pt_usbA: "USB-A", pt_usbA2: "USB-A ×2", pt_usbB: "USB-B",
+      pt_hdmi: "HDMI", pt_miniHdmi: "Mini-HDMI", pt_microHdmi: "Micro-HDMI", pt_rj45: "Ethernet", pt_dcJack: "Гніздо живлення",
+      pt_audio: "Аудіо 3,5 мм", pt_custom: "Свій"
     }
   };
 
@@ -426,6 +507,10 @@
       return [pill(t("eReject"), "warn"), details];
     }
     if (kind === "account") { return [pill(t("eAccount"), "info"), details]; }
+    if (kind === "presets") {
+      details.append(t("presetsCount", { n: number(event.count) }));
+      return [pill(t("ePresets"), "info"), details];
+    }
     return [pill(String(kind)), details];
   }
 
@@ -439,6 +524,7 @@
 
   function render() {
     applyStaticText();
+    if (presets.loaded) { renderPresetList(); renderEditor(); }
     var data = state.data;
     if (!data) { return; }
     document.getElementById("generated").textContent = t("updated", { time: new Intl.DateTimeFormat(locale(), { timeStyle: "medium" }).format(new Date(data.generatedAt * 1000)) });
@@ -469,6 +555,336 @@
     }
   }
 
+  // --- board presets ---------------------------------------------------------
+  // The list lives here until "Publish" sends it; the server checks every field.
+  // index: the preset being edited (-1 a new one, null none); draft: its working copy.
+
+  var presets = { boards: [], defaults: [], portTypes: {}, edited: false, dirty: false, loaded: false, index: null, draft: null };
+  var PORT_EDGES = ["front", "back", "left", "right"];
+  var MAX_ITEMS = 8;
+
+  function clone(value) { return JSON.parse(JSON.stringify(value)); }
+  function mm(value) { return new Intl.NumberFormat(locale(), { maximumFractionDigits: 2 }).format(Number(value) || 0); }
+
+  function presetStatus(message, isError) {
+    var node = document.getElementById("presets-status");
+    node.textContent = message || "";
+    node.className = "status" + (isError ? " error" : "");
+  }
+
+  function slug(name, taken) {
+    var base = String(name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 34) || "board";
+    if (base === "custom") { base = "custom-board"; }
+    var id = base; var n = 2;
+    while (taken.indexOf(id) !== -1) { id = base + "-" + n; n += 1; }
+    return id;
+  }
+
+  function newPort(type) {
+    var size = presets.portTypes[type] || presets.portTypes.custom || { shape: "rect", width: 10, height: 5, radius: 0, elevation: 0 };
+    return { type: presets.portTypes[type] ? type : "custom", edge: "front", offset: 10, elevation: size.elevation || 0, shape: size.shape,
+      width: size.width, height: size.height, radius: size.radius, overhang: 0, margin: 0.5 };
+  }
+
+  function blankPreset() {
+    return { id: "", name: "", width: 50, length: 30, thickness: 1.6, clearance: 5, componentHeight: 10, padDiameter: 6, boreDiameter: 2.5,
+      holes: [[3.5, 3.5], [46.5, 3.5], [3.5, 26.5], [46.5, 26.5]].map(function (point) { return { x: point[0], y: point[1], diameter: 3.2 }; }),
+      ports: [] };
+  }
+
+  function actionButton(label, onClick, disabled, className) {
+    var button = el("button", { type: "button", text: label });
+    if (className) { button.className = className; }
+    button.disabled = Boolean(disabled);
+    button.addEventListener("click", onClick);
+    return button;
+  }
+
+  function numberInput(target, key, step, onChange) {
+    var input = el("input", { type: "number", step: String(step), value: String(target[key]) });
+    input.addEventListener("input", function () {
+      var value = parseFloat(input.value);
+      if (isFinite(value)) { target[key] = value; (onChange || drawPreview)(); }
+    });
+    return input;
+  }
+
+  function selectInput(options, value, onChange) {
+    var select = el("select", {}, options.map(function (option) {
+      var node = el("option", { value: option[0], text: option[1] });
+      node.selected = option[0] === value;
+      return node;
+    }));
+    select.addEventListener("change", function () { onChange(select.value); });
+    return select;
+  }
+
+  function labelled(text, control) { return el("label", {}, [text, control]); }
+
+  function updatePresetBar() {
+    document.getElementById("presets-state").textContent = presets.dirty
+      ? t("presetsUnsaved")
+      : t(presets.edited ? "presetsEdited" : "presetsShipped", { n: number(presets.boards.length) });
+    document.getElementById("presets-publish").disabled = !presets.dirty;
+  }
+
+  function renderPresetList() {
+    var rows = presets.boards.map(function (board, index) {
+      return [board.name, board.id, mm(board.width) + " × " + mm(board.length), number(board.holes.length), number(board.ports.length),
+        el("span", { class: "row-actions" }, [
+          actionButton(t("edit"), function () { openEditor(index); }),
+          actionButton("↑", function () { movePreset(index, -1); }, index === 0),
+          actionButton("↓", function () { movePreset(index, 1); }, index === presets.boards.length - 1),
+          actionButton(t("duplicate"), function () { duplicatePreset(index); }),
+          actionButton(t("remove"), function () { removePreset(index); })
+        ])];
+    });
+    table("presets-list", [
+      { label: t("pName") }, { label: t("pId") }, { label: t("pSize") }, { label: t("pHoles"), num: true },
+      { label: t("pPorts"), num: true }, { label: "" }
+    ], rows, t("noPresets"));
+    Array.prototype.forEach.call(document.querySelectorAll("#presets-list tbody tr"), function (row, index) {
+      row.classList.toggle("selected", rows.length > 0 && index === presets.index);
+    });
+    updatePresetBar();
+  }
+
+  function openEditor(index) {
+    presets.index = index;
+    presets.draft = index === -1 ? blankPreset() : clone(presets.boards[index]);
+    presetStatus("");
+    renderPresetList();
+    renderEditor();
+  }
+
+  function closeEditor() {
+    presets.index = null;
+    presets.draft = null;
+    renderPresetList();
+    renderEditor();
+  }
+
+  // A top view of the draft: the board, its holes with their standoff pads, and its ports.
+  function drawPreview() {
+    var holder = document.getElementById("preset-preview");
+    var draft = presets.draft;
+    if (!holder || !draft) { return; }
+    var width = Math.max(Number(draft.width) || 1, 1); var length = Math.max(Number(draft.length) || 1, 1);
+    var margin = 14; var scale = Math.min(520 / width, 200 / length);
+    var svg = svgNode("svg", { viewBox: "0 0 " + (width * scale + margin * 2) + " " + (length * scale + margin * 2), role: "img" });
+    function sx(x) { return margin + x * scale; }
+    function sy(y) { return margin + (length - y) * scale; }
+    svg.appendChild(svgNode("rect", { x: sx(0), y: sy(length), width: width * scale, height: length * scale, rx: 3,
+      fill: "#2f8f5b", "fill-opacity": 0.3, stroke: "#2f8f5b" }));
+    draft.holes.forEach(function (hole) {
+      svg.appendChild(svgNode("circle", { cx: sx(hole.x), cy: sy(hole.y), r: Math.max((Number(draft.padDiameter) || 0) / 2 * scale, 1),
+        fill: "none", stroke: "var(--muted)", "stroke-dasharray": "3 2" }));
+      svg.appendChild(svgNode("circle", { cx: sx(hole.x), cy: sy(hole.y), r: Math.max((Number(hole.diameter) || 0) / 2 * scale, 1),
+        fill: "var(--panel)", stroke: "var(--ink)" }));
+    });
+    draft.ports.forEach(function (port, index) {
+      var body = 6; var out = Number(port.overhang) || 0; var size = Number(port.width) || 1; var along = Number(port.offset) || 0;
+      var box;
+      if (port.edge === "back") { box = [along - size / 2, length - body, size, body + out]; }
+      else if (port.edge === "left") { box = [-out, along - size / 2, body + out, size]; }
+      else if (port.edge === "right") { box = [width - body, along - size / 2, body + out, size]; }
+      else { box = [along - size / 2, -out, size, body + out]; }
+      svg.appendChild(svgNode("rect", { x: sx(box[0]), y: sy(box[1] + box[3]), width: box[2] * scale, height: box[3] * scale,
+        fill: "var(--accent)", "fill-opacity": 0.55, stroke: "var(--accent)" }));
+      var label = svgNode("text", { x: sx(box[0] + box[2] / 2), y: sy(box[1] + box[3] / 2) + 3, "text-anchor": "middle", "font-size": 9, fill: "var(--ink)" });
+      label.textContent = String(index + 1);
+      svg.appendChild(label);
+    });
+    holder.replaceChildren(svg);
+  }
+
+  function renderEditor() {
+    var holder = document.getElementById("preset-editor");
+    var draft = presets.draft;
+    if (!draft) { holder.replaceChildren(el("p", { class: "empty", text: t("pickPreset") })); return; }
+    var nameInput = el("input", { type: "text", maxlength: "60", value: draft.name });
+    nameInput.addEventListener("input", function () { draft.name = nameInput.value; });
+    var idInput = el("input", { type: "text", maxlength: "40", value: draft.id, placeholder: "auto" });
+    idInput.addEventListener("input", function () { draft.id = idInput.value.trim(); });
+    var holeRows = draft.holes.map(function (hole, index) {
+      return el("tr", {}, [
+        el("td", {}, [numberInput(hole, "x", 0.1)]), el("td", {}, [numberInput(hole, "y", 0.1)]), el("td", {}, [numberInput(hole, "diameter", 0.1)]),
+        el("td", {}, [actionButton(t("remove"), function () { draft.holes.splice(index, 1); renderEditor(); })])
+      ]);
+    });
+    var typeOptions = Object.keys(presets.portTypes).map(function (type) { return [type, t("pt_" + type)]; });
+    var portRows = draft.ports.map(function (port, index) {
+      return el("tr", {}, [
+        el("td", {}, [selectInput(typeOptions, port.type, function (type) {
+          draft.ports[index] = Object.assign(newPort(type), { edge: port.edge, offset: port.offset, overhang: port.overhang, margin: port.margin });
+          renderEditor();
+        })]),
+        el("td", {}, [selectInput(PORT_EDGES.map(function (edge) { return [edge, t("edge_" + edge)]; }), port.edge, function (edge) { port.edge = edge; drawPreview(); })]),
+        el("td", {}, [selectInput([["rect", t("shape_rect")], ["circle", t("shape_circle")]], port.shape, function (shape) {
+          port.shape = shape;
+          if (shape === "circle") { port.height = port.width; port.radius = 0; }
+          renderEditor();
+        })]),
+        el("td", {}, [numberInput(port, "offset", 0.1)]),
+        el("td", {}, [numberInput(port, "elevation", 0.25)]),
+        el("td", {}, [numberInput(port, "width", 0.1, function () { if (port.shape === "circle") { port.height = port.width; } drawPreview(); })]),
+        el("td", {}, [numberInput(port, "height", 0.1)]),
+        el("td", {}, [numberInput(port, "radius", 0.1)]),
+        el("td", {}, [numberInput(port, "overhang", 0.5)]),
+        el("td", {}, [numberInput(port, "margin", 0.1)]),
+        el("td", {}, [actionButton(t("remove"), function () { draft.ports.splice(index, 1); renderEditor(); })])
+      ]);
+    });
+    function header(labels) { return el("thead", {}, [el("tr", {}, labels.map(function (label) { return el("th", { text: label }); }))]); }
+    holder.replaceChildren(el("div", { class: "editor" }, [
+      el("h3", { text: presets.index === -1 ? t("editorNew") : t("editorTitle") + " · " + ((presets.boards[presets.index] || {}).name || "") }),
+      el("div", { class: "preview", id: "preset-preview" }),
+      el("div", { class: "fields" }, [
+        labelled(t("pName"), nameInput), labelled(t("pId"), idInput),
+        labelled(t("fWidth"), numberInput(draft, "width", 0.1)), labelled(t("fLength"), numberInput(draft, "length", 0.1)),
+        labelled(t("fThickness"), numberInput(draft, "thickness", 0.1)), labelled(t("fClearance"), numberInput(draft, "clearance", 0.5)),
+        labelled(t("fComponent"), numberInput(draft, "componentHeight", 0.5)), labelled(t("fPad"), numberInput(draft, "padDiameter", 0.5)),
+        labelled(t("fBore"), numberInput(draft, "boreDiameter", 0.1))
+      ]),
+      el("h3", { text: t("holesTitle") }),
+      el("div", { class: "scroll" }, [el("table", {}, [header([t("hX"), t("hY"), t("hD"), ""]), el("tbody", {}, holeRows)])]),
+      el("div", { class: "row" }, [actionButton(t("addHole"), function () {
+        draft.holes.push({ x: Math.round(draft.width * 5) / 10, y: Math.round(draft.length * 5) / 10, diameter: 3.2 });
+        renderEditor();
+      }, draft.holes.length >= MAX_ITEMS)]),
+      el("h3", { text: t("portsTitle") }),
+      el("div", { class: "scroll" }, [el("table", {}, [header([t("portType"), t("portEdge"), t("portShape"), t("portOffset"), t("portElevation"),
+        t("portWidth"), t("portHeight"), t("portRadius"), t("portOverhang"), t("portMargin"), ""]), el("tbody", {}, portRows)])]),
+      el("div", { class: "row" }, [actionButton(t("addPort"), function () {
+        var port = newPort("usbC");
+        port.offset = Math.round(draft.width * 5) / 10;
+        draft.ports.push(port);
+        renderEditor();
+      }, draft.ports.length >= MAX_ITEMS)]),
+      el("div", { class: "row" }, [actionButton(t("applyPreset"), applyDraft, false, "primary"), actionButton(t("cancel"), closeEditor)])
+    ]));
+    drawPreview();
+  }
+
+  function applyDraft() {
+    var draft = presets.draft;
+    draft.name = String(draft.name || "").trim();
+    if (!draft.name) { presetStatus(t("nameRequired"), true); return; }
+    var taken = presets.boards.filter(function (board, index) { return index !== presets.index; }).map(function (board) { return board.id; });
+    if (!draft.id) { draft.id = slug(draft.name, taken); }
+    if (taken.indexOf(draft.id) !== -1) { presetStatus(t("idTaken", { id: draft.id }), true); return; }
+    if (presets.index === -1) {
+      presets.boards.push(draft);
+      presets.index = presets.boards.length - 1;
+    } else {
+      presets.boards[presets.index] = draft;
+    }
+    presets.draft = clone(draft);
+    presets.dirty = true;
+    presetStatus("");
+    renderPresetList();
+    renderEditor();
+  }
+
+  function movePreset(index, delta) {
+    var target = index + delta;
+    if (target < 0 || target >= presets.boards.length) { return; }
+    presets.boards.splice(target, 0, presets.boards.splice(index, 1)[0]);
+    if (presets.index === index) { presets.index = target; } else if (presets.index === target) { presets.index = index; }
+    presets.dirty = true;
+    renderPresetList();
+  }
+
+  function duplicatePreset(index) {
+    var copy = clone(presets.boards[index]);
+    copy.name = (copy.name + " (2)").slice(0, 60);
+    copy.id = slug(copy.name, presets.boards.map(function (board) { return board.id; }));
+    presets.boards.splice(index + 1, 0, copy);
+    presets.dirty = true;
+    openEditor(index + 1);
+  }
+
+  function removePreset(index) {
+    if (!window.confirm(t("presetsConfirmDelete", { name: presets.boards[index].name }))) { return; }
+    presets.boards.splice(index, 1);
+    if (presets.index === index) { presets.index = null; presets.draft = null; }
+    else if (presets.index !== null && presets.index > index) { presets.index -= 1; }
+    presets.dirty = true;
+    renderPresetList();
+    renderEditor();
+  }
+
+  function takePresets(payload) {
+    presets.boards = Array.isArray(payload.boards) ? payload.boards : [];
+    presets.defaults = Array.isArray(payload.defaults) ? payload.defaults : [];
+    presets.portTypes = payload.portTypes || {};
+    presets.edited = Boolean(payload.edited);
+    presets.dirty = false;
+    presets.loaded = true;
+    if (presets.index !== null && presets.index >= presets.boards.length) { presets.index = null; presets.draft = null; }
+    renderPresetList();
+    renderEditor();
+  }
+
+  function presetRequest(method, body) {
+    var options = { method: method, cache: "no-store", credentials: "same-origin" };
+    if (method === "POST") {
+      options.headers = { "content-type": "application/json", "x-cadgen-viewer": "1" };
+      options.body = JSON.stringify(body);
+    }
+    return fetch("/__cad/admin/presets", options).then(function (response) {
+      return response.json().catch(function () { return {}; }).then(function (payload) {
+        if (!response.ok) { throw new Error(payload.error || ("HTTP " + response.status)); }
+        return payload;
+      });
+    });
+  }
+
+  function loadPresets() {
+    presetRequest("GET").then(takePresets).catch(function (error) { presetStatus(t("presetsLoadError", { error: error.message }), true); });
+  }
+
+  function sendPresets(body) {
+    presetStatus(t("loading"));
+    presetRequest("POST", body)
+      .then(function (payload) { takePresets(payload); presetStatus(t("presetsPublished")); })
+      .catch(function (error) { presetStatus(error.message || String(error), true); });
+  }
+
+  function showJson(open) {
+    document.getElementById("presets-json-box").hidden = !open;
+    document.getElementById("presets-main").hidden = open;
+    if (open) { document.getElementById("presets-json-text").value = JSON.stringify(presets.boards, null, 2); }
+  }
+
+  document.getElementById("preset-new").addEventListener("click", function () { showJson(false); openEditor(-1); });
+  document.getElementById("presets-publish").addEventListener("click", function () { sendPresets({ boards: presets.boards }); });
+  document.getElementById("presets-reset").addEventListener("click", function () {
+    if (!window.confirm(t("presetsConfirmReset"))) { return; }
+    presets.index = null;
+    presets.draft = null;
+    sendPresets({ reset: true });
+  });
+  document.getElementById("presets-json").addEventListener("click", function () { showJson(true); });
+  document.getElementById("presets-json-cancel").addEventListener("click", function () { showJson(false); });
+  document.getElementById("presets-json-apply").addEventListener("click", function () {
+    var parsed;
+    try { parsed = JSON.parse(document.getElementById("presets-json-text").value); }
+    catch (error) { presetStatus(t("presetsInvalidJson", { error: error.message }), true); return; }
+    if (!Array.isArray(parsed)) { presetStatus(t("presetsJsonList"), true); return; }
+    presets.boards = parsed;
+    presets.index = null;
+    presets.draft = null;
+    presets.dirty = true;
+    presetStatus("");
+    showJson(false);
+    renderPresetList();
+    renderEditor();
+  });
+  window.addEventListener("beforeunload", function (event) {
+    if (presets.dirty) { event.preventDefault(); event.returnValue = t("presetsLeave"); }
+  });
+
   document.getElementById("refresh").addEventListener("click", load);
   document.getElementById("auto").addEventListener("change", schedule);
   document.getElementById("filter").addEventListener("input", function (event) {
@@ -486,6 +902,7 @@
 
   applyStaticText();
   load();
+  loadPresets();
   schedule();
 })();
 </script>

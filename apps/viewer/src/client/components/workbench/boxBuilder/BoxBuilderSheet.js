@@ -40,7 +40,6 @@ import {
   removeSelected
 } from "@/workbench/boxBuilder/boxEdits.js";
 import {
-  BOARD_PRESET_IDS,
   PORT_TYPE_IDS,
   boardMinimumSize,
   fitBoxToBoard,
@@ -100,6 +99,7 @@ import FileSheet, {
   parseFileSheetNumberInput
 } from "../FileSheet";
 import FileSheetTabbedSurface from "../FileSheetTabbedSurface";
+import { useBoardPresets } from "./useBoardPresets";
 import { useBoxLanguage } from "./useBoxLanguage";
 
 const SECTION_IDS = Object.freeze({
@@ -652,6 +652,16 @@ function IconButton({ icon: Icon, label, className, ...props }) {
   );
 }
 
+// A board's template name; boards saved before names were stored carry only a template id.
+function boardLabel(board, t) {
+  if (board.name) {
+    return board.name;
+  }
+  const key = `board.preset.${board.preset}`;
+  const text = t(key);
+  return text === key ? board.preset : text;
+}
+
 function SubHeading({ children }) {
   return <FileSheetStatusText className="font-medium text-sidebar-foreground">{children}</FileSheetStatusText>;
 }
@@ -757,7 +767,7 @@ function BoardItem({ builder, board, index }) {
   return (
     <SelectableItem selected={selected} onSelect={() => setSelection(itemSelection)}>
       <FileSheetItemGroup
-        label={t("item.board", { n: index + 1, name: t(`board.preset.${board.preset}`) })}
+        label={t("item.board", { n: index + 1, name: boardLabel(board, t) })}
         className="!mt-0"
       >
         <FileSheetControlRow label={board.mounted ? t("board.mounted") : t("board.notMounted")} value={summary} />
@@ -880,14 +890,18 @@ function BoardItem({ builder, board, index }) {
 function BoardsTab({ builder }) {
   const { t } = useBoxLanguage();
   const { spec, edit, setSelection } = builder;
-  const [preset, setPreset] = useState("rpi4");
+  const presets = useBoardPresets();
+  const [presetId, setPresetId] = useState("custom");
+  const preset = presets.find((entry) => entry.id === presetId) || null;
   const full = spec.boards.length >= MAX_BOARDS;
+  // A new board goes straight into the box.
   const addBoard = () => {
     let created = null;
     edit((draft) => {
       if (draft.boards.length < MAX_BOARDS) {
         created = newBoard(draft, preset);
         draft.boards.push(created);
+        mountBoard(draft, created.id);
       }
     });
     if (created) {
@@ -899,14 +913,18 @@ function BoardsTab({ builder }) {
       <FileSheetSubsection title={t("section.newBoard")}>
         <FileSheetSelectRow
           label={t("field.boardPreset")}
-          value={preset}
-          onValueChange={setPreset}
-          options={BOARD_PRESET_IDS.map((id) => ({ value: id, label: t(`board.preset.${id}`) }))}
+          value={preset ? presetId : "custom"}
+          onValueChange={setPresetId}
+          options={[
+            { value: "custom", label: t("board.preset.custom") },
+            ...presets.map((entry) => ({ value: entry.id, label: entry.name }))
+          ]}
         />
         <FileSheetButtonRow>
           <CompactButton icon={Plus} disabled={full} onClick={addBoard}>{t("action.addBoard")}</CompactButton>
         </FileSheetButtonRow>
-        <FileSheetStatusText>{full ? t("boards.full", { max: MAX_BOARDS }) : t("boards.presetNote")}</FileSheetStatusText>
+        {full ? <FileSheetStatusText>{t("boards.full", { max: MAX_BOARDS })}</FileSheetStatusText> : null}
+        {!full && preset ? <FileSheetStatusText>{t("boards.presetNote")}</FileSheetStatusText> : null}
       </FileSheetSubsection>
       <FileSheetSubsection title={t("section.boards")}>
         {spec.boards.length ? (

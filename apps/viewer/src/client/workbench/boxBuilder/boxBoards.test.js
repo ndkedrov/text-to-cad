@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { fitBoxToBoard, mountBoard, newBoard, resizeBoard, rotateBoard, snapBoardToWalls } from "./boxBoards.js";
 import { buildBoxPlan } from "./boxPlan.js";
 import {
+  PORT_TYPES,
   boardEdgeWall,
   boardHolePoints,
   boardPortCutout,
@@ -13,11 +15,21 @@ import {
   normalizeBoxSpec
 } from "./boxSpec.js";
 
+// The board templates the server ships (GET /__cad/boxes/presets).
+const SHIPPED = JSON.parse(readFileSync(
+  new URL("../../../../../../packages/cadgen/src/cadgen/viewer/board_presets.json", import.meta.url),
+  "utf8"
+));
+
+function presetFor(id) {
+  return id === "custom" ? null : SHIPPED.boards.find((board) => board.id === id);
+}
+
 // The default box: 100 x 70 outside, 2 mm walls (96 x 66 inside), 4 mm corners,
 // a 2 mm floor and 30 mm walls (wall top at 32), a 4 mm lip 1.6 thick 0.25 off the wall.
 function specWithBoard(presetId, mutate = () => {}) {
   const draft = normalizeBoxSpec(defaultBoxSpec());
-  draft.boards.push(newBoard(draft, presetId));
+  draft.boards.push(newBoard(draft, presetFor(presetId)));
   mutate(draft, draft.boards[0]);
   return normalizeBoxSpec(draft);
 }
@@ -41,6 +53,25 @@ function findNodes(node, predicate, found = []) {
   }
   return found;
 }
+
+test("the shipped templates use the builder's connector sizes and survive normalizing", () => {
+  assert.deepEqual(SHIPPED.portTypes, JSON.parse(JSON.stringify(PORT_TYPES)));
+  assert.ok(SHIPPED.boards.length >= 10);
+  for (const preset of SHIPPED.boards) {
+    const spec = normalizeBoxSpec(defaultBoxSpec());
+    spec.boards.push(newBoard(spec, preset));
+    const board = normalizeBoxSpec(spec).boards[0];
+    assert.deepEqual([board.preset, board.name], [preset.id, preset.name]);
+    assert.deepEqual(board.holes.map(({ x, y, diameter }) => [x, y, diameter]), preset.holes.map(({ x, y, diameter }) => [x, y, diameter]), preset.id);
+    assert.equal(board.ports.length, preset.ports.length, preset.id);
+  }
+});
+
+test("a board without a template is the custom one", () => {
+  const spec = normalizeBoxSpec(defaultBoxSpec());
+  const board = newBoard(spec);
+  assert.deepEqual([board.preset, board.name, board.width, board.length, board.holes.length], ["custom", "", 50, 30, 4]);
+});
 
 test("mounting centres the board along its port wall and pushes it against that wall", () => {
   const spec = mounted("rpiZero");

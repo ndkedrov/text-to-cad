@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { readFileSync } from "node:fs";
+
 import { newBoard } from "./boxBoards.js";
 import { boxSpecWarnings, defaultBoxSpec, newHole, newStandoffGroup, normalizeBoxSpec } from "./boxSpec.js";
 import { BOX_MESSAGES, detectLanguage, formatWarning, translate } from "./i18n.js";
@@ -41,8 +43,12 @@ test("every warning the spec produces has a sentence in both languages", () => {
   spec.walls.enabled = true;
   spec.lid.enabled = false;
   spec.holes.push({ ...newHole(spec, "lid") });
-  spec.boards.push({ ...newBoard(spec, "rpiZero"), mounted: true, componentHeight: 100, x: 60 });
-  spec.boards.push({ ...newBoard(spec, "rpiZero"), mounted: true, clearance: 40 });
+  const rpiZero = JSON.parse(readFileSync(
+    new URL("../../../../../../packages/cadgen/src/cadgen/viewer/board_presets.json", import.meta.url),
+    "utf8"
+  )).boards.find((board) => board.id === "rpiZero");
+  spec.boards.push({ ...newBoard(spec, rpiZero), mounted: true, componentHeight: 100, x: 60 });
+  spec.boards.push({ ...newBoard(spec, rpiZero), mounted: true, clearance: 40 });
   const warnings = boxSpecWarnings(spec);
   const keys = new Set(warnings.map((warning) => warning.key));
   for (const key of ["warning.boardOutside", "warning.boardTall", "warning.portFar", "warning.portOutside"]) {

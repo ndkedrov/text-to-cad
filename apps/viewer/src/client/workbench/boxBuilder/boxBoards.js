@@ -31,83 +31,47 @@ function holesAt(points, diameter) {
   return points.map(([x, y]) => ({ x, y, diameter }));
 }
 
-// Sizes and hole positions from the makers' mechanical drawings; connector
-// positions are close but worth checking against the board in hand.
-export const BOARD_PRESETS = Object.freeze({
-  custom: {
-    width: 50,
-    length: 30,
-    clearance: 5,
-    componentHeight: 10,
-    padDiameter: 6,
-    boreDiameter: 2.5,
-    holes: holesAt([[3.5, 3.5], [46.5, 3.5], [3.5, 26.5], [46.5, 26.5]], 3.2),
-    ports: []
-  },
-  rpi4: {
-    width: 85,
-    length: 56,
-    clearance: 5,
-    componentHeight: 16,
-    padDiameter: 6,
-    boreDiameter: 2.2,
-    holes: holesAt([[3.5, 3.5], [61.5, 3.5], [3.5, 52.5], [61.5, 52.5]], 2.7),
-    ports: [
-      port("usbC", "front", 11.2),
-      port("microHdmi", "front", 26),
-      port("microHdmi", "front", 39.5),
-      port("audio", "front", 53.5),
-      port("usbA2", "right", 9, { overhang: 2 }),
-      port("usbA2", "right", 27, { overhang: 2 }),
-      port("rj45", "right", 45.75, { overhang: 2 })
-    ]
-  },
-  rpiZero: {
-    width: 65,
-    length: 30,
-    clearance: 4,
-    componentHeight: 5,
-    padDiameter: 5.5,
-    boreDiameter: 2.2,
-    holes: holesAt([[3.5, 3.5], [61.5, 3.5], [3.5, 26.5], [61.5, 26.5]], 2.7),
-    ports: [
-      port("miniHdmi", "front", 12.4),
-      port("microUsb", "front", 41.4),
-      port("microUsb", "front", 54)
-    ]
-  },
-  arduinoUno: {
-    width: 68.6,
-    length: 53.3,
-    clearance: 5,
-    componentHeight: 12,
-    padDiameter: 6,
-    boreDiameter: 2.6,
-    holes: holesAt([[13.97, 2.54], [15.24, 50.8], [66.04, 7.62], [66.04, 35.56]], 3.2),
-    ports: [
-      port("usbB", "left", 38.1, { overhang: 6.3 }),
-      port("dcJack", "left", 7.6, { overhang: 1.8 })
-    ]
-  }
+// "Custom": what a new board starts as when no template is picked.
+export const CUSTOM_BOARD = Object.freeze({
+  width: 50,
+  length: 30,
+  thickness: PCB_THICKNESS,
+  clearance: 5,
+  componentHeight: 10,
+  padDiameter: 6,
+  boreDiameter: 2.5,
+  holes: Object.freeze(holesAt([[3.5, 3.5], [46.5, 3.5], [3.5, 26.5], [46.5, 26.5]], 3.2)),
+  ports: Object.freeze([])
 });
 
-export const BOARD_PRESET_IDS = Object.freeze(Object.keys(BOARD_PRESETS));
-
-export function newBoard(spec, presetId = "custom") {
-  const key = Object.prototype.hasOwnProperty.call(BOARD_PRESETS, presetId) ? presetId : "custom";
-  const preset = BOARD_PRESETS[key];
+// A new, unmounted board from a template: one of the server's board presets
+// (GET /__cad/boxes/presets, edited from /admin), or CUSTOM_BOARD for none.
+// A port missing a size takes its type's.
+export function newBoard(spec, preset = null) {
+  const source = preset && typeof preset === "object" ? preset : CUSTOM_BOARD;
+  const pick = (key) => (Number.isFinite(Number(source[key])) ? Number(source[key]) : CUSTOM_BOARD[key]);
   return {
     id: nextId("board", spec.boards),
-    preset: key,
-    width: preset.width,
-    length: preset.length,
-    thickness: PCB_THICKNESS,
-    clearance: preset.clearance,
-    componentHeight: preset.componentHeight,
-    padDiameter: preset.padDiameter,
-    boreDiameter: preset.boreDiameter,
-    holes: preset.holes.map((hole, index) => ({ id: `mount-${index + 1}`, ...hole })),
-    ports: preset.ports.map((entry, index) => ({ id: `port-${index + 1}`, ...entry })),
+    preset: source === CUSTOM_BOARD ? "custom" : String(source.id || "custom"),
+    name: source === CUSTOM_BOARD ? "" : String(source.name || ""),
+    width: pick("width"),
+    length: pick("length"),
+    thickness: pick("thickness"),
+    clearance: pick("clearance"),
+    componentHeight: pick("componentHeight"),
+    padDiameter: pick("padDiameter"),
+    boreDiameter: pick("boreDiameter"),
+    holes: (Array.isArray(source.holes) ? source.holes : []).map((hole, index) => ({
+      id: `mount-${index + 1}`,
+      x: hole.x,
+      y: hole.y,
+      diameter: hole.diameter
+    })),
+    ports: (Array.isArray(source.ports) ? source.ports : []).map((entry, index) => ({
+      ...port(PORT_TYPES[entry.type] ? entry.type : "custom", entry.edge, entry.offset),
+      ...entry,
+      id: `port-${index + 1}`
+    })),
     mounted: false,
     x: 0,
     y: 0,

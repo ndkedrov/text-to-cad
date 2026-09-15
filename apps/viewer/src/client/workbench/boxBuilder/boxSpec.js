@@ -240,7 +240,9 @@ function normalizeBoard(raw, used) {
   const portIds = new Set();
   return {
     id: uniqueId(source.id, "board", used),
-    preset: typeof source.preset === "string" && /^[A-Za-z0-9]{1,24}$/u.test(source.preset) ? source.preset : "custom",
+    preset: typeof source.preset === "string" && /^[A-Za-z0-9][A-Za-z0-9-]{0,39}$/u.test(source.preset) ? source.preset : "custom",
+    // The template's name, shown in the board's heading.
+    name: typeof source.name === "string" ? source.name.replace(/[ -]/gu, "").trim().slice(0, 60) : "",
     width,
     length,
     thickness: numberIn(source.thickness, PCB_THICKNESS, 0.4, 5),
