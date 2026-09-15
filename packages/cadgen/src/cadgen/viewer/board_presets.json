@@ -1264,7 +1264,7 @@
      "thickness": 4
     },
     {
-     "offset": 67,
+     "offset": 65,
      "length": 22,
      "thickness": 4
     }
@@ -1517,7 +1517,7 @@
    "width": 25.4,
    "length": 67.44,
    "thickness": 1.6,
-   "clearance": 10,
+   "clearance": 2,
    "componentHeight": 3,
    "padDiameter": 5.2,
    "boreDiameter": 2.2,
@@ -1547,7 +1547,21 @@
      "overhang": 0.87,
      "margin": 0.5
     }
-   ]
+   ],
+   "rails": [
+    {
+     "offset": 8,
+     "length": 22,
+     "thickness": 4
+    },
+    {
+     "offset": 63.44,
+     "length": 22,
+     "thickness": 4
+    }
+   ],
+   "clamp": true,
+   "clampHeight": 14
   },
   {
    "id": "xiaoEsp32C3",

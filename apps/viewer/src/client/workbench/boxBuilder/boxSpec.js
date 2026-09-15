@@ -340,6 +340,8 @@ function normalizeBoard(raw, used) {
   // A board with no mounting holes is clamped unless told otherwise.
   board.clamp = booleanOr(source.clamp, board.holes.length === 0);
   board.clampHeight = numberIn(source.clampHeight, defaultClampHeight(board), 1, 200);
+  // The fingerprint of the template the board was last made from (boardTemplateStamp).
+  board.template = typeof source.template === "string" && /^[0-9a-f]{8}$/u.test(source.template) ? source.template : "";
   return board;
 }
 
