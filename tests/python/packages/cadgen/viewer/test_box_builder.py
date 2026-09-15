@@ -110,7 +110,7 @@ class PlanGrammar(unittest.TestCase):
                     normalize_plan_node(node)
 
     def test_refuses_plans_that_are_too_big_to_build_quickly(self):
-        many = {"type": "union", "children": [{"type": "cyl", "r": 1, "h": 1}] * 401}
+        many = {"type": "union", "children": [{"type": "cyl", "r": 1, "h": 1}] * 1001}
         with self.assertRaises(PlanError):
             normalize_plan_node(many)
         square = [[0, 0], [1, 0], [1, 1], [0, 1]]

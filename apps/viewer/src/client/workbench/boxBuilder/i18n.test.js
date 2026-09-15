@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { newBoard } from "./boxBoards.js";
 import { boxSpecWarnings, defaultBoxSpec, newHole, newStandoffGroup, normalizeBoxSpec } from "./boxSpec.js";
 import { BOX_MESSAGES, detectLanguage, formatWarning, translate } from "./i18n.js";
 
@@ -40,8 +41,13 @@ test("every warning the spec produces has a sentence in both languages", () => {
   spec.walls.enabled = true;
   spec.lid.enabled = false;
   spec.holes.push({ ...newHole(spec, "lid") });
+  spec.boards.push({ ...newBoard(spec, "rpiZero"), mounted: true, componentHeight: 100, x: 60 });
+  spec.boards.push({ ...newBoard(spec, "rpiZero"), mounted: true, clearance: 40 });
   const warnings = boxSpecWarnings(spec);
-  assert.ok(warnings.length >= 3);
+  const keys = new Set(warnings.map((warning) => warning.key));
+  for (const key of ["warning.boardOutside", "warning.boardTall", "warning.portFar", "warning.portOutside"]) {
+    assert.ok(keys.has(key), key);
+  }
   for (const language of ["en", "uk"]) {
     for (const warning of warnings) {
       const sentence = formatWarning(language, warning);

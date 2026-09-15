@@ -3,7 +3,18 @@
 // the very same tree with build123d (cadgen.box_csg) for the STEP/STL/3MF files.
 // Grammar: packages/cadgen/src/cadgen/box_plan.py.
 
-import { boxDimensions, faceFrame, isWallFace, roundMm, standoffPoints } from "./boxSpec.js";
+import {
+  boardHolePoints,
+  boardPortCutout,
+  boxDimensions,
+  faceFrame,
+  isWallFace,
+  roundMm,
+  standoffPoints
+} from "./boxSpec.js";
+
+// The most nodes cadgen.box_plan accepts in one save (base and lid together).
+export const PLAN_NODE_LIMIT = 1000;
 
 // How far a cutter reaches past the surface it cuts, so no boolean ever works
 // on two coincident faces.
@@ -96,7 +107,9 @@ function holeProfile(hole, depth, bottom) {
   return group([node], { rot: [0, 0, hole.rotation], pos: [0, 0, bottom] });
 }
 
-function holeCutter(hole, dims) {
+// `reach` is how deep a wall cutter goes in from the outside: the wall itself, or
+// further, through the lid's lip that stands inside it.
+function holeCutter(hole, dims, reach = dims.wallThickness) {
   if (hole.face === "floor") {
     return group(
       [holeProfile(hole, dims.floorThickness + 2 * CUT_MARGIN, -CUT_MARGIN)],
@@ -111,33 +124,49 @@ function holeCutter(hole, dims) {
   // Walls: built in local coordinates (u = X, v = Y, outward = +Z, outer surface
   // at z = 0) and turned onto the wall.
   const frame = faceFrame(dims, hole.face);
-  const depth = dims.wallThickness + 2 * CUT_MARGIN;
+  const depth = reach + 2 * CUT_MARGIN;
   const position = [0, 1, 2].map((axis) => (
     frame.origin[axis] + frame.u[axis] * hole.u + frame.v[axis] * hole.v
   ));
   return group(
-    [holeProfile(hole, depth, -(dims.wallThickness + CUT_MARGIN))],
+    [holeProfile(hole, depth, -(reach + CUT_MARGIN))],
     { rot: WALL_ROTATIONS[hole.face], pos: position }
   );
 }
 
-function standoffNodes(groupSpec, dims) {
-  return standoffPoints(groupSpec).map(([x, y]) => {
-    const pad = cylinder(
-      groupSpec.outerDiameter / 2,
-      groupSpec.height + FUSE_OVERLAP,
-      { pos: [x, y, dims.floorTop - FUSE_OVERLAP] }
-    );
-    if (groupSpec.holeDiameter <= 0) {
+function padNodes(points, { outerDiameter, holeDiameter, height }, dims) {
+  return points.map(([x, y]) => {
+    const pad = cylinder(outerDiameter / 2, height + FUSE_OVERLAP, { pos: [x, y, dims.floorTop - FUSE_OVERLAP] });
+    if (holeDiameter <= 0) {
       return pad;
     }
-    const bore = cylinder(
-      groupSpec.holeDiameter / 2,
-      groupSpec.height + CUT_MARGIN,
-      { pos: [x, y, dims.floorTop] }
-    );
+    const bore = cylinder(holeDiameter / 2, height + CUT_MARGIN, { pos: [x, y, dims.floorTop] });
     return difference(pad, [bore]);
   });
+}
+
+function standoffNodes(groupSpec, dims) {
+  return padNodes(standoffPoints(groupSpec), groupSpec, dims);
+}
+
+// A mounted board stands on one pad under each of its holes, as tall as its
+// clearance above the floor.
+function boardStandoffNodes(board, dims) {
+  return padNodes(
+    boardHolePoints(board),
+    { outerDiameter: board.padDiameter, holeDiameter: board.boreDiameter, height: board.clearance },
+    dims
+  );
+}
+
+// Wall cut-outs for the ports of every mounted board.
+export function boardPortCutouts(spec, dims) {
+  if (!dims.wallsEnabled) {
+    return [];
+  }
+  return spec.boards
+    .filter((board) => board.mounted)
+    .flatMap((board) => board.ports.map((port) => boardPortCutout(dims, board, port)));
 }
 
 function basePlan(spec, dims) {
@@ -154,9 +183,13 @@ function basePlan(spec, dims) {
   const cutters = spec.holes
     .filter((hole) => hole.face === "floor" || (isWallFace(hole.face) && dims.wallsEnabled))
     .map((hole) => holeCutter(hole, dims));
-  const shell = difference(body, [cavity, ...cutters]);
+  const portCutters = boardPortCutouts(spec, dims).map((cutout) => holeCutter(cutout, dims));
+  const shell = difference(body, [cavity, ...cutters, ...portCutters]);
   const standoffs = spec.standoffs.flatMap((groupSpec) => standoffNodes(groupSpec, dims));
-  return union([shell, ...standoffs]);
+  const boardStandoffs = spec.boards
+    .filter((board) => board.mounted)
+    .flatMap((board) => boardStandoffNodes(board, dims));
+  return union([shell, ...standoffs, ...boardStandoffs]);
 }
 
 function lidPlan(spec, dims) {
@@ -182,7 +215,15 @@ function lidPlan(spec, dims) {
   const cutters = spec.holes
     .filter((hole) => hole.face === "lid")
     .map((hole) => holeCutter(hole, dims));
-  return difference(union([plate, lip]), cutters);
+  // A port cut-out that reaches up into the lip's band goes through the lip too,
+  // or the closed lid would cover the connector from the inside.
+  const lipBottom = dims.wallTop - dims.lipHeight;
+  const lipCutters = lip
+    ? boardPortCutouts(spec, dims)
+      .filter((cutout) => cutout.v + cutout.height / 2 > lipBottom)
+      .map((cutout) => holeCutter(cutout, dims, dims.wallThickness + dims.clearance + dims.lipThickness))
+    : [];
+  return difference(union([plate, lip]), [...cutters, ...lipCutters]);
 }
 
 // `layout: "assembled"` keeps both parts where they sit on the closed box (for the

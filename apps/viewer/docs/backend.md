@@ -202,7 +202,10 @@ every producer.
 ## Box builder
 
 The client's box builder (parametric printable boxes: floor, walls, a lid with a
-locating lip, through-holes, PCB standoffs) keeps ONE geometry description. The
+locating lip, through-holes, PCB standoffs, circuit boards mounted on generated
+standoffs with wall cut-outs for their ports) keeps ONE geometry description. A
+board itself is only drawn in the preview; the plan carries its standoffs and
+cut-outs, never the board. The
 client turns its spec into a CSG plan (`src/client/workbench/boxBuilder/boxPlan.js`),
 previews that plan in the browser with manifold, and saves the same plan here.
 `cadgen.viewer.boxes` checks it against the plan grammar (`cadgen.box_plan`),

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { buildBoxPlan } from "@/workbench/boxBuilder/boxPlan.js";
+import { PLAN_NODE_LIMIT, buildBoxPlan, countPlanNodes } from "@/workbench/boxBuilder/boxPlan.js";
 import {
   boxDimensions,
   boxSpecWarnings,
@@ -11,6 +11,20 @@ import {
 const DRAFT_STORAGE_KEY = "cad-viewer:box-builder:draft:v1";
 const DRAFT_WRITE_DELAY_MS = 400;
 const HISTORY_LIMIT = 200;
+// How the viewport draws things, remembered in this browser; not part of the box.
+const DISPLAY_STORAGE_KEY = "cad-viewer:box-builder:display:v1";
+const DEFAULT_DISPLAY = Object.freeze({ groundMm: true, boxMm: false, boards: true });
+
+function readDisplay() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(DISPLAY_STORAGE_KEY) || "{}");
+    return Object.fromEntries(Object.entries(DEFAULT_DISPLAY).map(([key, fallback]) => (
+      [key, typeof parsed?.[key] === "boolean" ? parsed[key] : fallback]
+    )));
+  } catch {
+    return { ...DEFAULT_DISPLAY };
+  }
+}
 
 function readDraft() {
   try {
@@ -62,7 +76,20 @@ export function useBoxBuilder() {
   const [name, setName] = useState(initial.name);
   const [savedKey, setSavedKey] = useState(initial.savedKey);
   const [selection, setSelection] = useState(null);
+  const [display, setDisplayState] = useState(readDisplay);
   const [, setHistoryVersion] = useState(0);
+
+  const setDisplay = useCallback((patch) => {
+    setDisplayState((current) => {
+      const next = { ...current, ...patch };
+      try {
+        window.localStorage.setItem(DISPLAY_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // Blocked storage: the choice lasts for this page.
+      }
+      return next;
+    });
+  }, []);
   const specRef = useRef(spec);
   const pastRef = useRef([]);
   const futureRef = useRef([]);
@@ -166,7 +193,15 @@ export function useBoxBuilder() {
 
   const dims = useMemo(() => boxDimensions(spec), [spec]);
   const plan = useMemo(() => buildBoxPlan(spec), [spec]);
-  const warnings = useMemo(() => boxSpecWarnings(spec), [spec]);
+  const warnings = useMemo(() => {
+    const list = boxSpecWarnings(spec);
+    // The saved lid is turned over for printing: one more node than the preview's.
+    const nodes = countPlanNodes(plan.base) + countPlanNodes(plan.lid) + (plan.lid ? 1 : 0);
+    if (nodes > PLAN_NODE_LIMIT) {
+      list.push({ key: "warning.tooComplex", params: { count: nodes, limit: PLAN_NODE_LIMIT } });
+    }
+    return list;
+  }, [spec, plan]);
   const dirty = savedKey !== documentKey(name, spec);
 
   // A selection that points at something deleted (or undone away) is no selection.
@@ -174,8 +209,8 @@ export function useBoxBuilder() {
     if (!selection) {
       return null;
     }
-    const list = selection.kind === "hole" ? spec.holes : spec.standoffs;
-    return list.some((item) => item.id === selection.id) ? selection : null;
+    const lists = { hole: spec.holes, standoff: spec.standoffs, board: spec.boards };
+    return (lists[selection.kind] || []).some((item) => item.id === selection.id) ? selection : null;
   }, [selection, spec]);
 
   return {
@@ -189,6 +224,8 @@ export function useBoxBuilder() {
     markSaved,
     selection: effectiveSelection,
     setSelection,
+    display,
+    setDisplay,
     edit,
     beginGesture,
     gestureEdit,

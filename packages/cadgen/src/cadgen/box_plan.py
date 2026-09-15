@@ -39,7 +39,7 @@ BOX_PART_NAMES = ("base", "lid")
 
 _PRIMITIVES = frozenset({"rrect", "cyl", "poly"})
 _OPERATIONS = frozenset({"union", "difference"})
-_MAX_NODES = 400
+_MAX_NODES = 1000
 _MAX_DEPTH = 16
 _MAX_POLY_POINTS = 64
 _MAX_TOTAL_POINTS = 2000

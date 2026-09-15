@@ -10,10 +10,42 @@ export const WALL_FACES = Object.freeze(["front", "back", "left", "right"]);
 export const HOLE_SHAPES = Object.freeze(["circle", "rect", "slot", "hex"]);
 export const STANDOFF_PATTERNS = Object.freeze(["line", "triangle", "rect"]);
 
-// Display names for faces, shapes and patterns live in i18n.js (face.*, shape.*, pattern.*).
+// A circuit board's edges as seen from above before it is turned: front is its
+// Y = 0 edge, left its X = 0 edge.
+export const BOARD_EDGES = Object.freeze(["front", "back", "left", "right"]);
+export const BOARD_ROTATIONS = Object.freeze([0, 90, 180, 270]);
+export const PORT_SHAPES = Object.freeze(["rect", "circle"]);
+
+// Display names for faces, shapes, patterns, edges and port types live in i18n.js
+// (face.*, shape.*, pattern.*, edge.*, port.type.*).
 
 export const MAX_HOLES = 60;
 export const MAX_STANDOFF_GROUPS = 12;
+export const MAX_BOARDS = 4;
+export const MAX_BOARD_HOLES = 8;
+export const MAX_BOARD_PORTS = 8;
+export const PCB_THICKNESS = 1.6;
+// A connector whose front stops further than this from the inside of its wall is
+// reported: a plug will not reach it through the cut-out.
+export const PORT_REACH_TOLERANCE = 2;
+
+// Connector bodies as they stand on the board: width along the board edge, height
+// up from `elevation` above the board top.
+export const PORT_TYPES = Object.freeze({
+  usbC: Object.freeze({ shape: "rect", width: 9, height: 3.3, radius: 1.2, elevation: 0 }),
+  microUsb: Object.freeze({ shape: "rect", width: 8, height: 3, radius: 0.6, elevation: 0 }),
+  miniUsb: Object.freeze({ shape: "rect", width: 7.8, height: 4, radius: 0.5, elevation: 0 }),
+  usbA: Object.freeze({ shape: "rect", width: 13.2, height: 5.8, radius: 0.5, elevation: 0 }),
+  usbA2: Object.freeze({ shape: "rect", width: 13.5, height: 16, radius: 0.5, elevation: 0 }),
+  usbB: Object.freeze({ shape: "rect", width: 12.2, height: 11, radius: 0.5, elevation: 0 }),
+  hdmi: Object.freeze({ shape: "rect", width: 15.2, height: 5.8, radius: 0.5, elevation: 0 }),
+  miniHdmi: Object.freeze({ shape: "rect", width: 11.2, height: 3.4, radius: 0.5, elevation: 0 }),
+  microHdmi: Object.freeze({ shape: "rect", width: 7, height: 3.6, radius: 0.5, elevation: 0 }),
+  rj45: Object.freeze({ shape: "rect", width: 16, height: 13.5, radius: 0.5, elevation: 0 }),
+  dcJack: Object.freeze({ shape: "circle", width: 9.5, height: 9.5, radius: 0, elevation: 1.75 }),
+  audio: Object.freeze({ shape: "circle", width: 6.5, height: 6.5, radius: 0, elevation: 0 }),
+  custom: Object.freeze({ shape: "rect", width: 10, height: 5, radius: 0, elevation: 0 })
+});
 
 function finiteOr(value, fallback) {
   const number = Number(value);
@@ -51,7 +83,8 @@ export function defaultBoxSpec() {
       clearance: 0.25
     },
     holes: [],
-    standoffs: []
+    standoffs: [],
+    boards: []
   };
 }
 
@@ -159,6 +192,71 @@ function normalizeStandoffGroup(raw, used) {
   };
 }
 
+function normalizeBoardHole(raw, used, width, length) {
+  const source = raw && typeof raw === "object" ? raw : {};
+  return {
+    id: uniqueId(source.id, "mount", used),
+    x: numberIn(source.x, 3.5, 0, width),
+    y: numberIn(source.y, 3.5, 0, length),
+    diameter: numberIn(source.diameter, 3.2, 0.5, 12)
+  };
+}
+
+function normalizePort(raw, used, width, length) {
+  const source = raw && typeof raw === "object" ? raw : {};
+  const type = Object.prototype.hasOwnProperty.call(PORT_TYPES, source.type) ? source.type : "custom";
+  const defaults = PORT_TYPES[type];
+  const edge = BOARD_EDGES.includes(source.edge) ? source.edge : "front";
+  const shape = PORT_SHAPES.includes(source.shape) ? source.shape : defaults.shape;
+  const portWidth = numberIn(source.width, defaults.width, 0.5, 100);
+  const portHeight = shape === "circle" ? portWidth : numberIn(source.height, defaults.height, 0.5, 100);
+  const edgeLength = edge === "front" || edge === "back" ? width : length;
+  return {
+    id: uniqueId(source.id, "port", used),
+    type,
+    edge,
+    offset: numberIn(source.offset, edgeLength / 2, 0, edgeLength),
+    elevation: numberIn(source.elevation, defaults.elevation, -20, 100),
+    shape,
+    width: portWidth,
+    height: portHeight,
+    radius: shape === "circle" ? 0 : numberIn(source.radius, defaults.radius, 0, Math.min(portWidth, portHeight) / 2),
+    overhang: numberIn(source.overhang, 0, 0, 30),
+    margin: numberIn(source.margin, 0.5, 0, 5)
+  };
+}
+
+function normalizeBoard(raw, used) {
+  const source = raw && typeof raw === "object" ? raw : {};
+  const width = numberIn(source.width, 50, 5, 400);
+  const length = numberIn(source.length, 30, 5, 400);
+  const padDiameter = numberIn(source.padDiameter, 6, 2, 30);
+  const quarter = ((Math.round(finiteOr(source.rotation, 0) / 90) % 4) + 4) % 4;
+  const holeIds = new Set();
+  const portIds = new Set();
+  return {
+    id: uniqueId(source.id, "board", used),
+    preset: typeof source.preset === "string" && /^[A-Za-z0-9]{1,24}$/u.test(source.preset) ? source.preset : "custom",
+    width,
+    length,
+    thickness: numberIn(source.thickness, PCB_THICKNESS, 0.4, 5),
+    clearance: numberIn(source.clearance, 5, 1, 200),
+    componentHeight: numberIn(source.componentHeight, 10, 0, 200),
+    padDiameter,
+    boreDiameter: numberIn(source.boreDiameter, 2.5, 0, padDiameter - 0.8),
+    holes: (Array.isArray(source.holes) ? source.holes : [])
+      .slice(0, MAX_BOARD_HOLES)
+      .map((hole) => normalizeBoardHole(hole, holeIds, width, length)),
+    ports: (Array.isArray(source.ports) ? source.ports : [])
+      .slice(0, MAX_BOARD_PORTS)
+      .map((port) => normalizePort(port, portIds, width, length)),
+    mounted: booleanOr(source.mounted, false),
+    x: numberIn(source.x, 0, -2000, 2000),
+    y: numberIn(source.y, 0, -2000, 2000),
+    rotation: quarter * 90
+  };
+}
+
 // Clamp every value into a buildable range. Never throws: whatever arrives (a
 // saved file, a half-typed value) comes back as a spec both geometry engines accept.
 export function normalizeBoxSpec(raw) {
@@ -207,8 +305,12 @@ export function normalizeBoxSpec(raw) {
   const standoffs = (Array.isArray(source.standoffs) ? source.standoffs : [])
     .slice(0, MAX_STANDOFF_GROUPS)
     .map((group) => normalizeStandoffGroup(group, standoffIds));
+  const boardIds = new Set();
+  const boards = (Array.isArray(source.boards) ? source.boards : [])
+    .slice(0, MAX_BOARDS)
+    .map((board) => normalizeBoard(board, boardIds));
 
-  return { version: BOX_SPEC_VERSION, base, walls, lid, holes, standoffs };
+  return { version: BOX_SPEC_VERSION, base, walls, lid, holes, standoffs, boards };
 }
 
 // --- faces -------------------------------------------------------------------
@@ -355,10 +457,122 @@ export function newStandoffGroup(spec) {
   return group;
 }
 
+// --- boards --------------------------------------------------------------------
+
+// A board is described as on its drawing: seen from above, X along its width from
+// the left edge, Y along its length from the front edge. Mounted, its centre sits
+// at (x, y) on the floor and it is turned by `rotation` (0/90/180/270) about it.
+
+const EDGE_NORMALS = Object.freeze({ front: [0, -1], back: [0, 1], left: [-1, 0], right: [1, 0] });
+
+function turnQuarter([x, y], rotation) {
+  switch (rotation) {
+    case 90:
+      return [-y, x];
+    case 180:
+      return [-x, -y];
+    case 270:
+      return [y, -x];
+    default:
+      return [x, y];
+  }
+}
+
+// The board's extent along the box's X and Y.
+export function boardFootprint(board) {
+  return board.rotation % 180 === 0 ? [board.width, board.length] : [board.length, board.width];
+}
+
+// A point given in the board's own coordinates, in box coordinates.
+export function boardPoint(board, px, py) {
+  const [dx, dy] = turnQuarter([px - board.width / 2, py - board.length / 2], board.rotation);
+  return [roundMm(board.x + dx, 4), roundMm(board.y + dy, 4)];
+}
+
+export function boardHolePoints(board) {
+  return board.holes.map((hole) => boardPoint(board, hole.x, hole.y));
+}
+
+// Heights above the box bottom: the board's underside, its top, and the top of its parts.
+export function boardLevels(dims, board) {
+  const bottom = dims.floorTop + board.clearance;
+  const top = bottom + board.thickness;
+  return { bottom, top, partsTop: top + board.componentHeight };
+}
+
+// The wall a board edge faces once the board is turned.
+export function boardEdgeWall(board, edge) {
+  const [x, y] = turnQuarter(EDGE_NORMALS[edge] || EDGE_NORMALS.front, board.rotation);
+  if (Math.abs(x) > Math.abs(y)) {
+    return x > 0 ? "right" : "left";
+  }
+  return y > 0 ? "back" : "front";
+}
+
+function boardEdgePoint(board, edge, offset) {
+  switch (edge) {
+    case "back":
+      return [offset, board.length];
+    case "left":
+      return [0, offset];
+    case "right":
+      return [board.width, offset];
+    default:
+      return [offset, 0];
+  }
+}
+
+// From the box centre to the inside of a wall.
+export function wallInnerHalf(dims, wall) {
+  return wall === "front" || wall === "back" ? dims.innerDepth / 2 : dims.innerWidth / 2;
+}
+
+// The cut-out a port needs, shaped like a wall hole ({ face, shape, width, height,
+// radius, u, v, rotation }), plus `gap`: how far the connector's front stops short
+// of the inside of that wall (negative when it reaches into the wall).
+export function boardPortCutout(dims, board, port) {
+  const face = boardEdgeWall(board, port.edge);
+  const frame = faceFrame(dims, face);
+  const [px, py] = boardEdgePoint(board, port.edge, port.offset);
+  const [x, y] = boardPoint(board, px, py);
+  const front = x * frame.normal[0] + y * frame.normal[1] + port.overhang;
+  const width = port.width + 2 * port.margin;
+  const height = port.shape === "circle" ? width : port.height + 2 * port.margin;
+  return {
+    face,
+    shape: port.shape === "circle" ? "circle" : "rect",
+    width: roundMm(width, 4),
+    height: roundMm(height, 4),
+    radius: port.shape === "circle" ? 0 : roundMm(Math.min(port.radius + port.margin, Math.min(width, height) / 2), 4),
+    u: roundMm(x * frame.u[0] + y * frame.u[1], 4),
+    v: roundMm(boardLevels(dims, board).top + port.elevation + port.height / 2, 4),
+    rotation: 0,
+    gap: roundMm(wallInnerHalf(dims, face) - front, 3)
+  };
+}
+
+// Keep a mounted board between the walls.
+export function clampBoardPosition(dims, board, x, y) {
+  const [sizeX, sizeY] = boardFootprint(board);
+  const limitX = Math.max(dims.innerWidth / 2 - sizeX / 2, 0);
+  const limitY = Math.max(dims.innerDepth / 2 - sizeY / 2, 0);
+  // `|| 0` turns a -0 from a centred placement into 0.
+  return {
+    x: roundMm(clamp(x, -limitX, limitX), 3) || 0,
+    y: roundMm(clamp(y, -limitY, limitY), 3) || 0
+  };
+}
+
+// The stretch of a wall between its rounded corners.
+export function wallFlatHalf(dims, face) {
+  return (face === "front" || face === "back" ? dims.width : dims.depth) / 2 - dims.radius;
+}
+
 // --- checks ------------------------------------------------------------------
 
 // Things that build fine but are probably not what was meant, as { key, params }
-// for i18n.js's formatWarning.
+// for i18n.js's formatWarning; `target` names the item to select when it is not
+// the n-th hole or standoff group.
 export function boxSpecWarnings(spec) {
   const dims = boxDimensions(spec);
   const warnings = [];
@@ -390,6 +604,43 @@ export function boxSpecWarnings(spec) {
     ) {
       warnings.push({ key: "warning.holeOutside", params: { n } });
     }
+  });
+  spec.boards.forEach((board, index) => {
+    if (!board.mounted) {
+      return;
+    }
+    const n = index + 1;
+    const target = { kind: "board", id: board.id };
+    const [sizeX, sizeY] = boardFootprint(board);
+    if (
+      Math.abs(board.x) + sizeX / 2 > dims.innerWidth / 2 + 1e-6 ||
+      Math.abs(board.y) + sizeY / 2 > dims.innerDepth / 2 + 1e-6
+    ) {
+      warnings.push({ key: "warning.boardOutside", params: { n }, target });
+    }
+    if (dims.wallsEnabled && boardLevels(dims, board).partsTop > dims.wallTop + 1e-6) {
+      warnings.push({ key: "warning.boardTall", params: { n }, target });
+    }
+    if (!board.ports.length) {
+      return;
+    }
+    if (!dims.wallsEnabled) {
+      warnings.push({ key: "warning.boardNoWalls", params: { n }, target });
+      return;
+    }
+    board.ports.forEach((port, portIndex) => {
+      const cutout = boardPortCutout(dims, board, port);
+      const params = { n, port: portIndex + 1 };
+      if (
+        Math.abs(cutout.u) + cutout.width / 2 > wallFlatHalf(dims, cutout.face) + 1e-6 ||
+        cutout.v - cutout.height / 2 < dims.floorTop - 1e-6 ||
+        cutout.v + cutout.height / 2 > dims.wallTop + 1e-6
+      ) {
+        warnings.push({ key: "warning.portOutside", params, target });
+      } else if (cutout.gap > PORT_REACH_TOLERANCE) {
+        warnings.push({ key: "warning.portFar", params: { ...params, gap: Number(cutout.gap.toFixed(1)) }, target });
+      }
+    });
   });
   return warnings;
 }

@@ -14,6 +14,8 @@ import {
 } from "@/workbench/boxBuilder/boxEdits.js";
 import { manifoldFromPlan, roundedRectContour } from "@/workbench/boxBuilder/manifoldPlan.js";
 import {
+  boardLevels,
+  clampBoardPosition,
   clampHolePosition,
   clampStandoffPosition,
   faceAxisLabels,
@@ -28,6 +30,10 @@ const BASE_COLOR = 0xc3cad1;
 const LID_COLOR = 0x93b4cc;
 const EDGE_COLOR = 0x1f252b;
 const HIGHLIGHT_COLOR = 0xf97316;
+const BOARD_COLOR = 0x2f8f5b;
+const PORT_COLOR = 0x9aa3ab;
+// How far a connector body is drawn in from the board edge.
+const PORT_BODY_DEPTH = 6;
 // Pick proxies float just off the surface they belong to, so a ray reaches them
 // before the solid they sit on.
 const PROXY_LIFT = 0.35;
@@ -99,8 +105,11 @@ function cssColor(variable, fallback) {
   return color;
 }
 
-// The hole or standoff group a warning is about (its params.n is the 1-based index).
+// The item a warning is about: its own target, or the n-th hole or standoff group.
 function warningTarget(spec, warning) {
+  if (warning?.target) {
+    return warning.target;
+  }
   const isStandoff = String(warning?.key || "").startsWith("warning.standoffs");
   const list = isStandoff ? spec.standoffs : spec.holes;
   const item = list[Number(warning?.params?.n) - 1];
@@ -144,6 +153,51 @@ function disposeTree(object) {
   });
 }
 
+// Millimetre paper on the printed parts: lines every 1, 5 and 10 mm in the part's
+// own coordinates (from the box centre), projected along whichever axis the
+// surface faces most, so they lie on the floor and on both sides of every wall.
+// Lines packed tighter than a few pixels fade out instead of turning grey.
+const GRID_FRAGMENT_HEADER = `
+uniform float boxGridStrength;
+varying vec3 vGridPosition;
+varying vec3 vGridNormal;
+float boxGridLine(vec2 coord, float spacing) {
+  vec2 cell = coord / spacing;
+  vec2 width = max(fwidth(cell), vec2(1e-5));
+  vec2 toLine = abs(fract(cell - 0.5) - 0.5) / width;
+  float line = 1.0 - clamp(min(toLine.x, toLine.y), 0.0, 1.0);
+  return line * (1.0 - smoothstep(0.2, 0.45, max(width.x, width.y)));
+}
+`;
+
+const GRID_FRAGMENT_BODY = `
+if (boxGridStrength > 0.0) {
+  vec3 facing = abs(normalize(vGridNormal));
+  vec2 gridCoord = facing.z >= max(facing.x, facing.y)
+    ? vGridPosition.xy
+    : (facing.x >= facing.y ? vGridPosition.yz : vGridPosition.xz);
+  float gridInk = max(
+    max(boxGridLine(gridCoord, 1.0) * 0.16, boxGridLine(gridCoord, 5.0) * 0.3),
+    boxGridLine(gridCoord, 10.0) * 0.45
+  );
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.07, 0.09, 0.11), gridInk * boxGridStrength);
+}
+`;
+
+function addMillimetreGrid(material, runtime) {
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.boxGridStrength = runtime.gridUniforms.boxGridStrength;
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying vec3 vGridPosition;\nvarying vec3 vGridNormal;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvGridPosition = position;\nvGridNormal = objectNormal;");
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", `#include <common>\n${GRID_FRAGMENT_HEADER}`)
+      .replace("#include <color_fragment>", `#include <color_fragment>\n${GRID_FRAGMENT_BODY}`);
+  };
+  material.customProgramCacheKey = () => "box-millimetre-grid";
+  return material;
+}
+
 function replacePartMesh(runtime, part, geometry) {
   const group = part === "base" ? runtime.baseGroup : runtime.lidGroup;
   for (const key of [`${part}Mesh`, `${part}Edges`]) {
@@ -157,14 +211,14 @@ function replacePartMesh(runtime, part, geometry) {
   if (!geometry) {
     return;
   }
-  const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
+  const mesh = new THREE.Mesh(geometry, addMillimetreGrid(new THREE.MeshStandardMaterial({
     color: part === "base" ? BASE_COLOR : LID_COLOR,
     roughness: 0.78,
     metalness: 0,
     polygonOffset: true,
     polygonOffsetFactor: 1,
     polygonOffsetUnits: 1
-  }));
+  }), runtime));
   const edges = new THREE.LineSegments(
     new THREE.EdgesGeometry(geometry, 25),
     new THREE.LineBasicMaterial({ color: EDGE_COLOR, transparent: true, opacity: 0.55 })
@@ -251,6 +305,98 @@ function buildProxies(spec, dims) {
   return { base, lid };
 }
 
+// A board plate with its mounting holes, in the board's own frame centred on the
+// origin, from z = 0 (its underside) up.
+function boardPlateGeometry(board) {
+  const halfWidth = board.width / 2;
+  const halfLength = board.length / 2;
+  const shape = new THREE.Shape();
+  shape.moveTo(-halfWidth, -halfLength);
+  shape.lineTo(halfWidth, -halfLength);
+  shape.lineTo(halfWidth, halfLength);
+  shape.lineTo(-halfWidth, halfLength);
+  shape.closePath();
+  for (const hole of board.holes) {
+    const path = new THREE.Path();
+    path.absarc(hole.x - halfWidth, hole.y - halfLength, hole.diameter / 2, 0, Math.PI * 2, false);
+    shape.holes.push(path);
+  }
+  return new THREE.ExtrudeGeometry(shape, { depth: board.thickness, bevelEnabled: false, curveSegments: 20 });
+}
+
+// A connector body on its board edge: PORT_BODY_DEPTH in from the edge and
+// `overhang` out past it.
+function portBodyMesh(board, port, material) {
+  const depth = PORT_BODY_DEPTH + port.overhang;
+  const alongX = port.edge === "front" || port.edge === "back";
+  let geometry;
+  if (port.shape === "circle") {
+    geometry = new THREE.CylinderGeometry(port.width / 2, port.width / 2, depth, 32);
+    if (!alongX) {
+      geometry.rotateZ(Math.PI / 2);
+    }
+  } else {
+    geometry = alongX
+      ? new THREE.BoxGeometry(port.width, depth, port.height)
+      : new THREE.BoxGeometry(depth, port.width, port.height);
+  }
+  const mesh = new THREE.Mesh(geometry, material);
+  const halfWidth = board.width / 2;
+  const halfLength = board.length / 2;
+  const inward = (PORT_BODY_DEPTH - port.overhang) / 2;
+  const z = board.thickness + port.elevation + port.height / 2;
+  if (port.edge === "back") {
+    mesh.position.set(port.offset - halfWidth, halfLength - inward, z);
+  } else if (port.edge === "left") {
+    mesh.position.set(-halfWidth + inward, port.offset - halfLength, z);
+  } else if (port.edge === "right") {
+    mesh.position.set(halfWidth - inward, port.offset - halfLength, z);
+  } else {
+    mesh.position.set(port.offset - halfWidth, -halfLength + inward, z);
+  }
+  return mesh;
+}
+
+// Mounted boards as they sit on their standoffs. Shown, never printed.
+function buildBoardVisuals(spec, dims) {
+  const root = new THREE.Group();
+  for (const board of spec.boards) {
+    if (!board.mounted) {
+      continue;
+    }
+    const feature = { kind: "board", id: board.id };
+    const holder = new THREE.Group();
+    holder.position.set(board.x, board.y, boardLevels(dims, board).bottom);
+    holder.rotation.z = THREE.MathUtils.degToRad(board.rotation);
+    const plate = new THREE.Mesh(boardPlateGeometry(board), new THREE.MeshStandardMaterial({
+      color: BOARD_COLOR,
+      roughness: 0.6,
+      metalness: 0,
+      transparent: true,
+      opacity: 0.9
+    }));
+    const portMaterial = new THREE.MeshStandardMaterial({ color: PORT_COLOR, roughness: 0.4, metalness: 0.3 });
+    const parts = [plate, ...board.ports.map((port) => portBodyMesh(board, port, portMaterial))];
+    for (const part of parts) {
+      part.userData.feature = feature;
+      part.userData.boardPart = true;
+      holder.add(part);
+    }
+    root.add(holder);
+  }
+  return root;
+}
+
+function boardMeshes(runtime) {
+  const meshes = [];
+  runtime.boardVisuals?.traverse((object) => {
+    if (object.isMesh && object.userData.boardPart) {
+      meshes.push(object);
+    }
+  });
+  return meshes;
+}
+
 function sameFeature(left, right) {
   return Boolean(left && right && left.kind === right.kind && left.id === right.id);
 }
@@ -262,6 +408,10 @@ function paintProxies(runtime, selection, hover) {
       mesh.material.opacity = sameFeature(feature, selection) ? 0.5 : sameFeature(feature, hover) ? 0.22 : 0;
     }
   }
+  for (const mesh of boardMeshes(runtime)) {
+    const feature = mesh.userData.feature;
+    mesh.material.emissive.setHex(sameFeature(feature, selection) ? 0x9a4a10 : sameFeature(feature, hover) ? 0x4a2508 : 0x000000);
+  }
   runtime.requestRender();
 }
 
@@ -269,13 +419,27 @@ function applyTheme(runtime, dims) {
   const background = cssColor("--background", "#f4f5f7");
   const foreground = cssColor("--foreground", "#1f2328");
   runtime.scene.background = background;
-  if (runtime.grid) {
-    runtime.scene.remove(runtime.grid);
-    disposeTree(runtime.grid);
-    runtime.grid = null;
+  for (const key of ["grid", "gridFine"]) {
+    if (runtime[key]) {
+      runtime.scene.remove(runtime[key]);
+      disposeTree(runtime[key]);
+      runtime[key] = null;
+    }
   }
   if (dims) {
     const size = Math.max(100, Math.ceil((Math.max(dims.width, dims.depth) * 2) / 50) * 50);
+    // The 1 mm table grid: fainter than the 5 mm one and drawn under it; the
+    // render loop fades it out as the camera pulls back.
+    const fineColor = background.clone().lerp(foreground, 0.07);
+    const fine = new THREE.GridHelper(size, size, fineColor, fineColor);
+    fine.material.transparent = true;
+    fine.material.depthWrite = false;
+    fine.rotation.x = Math.PI / 2;
+    fine.position.z = -0.03;
+    fine.renderOrder = -1;
+    fine.visible = Boolean(runtime.display?.groundMm);
+    runtime.scene.add(fine);
+    runtime.gridFine = fine;
     const grid = new THREE.GridHelper(
       size,
       size / 5,
@@ -403,8 +567,12 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
       lidEdges: null,
       baseProxies: null,
       lidProxies: null,
+      boardVisuals: null,
       grid: null,
+      gridFine: null,
       gridSize: 0,
+      display: latestRef.current.builder.display,
+      gridUniforms: { boxGridStrength: { value: latestRef.current.builder.display?.boxMm ? 1 : 0 } },
       needsRender: true,
       requestRender: () => {
         runtime.needsRender = true;
@@ -424,6 +592,16 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
     const tick = () => {
       frame = requestAnimationFrame(tick);
       const moved = controls.update();
+      const fine = runtime.gridFine;
+      if (fine?.visible) {
+        const distance = Math.max(camera.position.distanceTo(controls.target), 1e-3);
+        const pixelsPerMm = renderer.domElement.height / (2 * distance * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+        const opacity = THREE.MathUtils.clamp((pixelsPerMm - 2.5) / 4, 0, 1);
+        if (Math.abs(fine.material.opacity - opacity) > 0.01) {
+          fine.material.opacity = opacity;
+          runtime.needsRender = true;
+        }
+      }
       if (runtime.needsRender || moved) {
         runtime.needsRender = false;
         renderer.render(scene, camera);
@@ -460,7 +638,8 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
         runtime.baseMesh,
         runtime.lidMesh,
         ...(runtime.baseProxies?.children || []),
-        ...(runtime.lidProxies?.children || [])
+        ...(runtime.lidProxies?.children || []),
+        ...boardMeshes(runtime)
       ].filter((object) => object && shown(object));
       const hit = raycaster.intersectObjects(targets, false)[0];
       return hit?.object.userData.feature ? { feature: hit.object.userData.feature, point: hit.point } : null;
@@ -539,13 +718,15 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
         const { builder: current } = latestRef.current;
         const { item } = drag;
         let text;
-        if (drag.feature.kind === "standoff") {
-          const target = clampStandoffPosition(current.dims, item, snap(item.x + delta.x), snap(item.y + delta.y));
+        if (drag.feature.kind !== "hole") {
+          const isBoard = drag.feature.kind === "board";
+          const clampPosition = isBoard ? clampBoardPosition : clampStandoffPosition;
+          const target = clampPosition(current.dims, item, snap(item.x + delta.x), snap(item.y + delta.y));
           current.gestureEdit((draft) => {
-            const group = draft.standoffs.find((entry) => entry.id === item.id);
-            if (group) {
-              group.x = target.x;
-              group.y = target.y;
+            const entry = (isBoard ? draft.boards : draft.standoffs).find((candidate) => candidate.id === item.id);
+            if (entry) {
+              entry.x = target.x;
+              entry.y = target.y;
             }
           });
           text = `X ${formatMm(target.x)} · Y ${formatMm(target.y)} ${latestRef.current.t("unit.mm")}`;
@@ -715,7 +896,7 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
     if (!runtime) {
       return;
     }
-    for (const key of ["baseProxies", "lidProxies"]) {
+    for (const key of ["baseProxies", "lidProxies", "boardVisuals"]) {
       if (runtime[key]) {
         runtime[key].parent?.remove(runtime[key]);
         disposeTree(runtime[key]);
@@ -727,6 +908,9 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
     runtime.lidGroup.add(proxies.lid);
     runtime.baseProxies = proxies.base;
     runtime.lidProxies = proxies.lid;
+    runtime.boardVisuals = buildBoardVisuals(spec, dims);
+    runtime.boardVisuals.visible = runtime.display?.boards !== false;
+    runtime.baseGroup.add(runtime.boardVisuals);
     paintProxies(runtime, latestRef.current.builder.selection, hoverRef.current);
   }, [spec, dims]);
 
@@ -746,6 +930,23 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
     runtime.lidGroup.position.z = lidView === "open" ? lidLift(dims) : 0;
     runtime.requestRender();
   }, [lidView, dims]);
+
+  useEffect(() => {
+    const runtime = runtimeRef.current;
+    if (!runtime) {
+      return;
+    }
+    runtime.display = builder.display;
+    runtime.gridUniforms.boxGridStrength.value = builder.display.boxMm ? 1 : 0;
+    if (runtime.gridFine) {
+      runtime.gridFine.visible = builder.display.groundMm;
+    }
+    // Hidden boards are not pickable either: the pick skips invisible objects.
+    if (runtime.boardVisuals) {
+      runtime.boardVisuals.visible = builder.display.boards;
+    }
+    runtime.requestRender();
+  }, [builder.display]);
 
   const setView = (view) => {
     const runtime = runtimeRef.current;
