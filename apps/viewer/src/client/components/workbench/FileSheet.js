@@ -332,7 +332,9 @@ export function parseFileSheetNumberInput(value, {
   max = Infinity,
   integer = false
 } = {}) {
-  const text = String(value ?? "").trim();
+  // A decimal comma ("1,6", as Ukrainian and most European keyboards type it) reads
+  // as a decimal point; otherwise "1,6" would stop at the comma and read as 1.
+  const text = String(value ?? "").trim().replace(/(^|\d),(?=\d)/g, "$1.");
   const match = text.match(/[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?/i);
   const fallbackValue = Number.isFinite(Number(fallback)) ? Number(fallback) : 0;
   const numericValue = match ? Number(match[0]) : NaN;
