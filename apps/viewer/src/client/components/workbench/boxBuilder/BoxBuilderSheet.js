@@ -42,6 +42,7 @@ import {
 import {
   PORT_TYPE_IDS,
   boardMinimumSize,
+  boardNameMatches,
   fitBoxToBoard,
   flipBoard,
   mountBoard,
@@ -931,8 +932,7 @@ function BoardsTab({ builder }) {
     const text = t(key);
     return text === key ? id : text;
   };
-  const needle = query.trim().toLowerCase();
-  const matching = presets.filter((entry) => !needle || entry.name.toLowerCase().includes(needle));
+  const matching = presets.filter((entry) => boardNameMatches(entry.name, query));
   const counts = Object.fromEntries(categories.map((id) => [id, matching.filter((entry) => entry.category === id).length]));
   // Shown in category order; with every type shown, the list is grouped under category headings.
   const shown = (category === "all" ? categories : [category])

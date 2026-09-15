@@ -2,7 +2,16 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { fitBoxToBoard, flipBoard, mountBoard, newBoard, resizeBoard, rotateBoard, snapBoardToWalls } from "./boxBoards.js";
+import {
+  boardNameMatches,
+  fitBoxToBoard,
+  flipBoard,
+  mountBoard,
+  newBoard,
+  resizeBoard,
+  rotateBoard,
+  snapBoardToWalls
+} from "./boxBoards.js";
 import { buildBoxPlan } from "./boxPlan.js";
 import {
   PORT_TYPES,
@@ -66,6 +75,19 @@ test("the shipped templates use the builder's connector sizes and survive normal
     assert.deepEqual(board.holes.map(({ x, y, diameter }) => [x, y, diameter]), preset.holes.map(({ x, y, diameter }) => [x, y, diameter]), preset.id);
     assert.equal(board.ports.length, preset.ports.length, preset.id);
   }
+});
+
+test("board search matches the starts of words, not fragments inside them", () => {
+  const found = (query) => SHIPPED.boards.filter((board) => boardNameMatches(board.name, query)).map((board) => board.name);
+  const es = found("es");
+  assert.ok(es.length > 0);
+  assert.ok(es.every((name) => /\bes/iu.test(name)), es.join(", "));
+  assert.ok(!es.some((name) => /Pressure|EYESPI/u.test(name)));
+  assert.ok(boardNameMatches("ESP32-S3-DevKitC-1 (N16R8)", "esp32s3"));
+  assert.ok(boardNameMatches("ESP32-S3-DevKitC-1 (N16R8)", "s3 n16"));
+  assert.ok(boardNameMatches("Raspberry Pi 4 B", "pi 4"));
+  assert.ok(!boardNameMatches("Raspberry Pi 4 B", "berry"));
+  assert.equal(found("").length, SHIPPED.boards.length);
 });
 
 test("a board without a template is the custom one", () => {
