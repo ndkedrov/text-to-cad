@@ -94,6 +94,7 @@ import FileSheet, {
   FILE_SHEET_COMPACT_INPUT_CLASSES,
   FileSheetBooleanToggle,
   FileSheetButtonRow,
+  FileSheetComboboxRow,
   FileSheetControlRow,
   FileSheetDisclosure,
   FileSheetField,
@@ -952,17 +953,15 @@ function BoardsTab({ builder }) {
   const { boards: presets, categories } = useBoardPresets();
   const [presetId, setPresetId] = useState("custom");
   const [category, setCategory] = useState("all");
-  const [query, setQuery] = useState("");
   const categoryName = (id) => {
     const key = `board.category.${id}`;
     const text = t(key);
     return text === key ? id : text;
   };
-  const matching = presets.filter((entry) => boardNameMatches(entry.name, query));
-  const counts = Object.fromEntries(categories.map((id) => [id, matching.filter((entry) => entry.category === id).length]));
+  const counts = Object.fromEntries(categories.map((id) => [id, presets.filter((entry) => entry.category === id).length]));
   // Shown in category order; with every type shown, the list is grouped under category headings.
   const shown = (category === "all" ? categories : [category])
-    .flatMap((id) => matching.filter((entry) => entry.category === id));
+    .flatMap((id) => presets.filter((entry) => entry.category === id));
   const preset = shown.find((entry) => entry.id === presetId) || null;
   const full = spec.boards.length >= MAX_BOARDS;
   // A new board goes straight into the box.
@@ -983,34 +982,25 @@ function BoardsTab({ builder }) {
     <div>
       <FileSheetSubsection title={t("section.newBoard")}>
         {presets.length ? (
-          <>
-            <FileSheetSelectRow
-              label={t("field.boardCategory")}
-              value={category}
-              onValueChange={setCategory}
-              options={[
-                { value: "all", label: `${t("board.category.all")} (${matching.length})` },
-                ...categories
-                  .filter((id) => counts[id] || id === category)
-                  .map((id) => ({ value: id, label: `${categoryName(id)} (${counts[id] || 0})` }))
-              ]}
-            />
-            <FileSheetInlineControlRow label={t("field.boardSearch")}>
-              <Input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={t("board.searchPlaceholder")}
-                className={cn(FILE_SHEET_COMPACT_INPUT_CLASSES, "w-40")}
-                aria-label={t("field.boardSearch")}
-                spellCheck={false}
-              />
-            </FileSheetInlineControlRow>
-          </>
+          <FileSheetSelectRow
+            label={t("field.boardCategory")}
+            value={category}
+            onValueChange={setCategory}
+            options={[
+              { value: "all", label: `${t("board.category.all")} (${presets.length})` },
+              ...categories
+                .filter((id) => counts[id] || id === category)
+                .map((id) => ({ value: id, label: `${categoryName(id)} (${counts[id] || 0})` }))
+            ]}
+          />
         ) : null}
-        <FileSheetSelectRow
+        <FileSheetComboboxRow
           label={t("field.boardPreset")}
           value={preset ? presetId : "custom"}
           onValueChange={setPresetId}
+          matches={(option, text) => boardNameMatches(option.label, text)}
+          searchPlaceholder={t("board.searchPlaceholder")}
+          emptyText={t("boards.noMatch")}
           options={[
             { value: "custom", label: t("board.preset.custom") },
             ...shown.map((entry) => ({
@@ -1020,7 +1010,6 @@ function BoardsTab({ builder }) {
             }))
           ]}
         />
-        {presets.length && !shown.length ? <FileSheetStatusText>{t("boards.noMatch")}</FileSheetStatusText> : null}
         <FileSheetButtonRow>
           <CompactButton icon={Plus} disabled={full} onClick={addBoard}>{t("action.addBoard")}</CompactButton>
         </FileSheetButtonRow>

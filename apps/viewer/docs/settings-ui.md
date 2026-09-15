@@ -189,6 +189,12 @@ glyphs (a DXF bend's `↑`/`↓`). Two words as long as `Orthographic` and
 - Never use a Radix `Tabs` strip to switch an edit target inside a sheet — that
   was how the five-light selector ended up as a full-width row of tabs.
 
+**A long list people search by name is a combobox.** When the options are many
+named things a person already knows the name of (the box builder's board
+templates), use `FileSheetComboboxRow`: the same inline trigger, with a search
+field inside that narrows the list as they type. Never a separate search row
+beside a select: the search belongs to the control it filters.
+
 **The stacked exception.** A select is stacked full-width only when it is a
 *primary* control: the first row of its group, whose value reframes everything
 under it. There are exactly four — Theme › `Preset`, Display › `Mode`,
