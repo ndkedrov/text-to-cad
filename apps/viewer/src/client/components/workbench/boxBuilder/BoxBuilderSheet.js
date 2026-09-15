@@ -1087,6 +1087,13 @@ function BoardsTab({ builder }) {
       </FileSheetSubsection>
       <FileSheetSubsection title={t("section.boards")} contentClassName="space-y-0.5">
         {spec.boards.length ? (
+          <FileSheetToggleRow
+            label={t("field.showBoards")}
+            checked={builder.display.boards}
+            onCheckedChange={(boards) => builder.setDisplay({ boards })}
+          />
+        ) : null}
+        {spec.boards.length ? (
           spec.boards.map((board, index) => (
             <BoardItem key={board.id} builder={builder} board={board} index={index} presets={presets} />
           ))
