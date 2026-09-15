@@ -99,6 +99,14 @@ function cssColor(variable, fallback) {
   return color;
 }
 
+// The hole or standoff group a warning is about (its params.n is the 1-based index).
+function warningTarget(spec, warning) {
+  const isStandoff = String(warning?.key || "").startsWith("warning.standoffs");
+  const list = isStandoff ? spec.standoffs : spec.holes;
+  const item = list[Number(warning?.params?.n) - 1];
+  return item ? { kind: isStandoff ? "standoff" : "hole", id: item.id } : null;
+}
+
 function lidLift(dims) {
   return Math.max(10, dims.wallHeight * 0.5) + (dims.lipEnabled ? dims.lipHeight : 0);
 }
@@ -327,6 +335,7 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
   const [hover, setHover] = useState(null);
   const [readout, setReadout] = useState(null);
   const [lidView, setLidView] = useState("open");
+  const [warningsOpen, setWarningsOpen] = useState(false);
   const { language, t } = useBoxLanguage();
   const { spec, dims, plan, selection, warnings } = builder;
   latestRef.current = { builder, insets, lidView, t };
@@ -786,11 +795,41 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
           </div>
         ) : null}
         {warnings.length ? (
-          <div
-            className="cad-glass-surface rounded-lg border border-amber-500/50 px-2 py-1 text-[11px] font-medium text-amber-700 dark:text-amber-300"
-            title={warnings.map((warning) => formatWarning(language, warning)).join("\n")}
-          >
-            {t("viewport.warnings", { count: warnings.length })}
+          <div className="relative">
+            <button
+              type="button"
+              aria-expanded={warningsOpen}
+              onClick={() => setWarningsOpen((open) => !open)}
+              className="cad-glass-surface rounded-lg border border-amber-500/50 px-2 py-1 text-[11px] font-medium text-amber-700 transition-colors hover:bg-amber-500/10 dark:text-amber-300"
+            >
+              {t("viewport.warnings", { count: warnings.length })} {warningsOpen ? "▴" : "▾"}
+            </button>
+            {warningsOpen ? (
+              <ul className="cad-glass-surface absolute left-0 top-full z-10 mt-1 w-72 max-w-[80vw] space-y-0.5 rounded-lg border border-amber-500/50 p-1 shadow-lg">
+                {warnings.map((warning) => {
+                  const target = warningTarget(spec, warning);
+                  const sentence = formatWarning(language, warning);
+                  return (
+                    <li key={sentence}>
+                      <button
+                        type="button"
+                        disabled={!target}
+                        onClick={() => {
+                          if (target) {
+                            builder.setSelection(target);
+                          }
+                          setWarningsOpen(false);
+                        }}
+                        className="w-full rounded-md px-2 py-1.5 text-left text-[11px] leading-4 text-foreground hover:bg-accent disabled:cursor-default disabled:hover:bg-transparent"
+                      >
+                        {sentence}
+                      </button>
+                    </li>
+                  );
+                })}
+                <li className="px-2 pb-1 pt-0.5 text-[10px] leading-4 text-muted-foreground">{t("viewport.warningsHint")}</li>
+              </ul>
+            ) : null}
           </div>
         ) : null}
         {!wasm && !loadError ? (

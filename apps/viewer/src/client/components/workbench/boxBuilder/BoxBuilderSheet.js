@@ -25,7 +25,15 @@ import {
   loadBox,
   saveBox
 } from "@/workbench/boxBuilder/boxApi.js";
-import { centerSelected, duplicateSelected, removeSelected } from "@/workbench/boxBuilder/boxEdits.js";
+import {
+  ARRAY_DIRECTIONS,
+  ARRAY_MODES,
+  applyArray,
+  centerSelected,
+  duplicateSelected,
+  planArray,
+  removeSelected
+} from "@/workbench/boxBuilder/boxEdits.js";
 import { buildBoxPlan } from "@/workbench/boxBuilder/boxPlan.js";
 import {
   HOLE_FACES,
@@ -374,6 +382,76 @@ function HoleItem({ builder, hole, index }) {
   );
 }
 
+function ArraySection({ builder, kind }) {
+  const { t } = useBoxLanguage();
+  const { spec, selection, edit } = builder;
+  const [direction, setDirection] = useState("+u");
+  const [mode, setMode] = useState("count");
+  const [count, setCount] = useState(3);
+  const [step, setStep] = useState(10);
+  if (selection?.kind !== kind) {
+    return null;
+  }
+  const list = kind === "hole" ? spec.holes : spec.standoffs;
+  const index = list.findIndex((item) => item.id === selection.id);
+  if (index < 0) {
+    return null;
+  }
+  const onWall = kind === "hole" && isWallFace(list[index].face);
+  const options = { direction, mode, count, step };
+  const planned = planArray(spec, selection, options);
+  const itemLabel = kind === "hole" ? t("item.hole", { n: index + 1 }) : t("item.standoffs", { n: index + 1 });
+  return (
+    <FileSheetSubsection title={t("section.array", { item: itemLabel })}>
+      <FileSheetSelectRow
+        label={t("field.direction")}
+        value={direction}
+        onValueChange={setDirection}
+        options={ARRAY_DIRECTIONS.map((value) => ({ value, label: t(`array.dir.${onWall ? "wall" : "plane"}.${value}`) }))}
+      />
+      <FileSheetSelectRow
+        label={t("field.arrayMode")}
+        value={mode}
+        onValueChange={setMode}
+        options={ARRAY_MODES.map((value) => ({ value, label: t(`array.mode.${value}`) }))}
+      />
+      {mode === "fill" ? null : (
+        <NumberRow
+          label={mode === "even" ? t("field.rowCount") : t("field.copies")}
+          unit=""
+          digits={0}
+          value={count}
+          min={mode === "even" ? 2 : 1}
+          max={100}
+          step={1}
+          onCommit={(value) => setCount(Math.round(value))}
+        />
+      )}
+      {mode === "even" ? null : (
+        <NumberRow label={t("field.step")} value={step} min={0.5} max={500} step={0.5} onCommit={setStep} />
+      )}
+      {mode === "even" && planned.spacing ? (
+        <FileSheetControlRow label={t("field.arraySpacing")} value={`${formatNumber(planned.spacing)} mm`} />
+      ) : null}
+      <FileSheetControlRow label={t("field.arrayResult")} value={t("array.result", { count: planned.positions.length })} />
+      {planned.skipped ? (
+        <FileSheetStatusText tone="error">{t("array.skipped", { count: planned.skipped })}</FileSheetStatusText>
+      ) : null}
+      <FileSheetButtonRow>
+        <CompactButton
+          icon={Copy}
+          disabled={!planned.positions.length}
+          onClick={() => edit((draft) => {
+            applyArray(draft, selection, options);
+          })}
+        >
+          {t("action.createArray")}
+        </CompactButton>
+      </FileSheetButtonRow>
+    </FileSheetSubsection>
+  );
+}
+
 function HolesTab({ builder }) {
   const { t } = useBoxLanguage();
   const { spec, dims, edit, setSelection } = builder;
@@ -403,6 +481,7 @@ function HolesTab({ builder }) {
           <CompactButton icon={Plus} onClick={addHole}>{t("action.addHole")}</CompactButton>
         </FileSheetButtonRow>
       </FileSheetSubsection>
+      <ArraySection builder={builder} kind="hole" />
       <FileSheetSubsection title={t("section.holes")}>
         {spec.holes.length ? (
           spec.holes.map((hole, index) => (
@@ -488,6 +567,7 @@ function StandoffsTab({ builder }) {
           <CompactButton icon={Plus} onClick={addGroup}>{t("action.addStandoffs")}</CompactButton>
         </FileSheetButtonRow>
       </FileSheetSubsection>
+      <ArraySection builder={builder} kind="standoff" />
       <FileSheetSubsection title={t("section.standoffs")}>
         {spec.standoffs.length ? (
           spec.standoffs.map((group, index) => (

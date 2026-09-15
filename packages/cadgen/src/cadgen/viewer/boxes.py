@@ -412,9 +412,11 @@ class _QuotaBook:
 
 
 class _Build:
-    __slots__ = ("state", "parts", "started_at", "finished_at", "rerun")
+    __slots__ = ("state", "parts", "started_at", "finished_at", "rerun", "owner", "name")
 
-    def __init__(self) -> None:
+    def __init__(self, owner: str | None = None, name: str = "") -> None:
+        self.owner = owner
+        self.name = name
         self.state = "queued"
         self.parts: dict[str, dict] = {}
         self.started_at = time.time()
@@ -438,12 +440,15 @@ class BoxBuilder:
         limits: BoxLimits | None = None,
         runner: Runner | None = None,
         expose_paths: bool = True,
+        observer: Callable[..., None] | None = None,
     ) -> None:
         self.root = Path(root).resolve()
         self.limits = limits or BoxLimits()
         # runner(script, *, timeout, max_output_bytes, ephemeral_cache) -> BuildResult.
         self._runner = runner or run_model_script
         self.expose_paths = expose_paths
+        # observer(event, owner, **fields): what accounts do, for a hosted viewer's analytics.
+        self._observer = observer
         self._lock = threading.Lock()
         self._builds: dict[tuple[str | None, str], _Build] = {}
         # A fixed set of locks, picked by hash: no per-name lock objects to pile up.
@@ -612,7 +617,7 @@ class BoxBuilder:
             is_new = not (directory / f"{name}{SPEC_SUFFIX}").is_file()
             self._check_quota(key, is_new=is_new)
             self._check_space(owner, key)
-            reservation = self._reserve(build_key)
+            reservation = self._reserve(build_key, owner)
             try:
                 directory.mkdir(parents=True, exist_ok=True)
                 _write_text(directory / f"{name}{SPEC_SUFFIX}", spec_text)
@@ -633,6 +638,7 @@ class BoxBuilder:
                 self._release(build_key, reservation)
                 raise
             self._launch(build_key, scripts, reservation)
+        self._emit("save", owner, box=name, new=is_new)
         return self.status(name, owner)
 
     def _check_quota(self, key: str | None, *, is_new: bool) -> None:
@@ -661,7 +667,7 @@ class BoxBuilder:
             if _folder_bytes(self._space(owner)) > limits.account_max_bytes:
                 raise BoxQuotaExceeded("this account's boxes use all of their space", code="quota_disk")
 
-    def _reserve(self, build_key: tuple[str | None, str]) -> str:
+    def _reserve(self, build_key: tuple[str | None, str], owner: str | None = None) -> str:
         """Take a place for this build atomically: ``"new"``, or ``"rerun"`` of an active one."""
         with self._lock:
             self._forget_finished_builds()
@@ -673,7 +679,7 @@ class BoxBuilder:
                 raise BoxBusy("your previous box is still building", code="busy_account")
             if len(active) >= self.limits.max_builds + self.limits.max_queue:
                 raise BoxBusy("the build queue is full; try again in a minute")
-            self._builds[build_key] = _Build()
+            self._builds[build_key] = _Build(owner=owner, name=build_key[1])
             return "new"
 
     def _release(self, build_key: tuple[str | None, str], reservation: str) -> None:
@@ -743,6 +749,7 @@ class BoxBuilder:
                     build.started_at = time.time()
                     for info in build.parts.values():
                         info["state"] = "building"
+                timed_out = False
                 for part, script in scripts:
                     try:
                         result = self._runner(
@@ -753,10 +760,22 @@ class BoxBuilder:
                         )
                     except Exception as error:  # noqa: BLE001 - a failure to start is a part error
                         result = BuildResult(1, f"{type(error).__name__}: {error}")
+                    timed_out = timed_out or result.timed_out
                     if result.code == 0:
                         self._set_part(build, part, "done", "")
                     else:
                         self._set_part(build, part, "error", _failure_text(result, self.limits.build_timeout))
+            with self._lock:
+                pass_failed = any(info["state"] == "error" for info in build.parts.values())
+                pass_seconds = round(time.time() - build.started_at, 2)
+            self._emit(
+                "build",
+                build.owner,
+                box=build.name,
+                state="error" if pass_failed else "done",
+                seconds=pass_seconds,
+                timedOut=timed_out,
+            )
             with self._lock:
                 if build.rerun is not None:
                     scripts, build.rerun = build.rerun, None
@@ -767,6 +786,36 @@ class BoxBuilder:
                 build.state = "error" if failed else "done"
                 build.finished_at = time.time()
                 return
+
+    def _emit(self, event: str, owner: str | None, **fields) -> None:
+        if self._observer is None or owner is None:
+            return
+        try:
+            self._observer(event, owner, **fields)
+        except Exception:  # noqa: BLE001 - analytics never breaks a save or a build
+            pass
+
+    def activity(self) -> dict:
+        """Builds running and waiting right now, against the limits."""
+        with self._lock:
+            states = [build.state for build in self._builds.values()]
+        return {
+            "building": states.count("building"),
+            "queued": states.count("queued"),
+            "maxBuilds": self.limits.max_builds,
+            "maxQueue": self.limits.max_queue,
+        }
+
+    def account_usage(self, owner: str) -> dict:
+        """How many boxes an account keeps and how many bytes they take."""
+        space = self._space(owner)
+        if not space.is_dir():
+            return {"boxes": 0, "bytes": 0}
+        boxes = sum(
+            1 for directory in space.iterdir()
+            if directory.is_dir() and (directory / f"{directory.name}{SPEC_SUFFIX}").is_file()
+        )
+        return {"boxes": boxes, "bytes": _folder_bytes(space)}
 
     def _set_part(self, build: _Build, part: str, state: str, error: str) -> None:
         with self._lock:

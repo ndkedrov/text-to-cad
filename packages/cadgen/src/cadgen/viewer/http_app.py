@@ -30,6 +30,7 @@ import time
 from pathlib import Path
 
 from .backend import CAD_CATALOG_SCHEMA_VERSION, ForbiddenAssetError, LocalAssetBackend
+from .box_analytics import BoxAnalytics
 from .boxes import BOX_OUTPUT_CONTENT_TYPES, BoxBuilder, BoxError, BoxLimits
 from .boxes import MAX_REQUEST_BYTES as BOX_MAX_REQUEST_BYTES
 from .cadgen_ops import create_cadgen_ops
@@ -230,10 +231,20 @@ class CadApp:
         self.telegram_url = _https_url(os.environ.get("CADGEN_VIEWER_TELEGRAM_URL"))
         # The box builder: the one writer into the root (boxes/...), whose kernel
         # work runs in bounded child processes, never in this server.
+        limits = BoxLimits.from_env(hosted=self.hosted)
+        # Hosted only: who uses the builder and how the builds go, for /admin.
+        self.analytics = BoxAnalytics(root_path, timezone=limits.timezone) if self.hosted else None
         self.boxes = BoxBuilder(
             root_path,
-            limits=BoxLimits.from_env(hosted=self.hosted),
+            limits=limits,
             expose_paths=not self.hosted,
+            observer=self.analytics.record if self.analytics is not None else None,
+        )
+        # Accounts that may open /admin (CADGEN_VIEWER_ADMIN_EMAILS, comma-separated).
+        self.admin_emails = frozenset(
+            address.strip().lower()
+            for address in os.environ.get("CADGEN_VIEWER_ADMIN_EMAILS", "").split(",")
+            if address.strip()
         )
 
     # --- server info ------------------------------------------------------
@@ -454,13 +465,16 @@ class CadApp:
                 url="", port=0, viewerVersion="", startedAt=0,
             )
             box_builder["account"] = request.header(self.user_header).strip() or None
+            box_builder["admin"] = self._is_admin(box_builder["account"] or "")
         info["boxBuilder"] = box_builder
         return info
 
-    def _box_call(self, response, call) -> None:
+    def _box_call(self, response, call, on_error=None) -> None:
         try:
             payload = call()
         except BoxError as error:
+            if on_error is not None:
+                on_error(error)
             response.send_json(error.status, {"ok": False, "error": str(error), "code": error.code})
             return
         response.send_json(200, payload)
@@ -472,9 +486,14 @@ class CadApp:
         except ValueError:
             declared = 0
         if declared > BOX_MAX_REQUEST_BYTES:
+            self._record_reject(owner, query.get("name"), "too_large")
             response.send_json(413, {"ok": False, "error": "box request is too large", "code": "too_large"})
             return
-        self._box_call(response, lambda: self.boxes.save(query.get("name"), request.body(), owner=owner))
+        self._box_call(
+            response,
+            lambda: self.boxes.save(query.get("name"), request.body(), owner=owner),
+            on_error=lambda error: self._record_reject(owner, query.get("name"), error.code),
+        )
 
     def _handle_box_file(self, response, query, owner) -> None:
         try:
@@ -492,6 +511,30 @@ class CadApp:
             BOX_OUTPUT_CONTENT_TYPES[path.suffix[1:].lower()],
             extra_headers=[("content-disposition", f'attachment; filename="{path.name}"')],
         )
+
+    def _is_admin(self, account: str) -> bool:
+        return bool(account) and account.strip().lower() in self.admin_emails
+
+    def _record_reject(self, owner, name, code) -> None:
+        if self.analytics is not None and owner:
+            self.analytics.record("reject", owner, code=str(code), box=str(name or "")[:64])
+
+    def _serve_admin_page(self, response) -> None:
+        try:
+            body = Path(__file__).with_name("admin.html").read_bytes()
+        except OSError:
+            response.send_json(404, {"error": "Not found"})
+            return
+        response.send_bytes(200, body, "text/html; charset=utf-8")
+
+    def _admin_stats(self) -> dict:
+        stats = self.analytics.stats(self.boxes)
+        stats["service"] = {
+            "sourceVersion": self.source_version,
+            "sourceUrl": self.source_version_url or self.source_url,
+            "startedAt": self.started_at,
+        }
+        return stats
 
     def _came_through_proxy(self, request) -> bool:
         scheme, _, token = request.header("authorization").strip().partition(" ")
@@ -517,6 +560,23 @@ class CadApp:
             return
         if method == "POST" and self._rejected_as_cross_site_post(request, response):
             return
+        account = request.header(self.user_header).strip()
+        # /admin and its data exist only for admin accounts; everyone else gets a plain 404.
+        if pathname in ("/admin", "/admin/"):
+            if method == "GET" and self._is_admin(account):
+                self._serve_admin_page(response)
+            else:
+                response.send_json(404, {"error": "Not found"})
+            return
+        if pathname == "/__cad/admin/stats":
+            if method != "GET" or not self._is_admin(account) or self.analytics is None:
+                response.send_json(404, {"error": "Not found"})
+                return
+            try:
+                response.send_json(200, self._admin_stats())
+            except Exception:  # noqa: BLE001 - never a server detail to the internet
+                response.send_json(500, {"ok": False, "error": "internal error", "code": "internal"})
+            return
         if not (pathname.startswith("/__cad/") or pathname.startswith(TESS_CACHE_ROUTE_PREFIX)):
             if method == "GET":
                 self._serve_dist(request, response)
@@ -524,6 +584,8 @@ class CadApp:
                 response.send_empty(405, [("allow", "GET")])
             return
         if method == "GET" and pathname == "/__cad/server":
+            if account and self.analytics is not None:
+                self.analytics.seen(account)
             response.send_json(200, self._server_info_for(request))
             return
         if method == "GET" and pathname == "/__cad/catalog":
@@ -539,6 +601,8 @@ class CadApp:
         if not owner:
             response.send_json(401, {"ok": False, "error": "sign in required", "code": "unauthorized"})
             return
+        if self.analytics is not None:
+            self.analytics.seen(owner)
         try:
             if pathname == "/__cad/boxes":
                 self._box_call(response, lambda: self.boxes.list_boxes(owner))
