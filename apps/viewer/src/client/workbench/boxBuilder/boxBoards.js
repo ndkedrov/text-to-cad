@@ -256,6 +256,22 @@ export function rotateBoard(draft, id, rotation) {
   }
 }
 
+// Turning a board over sends its side ports to the opposite walls: place it again,
+// and raise it until the parts now hanging below clear the floor.
+export function flipBoard(draft, id, flipped) {
+  const board = findBoard(draft, id);
+  if (!board) {
+    return;
+  }
+  board.flipped = Boolean(flipped);
+  if (board.flipped && board.clearance < board.componentHeight) {
+    board.clearance = Math.ceil(board.componentHeight * 2 - 1e-6) / 2;
+  }
+  if (board.mounted) {
+    placeBoard(draft, board);
+  }
+}
+
 export function snapBoardToWalls(draft, id) {
   const board = findBoard(draft, id);
   if (board?.mounted) {
@@ -280,7 +296,9 @@ export function fitBoxToBoard(draft, id) {
   draft.base.depth = Math.min(500, Math.max(draft.base.depth, up(inside(sizeY, "front", "back") + 2 * wall)));
   const tallestPort = Math.max(0, ...board.ports.map((entry) => entry.elevation + entry.height + entry.margin));
   const lip = draft.lid.enabled && draft.lid.lip ? draft.lid.lipHeight : 0;
-  const height = board.clearance + board.thickness + Math.max(board.componentHeight, tallestPort) + HEADROOM + lip;
+  // Upside down, the parts hang inside the clearance and nothing rises above the board.
+  const above = board.flipped ? 0 : Math.max(board.componentHeight, tallestPort);
+  const height = board.clearance + board.thickness + above + HEADROOM + lip;
   draft.walls.height = Math.min(500, Math.max(draft.walls.height, up(height)));
   if (board.mounted) {
     placeBoard(draft, board);

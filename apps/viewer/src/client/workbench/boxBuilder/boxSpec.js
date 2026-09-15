@@ -268,7 +268,8 @@ function normalizeBoard(raw, used) {
     width,
     length,
     thickness: numberIn(source.thickness, PCB_THICKNESS, 0.4, 5),
-    clearance: numberIn(source.clearance, 5, 1, 200),
+    // 0 lays the board straight on the floor, with no standoffs.
+    clearance: numberIn(source.clearance, 5, 0, 200),
     componentHeight: numberIn(source.componentHeight, 10, 0, 200),
     padDiameter,
     boreDiameter: numberIn(source.boreDiameter, 2.5, 0, padDiameter - 0.8),
@@ -279,6 +280,7 @@ function normalizeBoard(raw, used) {
       .slice(0, MAX_BOARD_PORTS)
       .map((port) => normalizePort(port, portIds, width, length)),
     mounted: booleanOr(source.mounted, false),
+    flipped: booleanOr(source.flipped, false),
     x: numberIn(source.x, 0, -2000, 2000),
     y: numberIn(source.y, 0, -2000, 2000),
     rotation: quarter * 90
@@ -490,6 +492,8 @@ export function newStandoffGroup(spec) {
 // A board is described as on its drawing: seen from above, X along its width from
 // the left edge, Y along its length from the front edge. Mounted, its centre sits
 // at (x, y) on the floor and it is turned by `rotation` (0/90/180/270) about it.
+// A `flipped` board is turned over about its own Y axis first: component side
+// down, its left edge on the right, its parts hanging below it.
 
 const EDGE_NORMALS = Object.freeze({ front: [0, -1], back: [0, 1], left: [-1, 0], right: [1, 0] });
 
@@ -513,7 +517,8 @@ export function boardFootprint(board) {
 
 // A point given in the board's own coordinates, in box coordinates.
 export function boardPoint(board, px, py) {
-  const [dx, dy] = turnQuarter([px - board.width / 2, py - board.length / 2], board.rotation);
+  const localX = board.flipped ? board.width - px : px;
+  const [dx, dy] = turnQuarter([localX - board.width / 2, py - board.length / 2], board.rotation);
   return [roundMm(board.x + dx, 4), roundMm(board.y + dy, 4)];
 }
 
@@ -521,16 +526,23 @@ export function boardHolePoints(board) {
   return board.holes.map((hole) => boardPoint(board, hole.x, hole.y));
 }
 
-// Heights above the box bottom: the board's underside, its top, and the top of its parts.
+// Heights above the box bottom: the board's underside, its top, and how far its
+// parts reach up (or, upside down, down).
 export function boardLevels(dims, board) {
   const bottom = dims.floorTop + board.clearance;
   const top = bottom + board.thickness;
-  return { bottom, top, partsTop: top + board.componentHeight };
+  return {
+    bottom,
+    top,
+    partsTop: board.flipped ? top : top + board.componentHeight,
+    partsBottom: board.flipped ? bottom - board.componentHeight : bottom
+  };
 }
 
-// The wall a board edge faces once the board is turned.
+// The wall a board edge faces once the board is turned (and turned over).
 export function boardEdgeWall(board, edge) {
-  const [x, y] = turnQuarter(EDGE_NORMALS[edge] || EDGE_NORMALS.front, board.rotation);
+  const [normalX, normalY] = EDGE_NORMALS[edge] || EDGE_NORMALS.front;
+  const [x, y] = turnQuarter([board.flipped ? -normalX : normalX, normalY], board.rotation);
   if (Math.abs(x) > Math.abs(y)) {
     return x > 0 ? "right" : "left";
   }
@@ -573,7 +585,10 @@ export function boardPortCutout(dims, board, port) {
     height: roundMm(height, 4),
     radius: port.shape === "circle" ? 0 : roundMm(Math.min(port.radius + port.margin, Math.min(width, height) / 2), 4),
     u: roundMm(x * frame.u[0] + y * frame.u[1], 4),
-    v: roundMm(boardLevels(dims, board).top + port.elevation + port.height / 2, 4),
+    // Upside down, a connector's `elevation` and body run down from the board's underside.
+    v: roundMm(board.flipped
+      ? boardLevels(dims, board).bottom - port.elevation - port.height / 2
+      : boardLevels(dims, board).top + port.elevation + port.height / 2, 4),
     rotation: 0,
     gap: roundMm(wallInnerHalf(dims, face) - front, 3)
   };
@@ -648,6 +663,9 @@ export function boxSpecWarnings(spec) {
     }
     if (dims.wallsEnabled && boardLevels(dims, board).partsTop > dims.wallTop + 1e-6) {
       warnings.push({ key: "warning.boardTall", params: { n }, target });
+    }
+    if (board.flipped && board.componentHeight > board.clearance + 1e-6) {
+      warnings.push({ key: "warning.boardPartsBelow", params: { n }, target });
     }
     if (!board.ports.length) {
       return;

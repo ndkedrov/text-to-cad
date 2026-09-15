@@ -1,6 +1,17 @@
 {
  "format": "cadgen-board-presets",
  "version": 1,
+ "categories": [
+  "sbc",
+  "mcu",
+  "wireless",
+  "motion",
+  "sensor",
+  "voltage",
+  "power",
+  "driver",
+  "display"
+ ],
  "portTypes": {
   "usbC": {
    "shape": "rect",
@@ -98,6 +109,7 @@
   {
    "id": "rpi5",
    "name": "Raspberry Pi 5",
+   "category": "sbc",
    "width": 85,
    "length": 56,
    "thickness": 1.6,
@@ -205,6 +217,7 @@
   {
    "id": "rpi4",
    "name": "Raspberry Pi 4 B",
+   "category": "sbc",
    "width": 85,
    "length": 56,
    "thickness": 1.6,
@@ -324,6 +337,7 @@
   {
    "id": "rpi3",
    "name": "Raspberry Pi 3 B / 3 B+",
+   "category": "sbc",
    "width": 85,
    "length": 56,
    "thickness": 1.6,
@@ -431,6 +445,7 @@
   {
    "id": "rpiZero",
    "name": "Raspberry Pi Zero / Zero 2 W",
+   "category": "sbc",
    "width": 65,
    "length": 30,
    "thickness": 1.6,
@@ -502,6 +517,7 @@
   {
    "id": "pico",
    "name": "Raspberry Pi Pico / Pico 2",
+   "category": "mcu",
    "width": 51,
    "length": 21,
    "thickness": 1,
@@ -549,6 +565,7 @@
   {
    "id": "arduinoUno",
    "name": "Arduino Uno R3",
+   "category": "mcu",
    "width": 68.58,
    "length": 53.34,
    "thickness": 1.6,
@@ -608,6 +625,7 @@
   {
    "id": "arduinoUnoR4",
    "name": "Arduino Uno R4 Minima / WiFi",
+   "category": "mcu",
    "width": 68.58,
    "length": 53.34,
    "thickness": 1.6,
@@ -667,6 +685,7 @@
   {
    "id": "arduinoMega",
    "name": "Arduino Mega 2560",
+   "category": "mcu",
    "width": 101.6,
    "length": 53.3,
    "thickness": 1.6,
@@ -736,6 +755,7 @@
   {
    "id": "arduinoNano",
    "name": "Arduino Nano",
+   "category": "mcu",
    "width": 18,
    "length": 43.2,
    "thickness": 1.6,
@@ -783,6 +803,7 @@
   {
    "id": "esp32DevkitC",
    "name": "ESP32-DevKitC",
+   "category": "wireless",
    "width": 27.94,
    "length": 54.3,
    "thickness": 1.6,
@@ -809,6 +830,7 @@
   {
    "id": "esp32S3DevkitC",
    "name": "ESP32-S3-DevKitC-1 (N16R8)",
+   "category": "wireless",
    "width": 25.4,
    "length": 69,
    "thickness": 1.6,
@@ -847,6 +869,7 @@
   {
    "id": "huzzah32Feather",
    "name": "Adafruit HUZZAH32 ESP32 Feather",
+   "category": "wireless",
    "width": 50.8,
    "length": 22.86,
    "thickness": 1.6,
@@ -894,6 +917,7 @@
   {
    "id": "lolinD32",
    "name": "LOLIN D32 (ESP32)",
+   "category": "wireless",
    "width": 25.4,
    "length": 57,
    "thickness": 1.6,
@@ -931,6 +955,7 @@
   {
    "id": "nodemcuV3",
    "name": "NodeMCU ESP8266 (LoLin V3)",
+   "category": "wireless",
    "width": 31,
    "length": 58,
    "thickness": 1.6,
@@ -978,6 +1003,7 @@
   {
    "id": "wemosD1Mini",
    "name": "LOLIN (Wemos) D1 mini v4 (ESP8266)",
+   "category": "wireless",
    "width": 25.4,
    "length": 34.3,
    "thickness": 1.6,

@@ -16,6 +16,21 @@ test("both languages carry exactly the same keys", () => {
   }
 });
 
+test("every board type the server ships is named in both languages", () => {
+  const shipped = JSON.parse(readFileSync(
+    new URL("../../../../../../packages/cadgen/src/cadgen/viewer/board_presets.json", import.meta.url),
+    "utf8"
+  ));
+  for (const id of shipped.categories) {
+    for (const language of ["en", "uk"]) {
+      assert.notEqual(translate(language, `board.category.${id}`), `board.category.${id}`, `${language} ${id}`);
+    }
+  }
+  for (const board of shipped.boards) {
+    assert.ok(shipped.categories.includes(board.category), board.id);
+  }
+});
+
 test("Ukrainian only when the browser's first language is Ukrainian", () => {
   assert.equal(detectLanguage("uk"), "uk");
   assert.equal(detectLanguage("uk-UA"), "uk");

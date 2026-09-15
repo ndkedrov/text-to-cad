@@ -43,6 +43,7 @@ import {
   PORT_TYPE_IDS,
   boardMinimumSize,
   fitBoxToBoard,
+  flipBoard,
   mountBoard,
   newBoard,
   newBoardHole,
@@ -817,6 +818,11 @@ function BoardItem({ builder, board, index }) {
             onValueChange={(value) => run(rotateBoard, Number(value))}
             options={BOARD_ROTATIONS.map((rotation) => ({ value: String(rotation), label: `${rotation}°` }))}
           />
+          <FileSheetToggleRow
+            label={t("field.boardFlipped")}
+            checked={board.flipped}
+            onCheckedChange={(flipped) => run(flipBoard, flipped)}
+          />
           <FileSheetButtonRow columns={3}>
             <CompactButton icon={Magnet} disabled={!board.ports.length} onClick={() => run(snapBoardToWalls)}>
               {t("action.snapBoard")}
@@ -844,7 +850,7 @@ function BoardItem({ builder, board, index }) {
           <NumberField label={t("field.thickness")} value={board.thickness} min={0.4} max={5} step={0.1} onCommit={(thickness) => patch({ thickness })} />
         </FileSheetFieldGrid>
         <FileSheetFieldGrid columns={2}>
-          <NumberField label={t("field.boardClearance")} value={board.clearance} min={1} max={200} step={0.5} onCommit={(clearance) => patch({ clearance })} />
+          <NumberField label={t("field.boardClearance")} value={board.clearance} min={0} max={200} step={0.5} onCommit={(clearance) => patch({ clearance })} />
           <NumberField label={t("field.componentHeight")} value={board.componentHeight} min={0} max={200} step={0.5} onCommit={(componentHeight) => patch({ componentHeight })} />
         </FileSheetFieldGrid>
         <FileSheetFieldGrid columns={2}>
@@ -916,9 +922,22 @@ function BoardItem({ builder, board, index }) {
 function BoardsTab({ builder }) {
   const { t } = useBoxLanguage();
   const { spec, edit, setSelection } = builder;
-  const presets = useBoardPresets();
+  const { boards: presets, categories } = useBoardPresets();
   const [presetId, setPresetId] = useState("custom");
-  const preset = presets.find((entry) => entry.id === presetId) || null;
+  const [category, setCategory] = useState("all");
+  const [query, setQuery] = useState("");
+  const categoryName = (id) => {
+    const key = `board.category.${id}`;
+    const text = t(key);
+    return text === key ? id : text;
+  };
+  const needle = query.trim().toLowerCase();
+  const matching = presets.filter((entry) => !needle || entry.name.toLowerCase().includes(needle));
+  const counts = Object.fromEntries(categories.map((id) => [id, matching.filter((entry) => entry.category === id).length]));
+  // Shown in category order; with every type shown, the list is grouped under category headings.
+  const shown = (category === "all" ? categories : [category])
+    .flatMap((id) => matching.filter((entry) => entry.category === id));
+  const preset = shown.find((entry) => entry.id === presetId) || null;
   const full = spec.boards.length >= MAX_BOARDS;
   // A new board goes straight into the box.
   const addBoard = () => {
@@ -937,15 +956,45 @@ function BoardsTab({ builder }) {
   return (
     <div>
       <FileSheetSubsection title={t("section.newBoard")}>
+        {presets.length ? (
+          <>
+            <FileSheetSelectRow
+              label={t("field.boardCategory")}
+              value={category}
+              onValueChange={setCategory}
+              options={[
+                { value: "all", label: `${t("board.category.all")} (${matching.length})` },
+                ...categories
+                  .filter((id) => counts[id] || id === category)
+                  .map((id) => ({ value: id, label: `${categoryName(id)} (${counts[id] || 0})` }))
+              ]}
+            />
+            <FileSheetInlineControlRow label={t("field.boardSearch")}>
+              <Input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={t("board.searchPlaceholder")}
+                className={cn(FILE_SHEET_COMPACT_INPUT_CLASSES, "w-40")}
+                aria-label={t("field.boardSearch")}
+                spellCheck={false}
+              />
+            </FileSheetInlineControlRow>
+          </>
+        ) : null}
         <FileSheetSelectRow
           label={t("field.boardPreset")}
           value={preset ? presetId : "custom"}
           onValueChange={setPresetId}
           options={[
             { value: "custom", label: t("board.preset.custom") },
-            ...presets.map((entry) => ({ value: entry.id, label: entry.name }))
+            ...shown.map((entry) => ({
+              value: entry.id,
+              label: entry.name,
+              group: category === "all" ? categoryName(entry.category) : undefined
+            }))
           ]}
         />
+        {presets.length && !shown.length ? <FileSheetStatusText>{t("boards.noMatch")}</FileSheetStatusText> : null}
         <FileSheetButtonRow>
           <CompactButton icon={Plus} disabled={full} onClick={addBoard}>{t("action.addBoard")}</CompactButton>
         </FileSheetButtonRow>

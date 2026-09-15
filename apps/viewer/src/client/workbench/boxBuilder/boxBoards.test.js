@@ -2,12 +2,13 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { fitBoxToBoard, mountBoard, newBoard, resizeBoard, rotateBoard, snapBoardToWalls } from "./boxBoards.js";
+import { fitBoxToBoard, flipBoard, mountBoard, newBoard, resizeBoard, rotateBoard, snapBoardToWalls } from "./boxBoards.js";
 import { buildBoxPlan } from "./boxPlan.js";
 import {
   PORT_TYPES,
   boardEdgeWall,
   boardHolePoints,
+  boardLevels,
   boardPortCutout,
   boxDimensions,
   boxSpecWarnings,
@@ -209,6 +210,37 @@ test("shrinking a board to its minimum and growing it back returns every hole", 
   resizeBoard(draft, id, { length: 30 });
   const board = normalizeBoxSpec(draft).boards[0];
   assert.deepEqual(board.holes.map((hole) => [hole.x, hole.y]), [[3.5, 3.5], [46.5, 3.5], [3.5, 26.5], [46.5, 26.5]]);
+});
+
+test("an upside-down board mirrors its holes and ports and hangs its parts below", () => {
+  const spec = mounted("arduinoUno");
+  const draft = JSON.parse(JSON.stringify(spec));
+  flipBoard(draft, draft.boards[0].id, true);
+  const flipped = normalizeBoxSpec(draft);
+  const board = flipped.boards[0];
+  assert.equal(board.flipped, true);
+  assert.equal(board.clearance, 12, "raised so its 12 mm parts clear the floor");
+  assert.equal(boardEdgeWall(board, "left"), "right");
+  const dims = boxDimensions(flipped);
+  const usb = boardPortCutout(dims, board, board.ports[0]);
+  assert.equal(usb.face, "right");
+  assert.equal(usb.v, boardLevels(dims, board).bottom - 11 / 2);
+  // The hole 13.97 mm from the left edge is now 13.97 mm from the right one.
+  const [holeX] = boardHolePoints(board)[0];
+  assert.ok(Math.abs(holeX - (board.x + 68.58 / 2 - 13.97)) < 1e-3);
+  const partsBelow = () => boxSpecWarnings(flipped).some((warning) => warning.key === "warning.boardPartsBelow");
+  assert.equal(partsBelow(), false);
+  board.clearance = 4;
+  assert.equal(partsBelow(), true);
+});
+
+test("a board with no clearance lies on the floor without standoffs", () => {
+  const spec = mounted("custom", (draft, board) => {
+    board.clearance = 0;
+  });
+  assert.equal(spec.boards[0].clearance, 0);
+  const { base } = buildBoxPlan(spec);
+  assert.equal(findNodes(base, (node) => node.type === "cyl" && node.r === 3).length, 0);
 });
 
 test("normalizing keeps boards buildable", () => {
