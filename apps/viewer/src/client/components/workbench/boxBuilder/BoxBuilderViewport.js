@@ -13,6 +13,7 @@ import {
   removeSelected
 } from "@/workbench/boxBuilder/boxEdits.js";
 import { manifoldFromPlan, roundedRectContour } from "@/workbench/boxBuilder/manifoldPlan.js";
+import { clampPieces } from "@/workbench/boxBuilder/boxPlan.js";
 import {
   boardLevels,
   clampBoardPosition,
@@ -491,12 +492,16 @@ function applyViewport(runtime, container, insets) {
   runtime.requestRender();
 }
 
-function frameBox(runtime, dims, view, lidView) {
+function frameBox(runtime, dims, view, lidView, spec) {
   const { camera, controls } = runtime;
   const lift = lidView === "open" && dims.lidEnabled ? lidLift(dims) : 0;
   const height = dims.totalHeight + lift;
-  const center = new THREE.Vector3(0, 0, height / 2);
-  const radius = 0.5 * Math.hypot(dims.width, dims.depth, height);
+  // Clamp T pieces lie on the bed to the right of the box: keep them in the frame.
+  const pieces = spec ? clampPieces(spec, dims) : [];
+  const last = pieces[pieces.length - 1];
+  const extra = last ? last.x + last.width - dims.width / 2 : 0;
+  const center = new THREE.Vector3(extra / 2, 0, height / 2);
+  const radius = 0.5 * Math.hypot(dims.width + extra, dims.depth, height);
   const distance = (radius / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2))) * 1.12;
   const direction = new THREE.Vector3(...(VIEW_DIRECTIONS[view] || VIEW_DIRECTIONS.iso)).normalize();
   camera.position.copy(center).addScaledVector(direction, distance);
@@ -907,7 +912,7 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
       }
       if (!framedRef.current) {
         framedRef.current = true;
-        frameBox(runtime, dims, "iso", latestRef.current.lidView);
+        frameBox(runtime, dims, "iso", latestRef.current.lidView, latestRef.current.builder?.spec);
       }
       runtime.requestRender();
     });
@@ -974,7 +979,7 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
   const setView = (view) => {
     const runtime = runtimeRef.current;
     if (runtime) {
-      frameBox(runtime, dims, view, lidView);
+      frameBox(runtime, dims, view, lidView, spec);
     }
   };
 

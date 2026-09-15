@@ -45,6 +45,13 @@ class EditedPresets(unittest.TestCase):
         self.assertFalse(self.presets.path.exists())
         self.assertEqual(restored["boards"], self.presets.defaults())
 
+    def test_ribs_and_a_clamp_are_kept_only_when_set(self):
+        rails = [{"offset": 8, "length": 22, "thickness": 4}]
+        ribbed = self.save([self.board(id="ribbed", rails=rails, clamp=True, clampHeight=14)])["boards"][0]
+        self.assertEqual((ribbed["rails"], ribbed["clamp"], ribbed["clampHeight"]), (rails, True, 14))
+        plain = self.save([self.board(id="plain")])["boards"][0]
+        self.assertFalse({"rails", "clamp", "clampHeight"} & set(plain))
+
     def test_an_unreadable_edited_list_reads_as_the_shipped_one(self):
         self.presets.path.parent.mkdir(parents=True)
         self.presets.path.write_text("{broken", encoding="utf-8")
@@ -66,6 +73,10 @@ class EditedPresets(unittest.TestCase):
             "type": [self.board(ports=[{**port, "type": "lightning"}])],
             "offset": [self.board(ports=[{**port, "offset": 500}])],
             ".x": [self.board(holes=[{"x": True, "y": 1, "diameter": 3}])],
+            "rails": [self.board(rails=[{"offset": 1, "length": 5, "thickness": 2}] * 5)],
+            ".thickness": [self.board(rails=[{"offset": 1, "length": 5, "thickness": 0}])],
+            ".clamp": [self.board(clamp="yes")],
+            "clampHeight": [self.board(clampHeight=0)],
         }
         for fragment, boards in cases.items():
             with self.subTest(fragment=fragment):

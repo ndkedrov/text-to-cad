@@ -12,7 +12,7 @@ import {
   rotateBoard,
   snapBoardToWalls
 } from "./boxBoards.js";
-import { buildBoxPlan } from "./boxPlan.js";
+import { CLAMP_DEPTH, buildBoxPlan, clampPieces } from "./boxPlan.js";
 import {
   PORT_TYPES,
   boardEdgeWall,
@@ -93,6 +93,48 @@ test("board search matches the starts of words, not fragments inside them", () =
   assert.ok(!boardNameMatches("SN65HVD230 CAN transceiver module", "ceiver"));
   assert.ok(found("485").some((name) => name.startsWith("TTL-RS485")));
   assert.equal(found("").length, SHIPPED.boards.length);
+});
+
+test("the dual USB-C ESP32-S3 rests on two ribs and a T piece next to the box clamps it down", () => {
+  const spec = mounted("esp32S3DevkitC", (draft) => {
+    draft.base.width = 120;
+    draft.base.depth = 100;
+  });
+  const board = spec.boards[0];
+  assert.deepEqual([board.clearance, board.clamp, board.clampHeight, board.rails.length], [2, true, 14, 2]);
+  // Against the front wall: inside half-depth 48, 1 mm gap, half the 69 mm length.
+  assert.deepEqual([board.x, board.y], [0, -12.5]);
+  const { base } = buildBoxPlan(spec);
+  const ribs = findNodes(base, (node) => node.type === "rrect" && node.w === 22 && node.d === 4);
+  assert.deepEqual(ribs.map((rib) => [rib.pos, rib.h]), [[[0, -37, 1.99], 2.01], [[0, 22, 1.99], 2.01]]);
+  const posts = findNodes(base, (node) => node.type === "cyl" && node.r === 2.5 && node.h === 14.01);
+  assert.deepEqual(posts.map((post) => post.pos), [[-15.7, -12.5, 1.99], [15.7, -12.5, 1.99]]);
+  const tee = findNodes(base, (node) => node.type === "poly" && node.h === CLAMP_DEPTH);
+  assert.equal(tee.length, 1);
+  // Bar 3 mm plus a stem from the 14 mm post tops down to the board top at 3.6 mm.
+  assert.equal(Math.max(...tee[0].points.map(([x]) => x)), 13.4);
+  assert.deepEqual(tee[0].points.map(([, y]) => y).filter((y) => y > 0).sort((a, b) => a - b), [2, 2, 18.2, 18.2]);
+  const screwHoles = findNodes(base, (node) => node.type === "cyl" && node.r === 1.4);
+  assert.deepEqual(screwHoles.map((hole) => hole.pos), [[-1, -15.7, 5], [-1, 15.7, 5]]);
+  assert.deepEqual(clampPieces(spec, boxDimensions(spec)).map((piece) => piece.x), [65]);
+  assert.deepEqual(boxSpecWarnings(spec), []);
+});
+
+test("a clamped board is reported when nothing holds it up or its posts are too low or too tall", () => {
+  assert.equal(specWithBoard("custom").boards[0].clamp, false, "a board with holes is screwed down instead");
+  const spec = mounted("rs485AutoDirSlimGeneric", (draft) => {
+    draft.base.width = 120;
+    draft.base.depth = 100;
+  });
+  const keys = () => boxSpecWarnings(spec).map((warning) => warning.key);
+  assert.equal(spec.boards[0].clamp, true);
+  assert.deepEqual(keys(), []);
+  spec.boards[0].rails = [];
+  assert.ok(keys().includes("warning.boardUnsupported"));
+  spec.boards[0].clampHeight = 5;
+  assert.ok(keys().includes("warning.clampLow"));
+  spec.boards[0].clampHeight = 30;
+  assert.ok(keys().includes("warning.clampTall"));
 });
 
 test("a board without a template is the custom one", () => {

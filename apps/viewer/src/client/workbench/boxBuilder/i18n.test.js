@@ -64,9 +64,10 @@ test("every warning the spec produces has a sentence in both languages", () => {
   )).boards.find((board) => board.id === "rpiZero");
   spec.boards.push({ ...newBoard(spec, rpiZero), mounted: true, componentHeight: 100, x: 60 });
   spec.boards.push({ ...newBoard(spec, rpiZero), mounted: true, clearance: 40 });
+  spec.boards.push({ ...newBoard(spec, { id: "bare", name: "Bare", width: 20, length: 10, clearance: 30, holes: [], ports: [] }), mounted: true, clampHeight: 3 });
   const warnings = boxSpecWarnings(spec);
   const keys = new Set(warnings.map((warning) => warning.key));
-  for (const key of ["warning.boardOutside", "warning.boardTall", "warning.portFar", "warning.portOutside"]) {
+  for (const key of ["warning.boardOutside", "warning.boardTall", "warning.portFar", "warning.portOutside", "warning.boardUnsupported", "warning.clampLow"]) {
     assert.ok(keys.has(key), key);
   }
   for (const language of ["en", "uk"]) {
