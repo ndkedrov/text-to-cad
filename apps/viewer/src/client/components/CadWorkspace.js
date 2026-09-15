@@ -7236,7 +7236,8 @@ export default function CadWorkspace({
             sourceUrl: String(viewerServerInfo?.boxBuilder?.sourceUrl || ""),
             sourceVersion: String(viewerServerInfo?.boxBuilder?.sourceVersion || ""),
             sourceVersionUrl: String(viewerServerInfo?.boxBuilder?.sourceVersionUrl || ""),
-            telegramUrl: String(viewerServerInfo?.boxBuilder?.telegramUrl || "")
+            telegramUrl: String(viewerServerInfo?.boxBuilder?.telegramUrl || ""),
+            adminUrl: viewerServerInfo?.boxBuilder?.admin ? "/admin" : ""
           } : null}
         />
 

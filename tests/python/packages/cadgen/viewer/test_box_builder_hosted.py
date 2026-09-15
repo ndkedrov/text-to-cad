@@ -44,6 +44,7 @@ class HostedServer:
         settings = {
             "CADGEN_VIEWER_HOSTED": "1",
             "CADGEN_VIEWER_PROXY_SECRET": PROXY_SECRET,
+            "CADGEN_VIEWER_ADMIN_EMAILS": "owner@example.com",
             "CADGEN_VIEWER_SOURCE_URL": "https://example.com/source",
             "CADGEN_VIEWER_SOURCE_VERSION": "0.5.1-box.abc1234",
             "CADGEN_VIEWER_SOURCE_VERSION_URL": "https://example.com/source/commit/abc1234",
@@ -222,6 +223,34 @@ class HostedSurface(unittest.TestCase):
         self.assertEqual(payload["code"], "bad_plan")
         self.assertNotIn(self.server.root, json.dumps(payload))
         self.assertNotIn("Traceback", json.dumps(payload))
+
+    def test_the_admin_page_and_its_stats_exist_only_for_admins(self):
+        for account in (None, "alice@example.com"):
+            with self.subTest(account=account):
+                self.assertEqual(self.server.request("GET", "/admin", account=account)[0], 404)
+                self.assertEqual(self.server.request("GET", "/__cad/admin/stats", account=account)[0], 404)
+        status, headers, body = self.server.request("GET", "/admin", account="Owner@Example.com")
+        self.assertEqual(status, 200)
+        self.assertIn("text/html", headers["content-type"])
+        self.assertIn(b"/__cad/admin/stats", body)
+        self.assertTrue(self.server.json("GET", "/__cad/server", account="owner@example.com")[1]["boxBuilder"]["admin"])
+        self.assertFalse(self.server.json("GET", "/__cad/server", account="alice@example.com")[1]["boxBuilder"]["admin"])
+
+    def test_admin_stats_count_accounts_saves_builds_and_refusals(self):
+        self.assertEqual(self.server.save("first", "alice@example.com")[0], 200)
+        self.server.wait_built("first", "alice@example.com")
+        self.assertEqual(self.server.save("second", "alice@example.com")[0], 429)
+        status, stats = self.server.json("GET", "/__cad/admin/stats", account="owner@example.com")
+        self.assertEqual(status, 200)
+        alice = next(row for row in stats["accounts"] if row["email"] == "alice@example.com")
+        self.assertEqual((alice["boxes"], alice["builds"], alice["rejects"]), (1, 1, 1))
+        self.assertEqual(stats["rejects"].get("quota_new"), 1)
+        self.assertEqual(stats["totals"]["builds7d"], 1)
+        self.assertEqual(stats["series"][-1]["newBoxes"], 1)
+        kinds = [event["e"] for event in stats["recent"]]
+        self.assertIn("build", kinds)
+        self.assertIn("reject", kinds)
+        self.assertEqual(stats["service"]["sourceVersion"], "0.5.1-box.abc1234")
 
 
 if __name__ == "__main__":

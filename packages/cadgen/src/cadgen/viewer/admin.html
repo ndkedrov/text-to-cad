@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>3D Maker · Admin</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --panel: #ffffff; --ink: #1c2127; --muted: #626b76; --line: #dfe3e8;
+    --accent: #e8672a; --ok: #3f8f6b; --bad: #d1483f; --info: #4d7fb8; --soft: #eef1f4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121518; --panel: #1a1e23; --ink: #e9ebee; --muted: #9aa3ad; --line: #2b3138;
+      --accent: #f07a3f; --ok: #5fb38b; --bad: #e0675f; --info: #6f9ed4; --soft: #222830;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: inherit; }
+  .bar { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between;
+    padding: 10px 20px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .brand { font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .tag { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); }
+  .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .muted { color: var(--muted); }
+  button, .button { font: inherit; font-size: 13px; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    padding: 5px 10px; border-radius: 7px; cursor: pointer; text-decoration: none; }
+  button:hover, .button:hover { border-color: var(--muted); }
+  .langs { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 8px; }
+  .langs button { border: 0; padding: 4px 8px; font-size: 11px; font-weight: 700; letter-spacing: .04em; color: var(--muted); }
+  .langs button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+  label.auto { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; }
+  main { max-width: 1280px; margin: 0 auto; padding: 18px 20px 48px; display: grid; gap: 16px; }
+  .status { margin: 0; min-height: 1em; }
+  .status.error { color: var(--bad); font-weight: 600; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .card .label { font-size: 12px; color: var(--muted); }
+  .card .value { font-size: 26px; font-weight: 700; letter-spacing: -.01em; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .card .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+  .panel h2 { font-size: 14px; margin: 0 0 10px; }
+  .panel-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .panel-head h2 { margin: 0; }
+  input[type="search"] { font: inherit; font-size: 13px; padding: 5px 9px; border-radius: 7px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); min-width: 220px; }
+  .chart svg { width: 100%; height: auto; display: block; }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  .scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { font-size: 12px; font-weight: 600; color: var(--muted); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr:last-child td { border-bottom: 0; }
+  .pill { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--soft); }
+  .pill.ok { color: var(--ok); } .pill.bad { color: var(--bad); } .pill.info { color: var(--info); } .pill.warn { color: var(--accent); }
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 0; font-size: 13px; }
+  dt { color: var(--muted); } dd { margin: 0; font-variant-numeric: tabular-nums; }
+  .empty { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="brand">3D Maker <span class="tag" data-t="admin">Admin</span></div>
+  <div class="actions">
+    <span id="generated" class="muted"></span>
+    <label class="auto"><input type="checkbox" id="auto" checked> <span data-t="auto">Auto-refresh</span></label>
+    <button type="button" id="refresh" data-t="refresh">Refresh</button>
+    <div class="langs" role="group" aria-label="Language / Мова">
+      <button type="button" data-lang="uk" lang="uk">УКР</button>
+      <button type="button" data-lang="en" lang="en">ENG</button>
+    </div>
+    <a class="button" href="/" data-t="back">Back to the builder</a>
+  </div>
+</header>
+<main>
+  <p id="status" class="status" role="status"></p>
+  <section id="cards" class="cards" aria-live="polite"></section>
+  <section class="grid2">
+    <div class="panel"><h2 data-t="chartBuilds">Builds per day</h2><div id="chart-builds" class="chart"></div></div>
+    <div class="panel"><h2 data-t="chartPeople">People per day</h2><div id="chart-people" class="chart"></div></div>
+  </section>
+  <section class="grid2">
+    <div class="panel"><h2 data-t="rejects">Refusals, 30 days</h2><div id="rejects"></div></div>
+    <div class="panel"><h2 data-t="system">Service</h2><div id="system"></div></div>
+  </section>
+  <section class="panel">
+    <div class="panel-head">
+      <h2 data-t="accounts">Accounts</h2>
+      <input id="filter" type="search" autocomplete="off">
+    </div>
+    <div class="scroll"><table id="accounts"></table></div>
+  </section>
+  <section class="panel">
+    <h2 data-t="recent">Recent activity</h2>
+    <div class="scroll"><table id="recent"></table></div>
+  </section>
+</main>
+<script>
+(function () {
+  "use strict";
+
+  var TEXT = {
+    en: {
+      title: "3D Maker · Admin", admin: "Admin", auto: "Auto-refresh", refresh: "Refresh", back: "Back to the builder",
+      loading: "Loading…", noAccess: "No access. Sign in with the admin account.", updated: "Updated {time}",
+      chartBuilds: "Builds per day, 30 days", chartPeople: "People per day, 30 days", rejects: "Refusals, 30 days",
+      system: "Service", accounts: "Accounts", recent: "Recent activity", filter: "Filter by e-mail",
+      cAccounts: "Accounts", cAccountsSub: "+{n} in 7 days", cActive: "Active today", cActiveSub: "{n} in 7 days",
+      cBoxes: "Boxes", cBuilds: "Builds, 7 days", cBuildsSub: "{n} today", cFailure: "Failed builds, 30 days",
+      cFailureSub: "{failed} of {total}", cTime: "Build time, 7 days", cTimeSub: "p95 {p95}", cQueue: "Building now",
+      cQueueSub: "{queued} queued of {max}", cDisk: "Disk free", cDiskSub: "of {total}",
+      ok: "Built", failed: "Failed", active: "Active accounts", newAccounts: "New accounts", newBoxes: "New boxes",
+      noRejects: "No refusals.", noAccounts: "No accounts yet.", noEvents: "No activity yet.",
+      email: "E-mail", firstSeen: "First seen", lastSeen: "Last seen", boxes: "Boxes", storage: "Storage",
+      saves: "Saves", builds: "Builds", fails: "Failed", refusals: "Refusals",
+      time: "Time", account: "Account", event: "Event", details: "Details", reason: "Reason", count: "Count",
+      version: "Version", started: "Running since", queue: "Queue", limits: "Limits", timeout: "Build timeout",
+      perAccountDay: "{boxes} new boxes and {builds} builds per account a day", servicewide: "{n} new boxes a day service-wide",
+      accountDisk: "{size} per account", concurrency: "{builds} builds at once, {queue} queued", seconds: "{n} s",
+      eAccount: "New account", eSave: "Saved", eBuild: "Build", eReject: "Refused", newBox: "new", timedOut: "timed out",
+      allTime: "{builds} builds all time, {failed} failed",
+      r_quota_new: "Daily new-box limit", r_quota_builds: "Daily build limit", r_busy: "Queue full",
+      r_busy_account: "Previous box still building", r_quota_global: "Service-wide daily limit", r_quota_disk: "Account storage full",
+      r_quota_unavailable: "Limits unavailable", r_disk_full: "Server disk low", r_too_large: "Request too large",
+      r_bad_plan: "Invalid geometry", r_bad_name: "Invalid name", r_invalid: "Invalid request", r_unauthorized: "Not signed in",
+      r_internal: "Internal error", r_unknown: "Unknown"
+    },
+    uk: {
+      title: "3D Maker · Адмінка", admin: "Адмінка", auto: "Автооновлення", refresh: "Оновити", back: "До конструктора",
+      loading: "Завантаження…", noAccess: "Немає доступу. Увійдіть акаунтом адміністратора.", updated: "Оновлено {time}",
+      chartBuilds: "Збірки за днями, 30 днів", chartPeople: "Люди за днями, 30 днів", rejects: "Відмови, 30 днів",
+      system: "Сервіс", accounts: "Акаунти", recent: "Остання активність", filter: "Фільтр за e-mail",
+      cAccounts: "Акаунтів", cAccountsSub: "+{n} за 7 днів", cActive: "Активних сьогодні", cActiveSub: "за 7 днів: {n}",
+      cBoxes: "Коробок", cBuilds: "Збірок за 7 днів", cBuildsSub: "сьогодні: {n}", cFailure: "Невдалих збірок, 30 днів",
+      cFailureSub: "{failed} з {total}", cTime: "Час збірки, 7 днів", cTimeSub: "p95 {p95}", cQueue: "Збирається зараз",
+      cQueueSub: "у черзі {queued} з {max}", cDisk: "Вільно на диску", cDiskSub: "з {total}",
+      ok: "Зібрано", failed: "Помилка", active: "Активні акаунти", newAccounts: "Нові акаунти", newBoxes: "Нові коробки",
+      noRejects: "Відмов не було.", noAccounts: "Акаунтів ще немає.", noEvents: "Активності ще немає.",
+      email: "E-mail", firstSeen: "Перший візит", lastSeen: "Останній візит", boxes: "Коробок", storage: "Місце",
+      saves: "Збережень", builds: "Збірок", fails: "Помилок", refusals: "Відмов",
+      time: "Час", account: "Акаунт", event: "Подія", details: "Деталі", reason: "Причина", count: "Кількість",
+      version: "Версія", started: "Працює з", queue: "Черга", limits: "Ліміти", timeout: "Тайм-аут збірки",
+      perAccountDay: "{boxes} нових коробок і {builds} збірок на акаунт за день", servicewide: "{n} нових коробок за день на весь сервіс",
+      accountDisk: "{size} на акаунт", concurrency: "{builds} збірок одночасно, у черзі {queue}", seconds: "{n} с",
+      eAccount: "Новий акаунт", eSave: "Збережено", eBuild: "Збірка", eReject: "Відмова", newBox: "нова", timedOut: "тайм-аут",
+      allTime: "за весь час збірок: {builds}, невдалих: {failed}",
+      r_quota_new: "Денний ліміт нових коробок", r_quota_builds: "Денний ліміт збірок", r_busy: "Черга заповнена",
+      r_busy_account: "Попередня коробка ще збирається", r_quota_global: "Денний ліміт сервісу", r_quota_disk: "Місце акаунта вичерпано",
+      r_quota_unavailable: "Ліміти недоступні", r_disk_full: "Мало місця на сервері", r_too_large: "Завеликий запит",
+      r_bad_plan: "Неправильна геометрія", r_bad_name: "Неправильна назва", r_invalid: "Неправильний запит", r_unauthorized: "Не увійшов",
+      r_internal: "Внутрішня помилка", r_unknown: "Невідомо"
+    }
+  };
+
+  var state = { lang: pickLanguage(), data: null, timer: 0, filter: "" };
+
+  function pickLanguage() {
+    try {
+      var stored = localStorage.getItem("3dmaker:lang");
+      if (stored === "uk" || stored === "en") { return stored; }
+    } catch (error) { /* storage blocked */ }
+    var primary = String(navigator.language || "").toLowerCase();
+    return primary === "uk" || primary.indexOf("uk-") === 0 ? "uk" : "en";
+  }
+
+  function t(key, params) {
+    var text = (TEXT[state.lang] && TEXT[state.lang][key]) || TEXT.en[key] || key;
+    Object.keys(params || {}).forEach(function (name) {
+      text = text.split("{" + name + "}").join(String(params[name]));
+    });
+    return text;
+  }
+
+  function locale() { return state.lang === "uk" ? "uk-UA" : "en-GB"; }
+
+  // Every value from the server goes in through textContent: nothing is parsed as HTML.
+  function el(tag, attributes, children) {
+    var node = document.createElement(tag);
+    Object.keys(attributes || {}).forEach(function (name) {
+      if (name === "class") { node.className = attributes[name]; }
+      else if (name === "text") { node.textContent = attributes[name]; }
+      else { node.setAttribute(name, attributes[name]); }
+    });
+    (children || []).forEach(function (child) {
+      if (child === null || child === undefined) { return; }
+      node.appendChild(typeof child === "string" ? document.createTextNode(child) : child);
+    });
+    return node;
+  }
+
+  function svgNode(tag, attributes) {
+    var node = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    Object.keys(attributes || {}).forEach(function (name) { node.setAttribute(name, attributes[name]); });
+    return node;
+  }
+
+  function number(value) { return value === null || value === undefined ? "—" : new Intl.NumberFormat(locale()).format(value); }
+  function bytes(value) {
+    if (value === null || value === undefined) { return "—"; }
+    var units = ["B", "KB", "MB", "GB", "TB"];
+    var size = Number(value); var index = 0;
+    while (size >= 1024 && index < units.length - 1) { size /= 1024; index += 1; }
+    return new Intl.NumberFormat(locale(), { maximumFractionDigits: size < 10 && index ? 1 : 0 }).format(size) + " " + units[index];
+  }
+  function dateTime(epoch) {
+    if (!epoch) { return "—"; }
+    return new Intl.DateTimeFormat(locale(), { dateStyle: "medium", timeStyle: "short" }).format(new Date(epoch * 1000));
+  }
+  function relative(epoch) {
+    if (!epoch) { return "—"; }
+    var seconds = Math.round(epoch - Date.now() / 1000);
+    var format = new Intl.RelativeTimeFormat(locale(), { numeric: "auto" });
+    var steps = [["year", 31536000], ["month", 2592000], ["day", 86400], ["hour", 3600], ["minute", 60]];
+    for (var i = 0; i < steps.length; i += 1) {
+      if (Math.abs(seconds) >= steps[i][1]) { return format.format(Math.round(seconds / steps[i][1]), steps[i][0]); }
+    }
+    return format.format(seconds, "second");
+  }
+  function secondsText(value) {
+    return value === null || value === undefined ? "—" : t("seconds", { n: new Intl.NumberFormat(locale(), { maximumFractionDigits: 1 }).format(value) });
+  }
+  function reasonText(code) { var key = "r_" + code; return TEXT.en[key] ? t(key) : String(code); }
+
+  function setStatus(message, isError) {
+    var node = document.getElementById("status");
+    node.textContent = message || "";
+    node.className = "status" + (isError ? " error" : "");
+  }
+
+  function applyStaticText() {
+    document.documentElement.lang = state.lang;
+    document.title = t("title");
+    Array.prototype.forEach.call(document.querySelectorAll("[data-t]"), function (node) { node.textContent = t(node.getAttribute("data-t")); });
+    document.getElementById("filter").setAttribute("placeholder", t("filter"));
+    Array.prototype.forEach.call(document.querySelectorAll("[data-lang]"), function (button) {
+      button.setAttribute("aria-pressed", button.getAttribute("data-lang") === state.lang ? "true" : "false");
+    });
+  }
+
+  function renderCards(data) {
+    var totals = data.totals; var queue = data.queue || {}; var disk = data.disk;
+    var cards = [
+      [t("cAccounts"), number(totals.accounts), t("cAccountsSub", { n: number(totals.newAccounts7d) })],
+      [t("cActive"), number(totals.activeToday), t("cActiveSub", { n: number(totals.active7d) })],
+      [t("cBoxes"), number(totals.boxes), bytes(totals.bytes)],
+      [t("cBuilds"), number(totals.builds7d), t("cBuildsSub", { n: number(totals.buildsToday) })],
+      [t("cFailure"), totals.failureRate30d === null ? "—" : new Intl.NumberFormat(locale(), { style: "percent", maximumFractionDigits: 1 }).format(totals.failureRate30d),
+        t("cFailureSub", { failed: number(totals.failed30d), total: number(totals.builds30d) })],
+      [t("cTime"), secondsText(totals.avgBuildSeconds7d), t("cTimeSub", { p95: secondsText(totals.p95BuildSeconds7d) })],
+      [t("cQueue"), number(queue.building) + " / " + number(queue.maxBuilds), t("cQueueSub", { queued: number(queue.queued), max: number(queue.maxQueue) })],
+      [t("cDisk"), disk ? bytes(disk.free) : "—", disk ? t("cDiskSub", { total: bytes(disk.total) }) : ""]
+    ];
+    var container = document.getElementById("cards");
+    container.replaceChildren.apply(container, cards.map(function (card) {
+      return el("div", { class: "card" }, [
+        el("div", { class: "label", text: card[0] }),
+        el("div", { class: "value", text: card[1] }),
+        el("div", { class: "sub", text: card[2] })
+      ]);
+    }));
+  }
+
+  // Bars per day. `bars` lists {key, color, label}; stacked bars add up, grouped ones sit side by side.
+  function barChart(containerId, rows, bars, stacked) {
+    var width = 640; var height = 190; var left = 34; var bottom = 22; var top = 8;
+    var plotWidth = width - left - 6; var plotHeight = height - bottom - top;
+    var maximum = 0;
+    rows.forEach(function (row) {
+      var total = 0;
+      bars.forEach(function (bar) { total = stacked ? total + (row[bar.key] || 0) : Math.max(total, row[bar.key] || 0); });
+      maximum = Math.max(maximum, total);
+    });
+    var ceiling = Math.max(1, Math.ceil(maximum * 1.1));
+    var svg = svgNode("svg", { viewBox: "0 0 " + width + " " + height, role: "img" });
+    [0, 0.5, 1].forEach(function (fraction) {
+      var y = top + plotHeight * (1 - fraction);
+      svg.appendChild(svgNode("line", { x1: left, x2: width - 6, y1: y, y2: y, stroke: "var(--line)", "stroke-width": 1 }));
+      var label = svgNode("text", { x: left - 6, y: y + 4, "text-anchor": "end", "font-size": 10, fill: "var(--muted)" });
+      label.textContent = number(Math.round(ceiling * fraction));
+      svg.appendChild(label);
+    });
+    var slot = plotWidth / Math.max(rows.length, 1);
+    rows.forEach(function (row, index) {
+      var x = left + index * slot;
+      var tooltip = [row.day].concat(bars.map(function (bar) { return bar.label + ": " + number(row[bar.key] || 0); })).join("\n");
+      if (stacked) {
+        var base = top + plotHeight;
+        bars.forEach(function (bar) {
+          var value = row[bar.key] || 0; var barHeight = plotHeight * value / ceiling;
+          if (value > 0) {
+            var rect = svgNode("rect", { x: x + slot * 0.15, y: base - barHeight, width: slot * 0.7, height: barHeight, rx: 1.5, fill: bar.color });
+            var title = svgNode("title", {}); title.textContent = tooltip; rect.appendChild(title);
+            svg.appendChild(rect);
+          }
+          base -= barHeight;
+        });
+      } else {
+        var inner = slot * 0.8 / bars.length;
+        bars.forEach(function (bar, barIndex) {
+          var value = row[bar.key] || 0; var barHeight = plotHeight * value / ceiling;
+          if (value > 0) {
+            var rect = svgNode("rect", { x: x + slot * 0.1 + barIndex * inner, y: top + plotHeight - barHeight, width: inner * 0.9, height: barHeight, rx: 1.5, fill: bar.color });
+            var title = svgNode("title", {}); title.textContent = tooltip; rect.appendChild(title);
+            svg.appendChild(rect);
+          }
+        });
+      }
+      if (index % 5 === 0 || index === rows.length - 1) {
+        var dayLabel = svgNode("text", { x: x + slot / 2, y: height - 6, "text-anchor": "middle", "font-size": 10, fill: "var(--muted)" });
+        dayLabel.textContent = String(row.day).slice(5);
+        svg.appendChild(dayLabel);
+      }
+    });
+    var legend = el("div", { class: "legend" }, bars.map(function (bar) {
+      var swatch = el("i"); swatch.style.background = bar.color;
+      return el("span", {}, [swatch, bar.label]);
+    }));
+    var container = document.getElementById(containerId);
+    container.replaceChildren(svg, legend);
+  }
+
+  function renderCharts(data) {
+    var rows = (data.series || []).map(function (row) { return Object.assign({ built: Math.max(0, row.builds - row.failed) }, row); });
+    barChart("chart-builds", rows, [
+      { key: "built", color: "var(--ok)", label: t("ok") },
+      { key: "failed", color: "var(--bad)", label: t("failed") }
+    ], true);
+    barChart("chart-people", rows, [
+      { key: "active", color: "var(--info)", label: t("active") },
+      { key: "newAccounts", color: "var(--accent)", label: t("newAccounts") },
+      { key: "newBoxes", color: "var(--ok)", label: t("newBoxes") }
+    ], false);
+  }
+
+  function table(id, headers, rows, emptyText) {
+    var node = document.getElementById(id);
+    if (!rows.length) {
+      node.replaceChildren(el("tbody", {}, [el("tr", {}, [el("td", { class: "empty", text: emptyText })])]));
+      return;
+    }
+    var head = el("thead", {}, [el("tr", {}, headers.map(function (header) {
+      return el("th", { class: header.num ? "num" : "", text: header.label });
+    }))]);
+    var body = el("tbody", {}, rows.map(function (cells) {
+      return el("tr", {}, cells.map(function (cell, index) {
+        var content = cell && cell.nodeType ? [cell] : [String(cell)];
+        var attributes = { class: headers[index].num ? "num" : "" };
+        if (cell && cell.title) { attributes.title = cell.title; }
+        return el("td", attributes, content);
+      }));
+    }));
+    node.replaceChildren(head, body);
+  }
+
+  function renderRejects(data) {
+    var entries = Object.keys(data.rejects || {}).map(function (code) { return [reasonText(code), number(data.rejects[code])]; });
+    var container = document.getElementById("rejects");
+    if (!entries.length) { container.replaceChildren(el("p", { class: "empty", text: t("noRejects") })); return; }
+    var holder = el("table", { id: "rejects-table" });
+    container.replaceChildren(holder);
+    table("rejects-table", [{ label: t("reason") }, { label: t("count"), num: true }], entries, "");
+  }
+
+  function renderSystem(data) {
+    var service = data.service || {}; var limits = data.limits || {}; var totals = data.totals || {};
+    var versionNode = service.sourceUrl
+      ? el("a", { href: service.sourceUrl, target: "_blank", rel: "noreferrer", text: service.sourceVersion || service.sourceUrl })
+      : document.createTextNode(service.sourceVersion || "—");
+    var pairs = [
+      [t("version"), versionNode],
+      [t("started"), dateTime(service.startedAt)],
+      [t("builds"), t("allTime", { builds: number(totals.buildsAllTime), failed: number(totals.failedAllTime) })],
+      [t("limits"), t("perAccountDay", { boxes: number(limits.dailyNewBoxes), builds: number(limits.dailyBuilds) })],
+      ["", t("servicewide", { n: number(limits.globalDailyNewBoxes) })],
+      ["", t("accountDisk", { size: bytes(limits.accountMaxBytes) })],
+      [t("queue"), t("concurrency", { builds: number(limits.maxBuilds), queue: number(limits.maxQueue) })],
+      [t("timeout"), secondsText(limits.buildTimeout)]
+    ];
+    var list = el("dl");
+    pairs.forEach(function (pair) {
+      list.appendChild(el("dt", { text: pair[0] }));
+      list.appendChild(el("dd", {}, [typeof pair[1] === "string" ? pair[1] : pair[1]]));
+    });
+    document.getElementById("system").replaceChildren(list);
+  }
+
+  function withTitle(text, title) { var span = el("span", { text: text }); span.title = title; return span; }
+  function pill(text, tone) { return el("span", { class: "pill " + (tone || ""), text: text }); }
+
+  function renderAccounts(data) {
+    var query = state.filter.trim().toLowerCase();
+    var rows = (data.accounts || []).filter(function (row) { return !query || row.email.indexOf(query) !== -1; }).map(function (row) {
+      return [
+        row.email,
+        withTitle(dateTime(row.firstSeen), relative(row.firstSeen)),
+        withTitle(relative(row.lastSeen), dateTime(row.lastSeen)),
+        number(row.boxes), bytes(row.bytes), number(row.saves), number(row.builds), number(row.failed), number(row.rejects)
+      ];
+    });
+    table("accounts", [
+      { label: t("email") }, { label: t("firstSeen") }, { label: t("lastSeen") }, { label: t("boxes"), num: true },
+      { label: t("storage"), num: true }, { label: t("saves"), num: true }, { label: t("builds"), num: true },
+      { label: t("fails"), num: true }, { label: t("refusals"), num: true }
+    ], rows, t("noAccounts"));
+  }
+
+  function eventCells(event) {
+    var kind = event.e; var details = el("span");
+    if (kind === "save") {
+      details.append(event.box || "", " ");
+      if (event.new) { details.append(pill(t("newBox"), "info")); }
+      return [pill(t("eSave"), "info"), details];
+    }
+    if (kind === "build") {
+      var ok = event.state === "done";
+      details.append(event.box || "", " · ", secondsText(event.seconds));
+      if (event.timedOut) { details.append(" ", pill(t("timedOut"), "bad")); }
+      return [pill(ok ? t("ok") : t("failed"), ok ? "ok" : "bad"), details];
+    }
+    if (kind === "reject") {
+      details.append(reasonText(event.code), event.box ? " · " + event.box : "");
+      return [pill(t("eReject"), "warn"), details];
+    }
+    if (kind === "account") { return [pill(t("eAccount"), "info"), details]; }
+    return [pill(String(kind)), details];
+  }
+
+  function renderRecent(data) {
+    var rows = (data.recent || []).map(function (event) {
+      var cells = eventCells(event);
+      return [withTitle(relative(event.t), dateTime(event.t)), event.a || "—", cells[0], cells[1]];
+    });
+    table("recent", [{ label: t("time") }, { label: t("account") }, { label: t("event") }, { label: t("details") }], rows, t("noEvents"));
+  }
+
+  function render() {
+    applyStaticText();
+    var data = state.data;
+    if (!data) { return; }
+    document.getElementById("generated").textContent = t("updated", { time: new Intl.DateTimeFormat(locale(), { timeStyle: "medium" }).format(new Date(data.generatedAt * 1000)) });
+    renderCards(data);
+    renderCharts(data);
+    renderRejects(data);
+    renderSystem(data);
+    renderAccounts(data);
+    renderRecent(data);
+  }
+
+  function load() {
+    if (!state.data) { setStatus(t("loading")); }
+    return fetch("/__cad/admin/stats", { cache: "no-store", credentials: "same-origin" })
+      .then(function (response) {
+        if (response.status === 401 || response.status === 403 || response.status === 404) { throw new Error(t("noAccess")); }
+        if (!response.ok) { throw new Error("HTTP " + response.status); }
+        return response.json();
+      })
+      .then(function (data) { state.data = data; setStatus(""); render(); })
+      .catch(function (error) { setStatus(error.message || String(error), true); });
+  }
+
+  function schedule() {
+    window.clearInterval(state.timer);
+    if (document.getElementById("auto").checked) {
+      state.timer = window.setInterval(function () { if (!document.hidden) { load(); } }, 60000);
+    }
+  }
+
+  document.getElementById("refresh").addEventListener("click", load);
+  document.getElementById("auto").addEventListener("change", schedule);
+  document.getElementById("filter").addEventListener("input", function (event) {
+    state.filter = event.target.value;
+    if (state.data) { renderAccounts(state.data); }
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-lang]"), function (button) {
+    button.addEventListener("click", function () {
+      state.lang = button.getAttribute("data-lang");
+      try { localStorage.setItem("3dmaker:lang", state.lang); } catch (error) { /* storage blocked */ }
+      render();
+    });
+  });
+  document.addEventListener("visibilitychange", function () { if (!document.hidden && document.getElementById("auto").checked) { load(); } });
+
+  applyStaticText();
+  load();
+  schedule();
+})();
+</script>
+</body>
+</html>

@@ -228,6 +228,10 @@ an authenticating proxy such as oauth2-proxy:
 - `/__cad/server` carries no machine detail. `CADGEN_VIEWER_SOURCE_URL`,
   `CADGEN_VIEWER_SOURCE_VERSION`, `CADGEN_VIEWER_SOURCE_VERSION_URL` and
   `CADGEN_VIEWER_TELEGRAM_URL` (https only) are the project links the client shows.
+- `/admin` is a usage dashboard for the accounts listed in
+  `CADGEN_VIEWER_ADMIN_EMAILS`; everyone else gets 404. Its numbers come from an
+  event log and an accounts file under `.box-analytics/` in the root
+  (`cadgen.viewer.box_analytics`), which no route serves.
 
 ## Routes
 
@@ -239,6 +243,7 @@ an authenticating proxy such as oauth2-proxy:
 - `GET /__cad/boxes`, `GET /__cad/boxes/spec?name=...`, `GET /__cad/boxes/status?name=...`,
   `GET /__cad/boxes/file?name=...&part=base|lid&format=step|stl|3mf`,
   `POST /__cad/boxes/save?name=...`: the box builder (above)
+- `GET /admin`, `GET /__cad/admin/stats`: the hosted builder's admin dashboard (admins only)
 - `GET /__tess_cache/<key>.tess`, `POST /__tess_cache/<key>.tess`,
   `POST /__tess_cache/batch` — the shared component-tessellation cache
   (`<cache root>/meshes`, the same store the export CLI and the snapshot host

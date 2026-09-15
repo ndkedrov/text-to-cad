@@ -12,8 +12,8 @@ export const STANDOFF_PATTERNS = Object.freeze(["line", "triangle", "rect"]);
 
 // Display names for faces, shapes and patterns live in i18n.js (face.*, shape.*, pattern.*).
 
-const MAX_HOLES = 60;
-const MAX_STANDOFF_GROUPS = 12;
+export const MAX_HOLES = 60;
+export const MAX_STANDOFF_GROUPS = 12;
 
 function finiteOr(value, fallback) {
   const number = Number(value);

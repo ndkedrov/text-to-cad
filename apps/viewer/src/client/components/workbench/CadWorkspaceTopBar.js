@@ -1153,6 +1153,14 @@ export default function CadWorkspaceTopBar({
         <div className="flex shrink-0 items-center gap-1.5">
           {projectLinks ? (
             <>
+              {projectLinks.adminUrl ? (
+                <a
+                  href={projectLinks.adminUrl}
+                  className="rounded-md px-1.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  {translateBox("links.admin")}
+                </a>
+              ) : null}
               {projectLinks.sourceVersion ? (
                 <a
                   href={projectLinks.sourceVersionUrl || projectLinks.sourceUrl || undefined}
