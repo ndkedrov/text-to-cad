@@ -42,6 +42,7 @@ import {
 import {
   BOARD_PRESET_IDS,
   PORT_TYPE_IDS,
+  boardMinimumSize,
   fitBoxToBoard,
   mountBoard,
   newBoard,
@@ -805,8 +806,8 @@ function BoardItem({ builder, board, index }) {
         {selected ? (
           <>
             <FileSheetFieldGrid columns={3}>
-              <NumberField label={t("field.boardWidth")} value={board.width} min={5} max={400} step={0.5} onCommit={(width) => run(resizeBoard, { width })} />
-              <NumberField label={t("field.boardLength")} value={board.length} min={5} max={400} step={0.5} onCommit={(length) => run(resizeBoard, { length })} />
+              <NumberField label={t("field.boardWidth")} value={board.width} min={boardMinimumSize(board, "x")} max={400} step={0.5} onCommit={(width) => run(resizeBoard, { width })} />
+              <NumberField label={t("field.boardLength")} value={board.length} min={boardMinimumSize(board, "y")} max={400} step={0.5} onCommit={(length) => run(resizeBoard, { length })} />
               <NumberField label={t("field.thickness")} value={board.thickness} min={0.4} max={5} step={0.1} onCommit={(thickness) => patch({ thickness })} />
             </FileSheetFieldGrid>
             <FileSheetFieldGrid columns={2}>

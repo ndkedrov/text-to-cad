@@ -146,17 +146,56 @@ export function findBoard(spec, id) {
   return spec.boards.find((board) => board.id === id) || null;
 }
 
-// A new board size. Holes and ports keep their distance to the nearer edge, so
-// corner holes (and the standoffs under them) stay in the corners; a mounted
-// board stays between the walls.
+const BOARD_MIN_SIZE = 5;
+
+function isCentred(value, size) {
+  return Math.abs(value - size / 2) < 1e-6;
+}
+
+// How far a coordinate is from the edge it follows on a resize: the nearer one.
+function edgeDistance(value, size) {
+  return value > size / 2 ? size - value : value;
+}
+
+// The smallest width ("x") or length ("y") that keeps every hole and port whole
+// on its own half of the board. Shrinking any further would push a hole across
+// the middle, after which it would follow the other edge and growing the board
+// back would no longer return it (two corner holes would end up as one).
+export function boardMinimumSize(board, axis) {
+  const size = axis === "x" ? board.width : board.length;
+  let half = BOARD_MIN_SIZE / 2;
+  for (const hole of board.holes) {
+    const value = axis === "x" ? hole.x : hole.y;
+    const radius = hole.diameter / 2;
+    half = Math.max(half, isCentred(value, size) ? radius : edgeDistance(value, size) + radius);
+  }
+  for (const entry of board.ports) {
+    if ((entry.edge === "front" || entry.edge === "back") !== (axis === "x")) {
+      continue;
+    }
+    const halfWidth = entry.width / 2;
+    half = Math.max(half, isCentred(entry.offset, size) ? halfWidth : edgeDistance(entry.offset, size) + halfWidth);
+  }
+  return Math.ceil(2 * half * 10 - 1e-6) / 10;
+}
+
+// A new board size. Holes and ports keep their distance to the nearer edge (a
+// centred one stays centred), so corner holes and the standoffs under them stay
+// in the corners; the size never goes below boardMinimumSize, so shrinking and
+// growing back returns everything where it was. A mounted board stays between the walls.
 export function resizeBoard(draft, id, { width, length }) {
   const board = findBoard(draft, id);
   if (!board) {
     return;
   }
-  const nextWidth = width ?? board.width;
-  const nextLength = length ?? board.length;
-  const keep = (value, from, to) => roundMm(value > from / 2 ? to - (from - value) : value, 3);
+  const nextWidth = Math.max(width ?? board.width, boardMinimumSize(board, "x"));
+  const nextLength = Math.max(length ?? board.length, boardMinimumSize(board, "y"));
+  const keep = (value, from, to) => {
+    if (isCentred(value, from)) {
+      return roundMm(to / 2, 3);
+    }
+    return roundMm(value > from / 2 ? to - (from - value) : value, 3);
+  };
   for (const hole of board.holes) {
     hole.x = keep(hole.x, board.width, nextWidth);
     hole.y = keep(hole.y, board.length, nextLength);

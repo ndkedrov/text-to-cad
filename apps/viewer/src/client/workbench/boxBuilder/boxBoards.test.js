@@ -157,11 +157,26 @@ test("resizing a board keeps holes and ports at their distance from the nearer e
     board.ports.push({ id: "port-1", type: "usbC", edge: "front", offset: 40, width: 9, height: 3.3 });
   });
   const draft = JSON.parse(JSON.stringify(spec));
-  resizeBoard(draft, draft.boards[0].id, { width: 20 });
+  resizeBoard(draft, draft.boards[0].id, { width: 30 });
   resizeBoard(draft, draft.boards[0].id, { length: 20 });
   const board = normalizeBoxSpec(draft).boards[0];
-  assert.deepEqual(board.holes.map((hole) => [hole.x, hole.y]), [[3.5, 3.5], [16.5, 3.5], [3.5, 16.5], [16.5, 16.5]]);
-  assert.equal(board.ports[0].offset, 10);
+  assert.deepEqual(board.holes.map((hole) => [hole.x, hole.y]), [[3.5, 3.5], [26.5, 3.5], [3.5, 16.5], [26.5, 16.5]]);
+  assert.equal(board.ports[0].offset, 20);
+});
+
+test("shrinking a board to its minimum and growing it back returns every hole", () => {
+  const spec = mounted("custom");
+  const draft = JSON.parse(JSON.stringify(spec));
+  const id = draft.boards[0].id;
+  resizeBoard(draft, id, { width: 5 });
+  resizeBoard(draft, id, { length: 5 });
+  // Each corner hole keeps its half: 2 x (3.5 inset + 1.6 radius).
+  assert.deepEqual([draft.boards[0].width, draft.boards[0].length], [10.2, 10.2]);
+  assert.deepEqual(draft.boards[0].holes.map((hole) => [hole.x, hole.y]), [[3.5, 3.5], [6.7, 3.5], [3.5, 6.7], [6.7, 6.7]]);
+  resizeBoard(draft, id, { width: 50 });
+  resizeBoard(draft, id, { length: 30 });
+  const board = normalizeBoxSpec(draft).boards[0];
+  assert.deepEqual(board.holes.map((hole) => [hole.x, hole.y]), [[3.5, 3.5], [46.5, 3.5], [3.5, 26.5], [46.5, 26.5]]);
 });
 
 test("normalizing keeps boards buildable", () => {
