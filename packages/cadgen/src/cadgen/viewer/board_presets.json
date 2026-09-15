@@ -135,9 +135,9 @@
      "elevation": 0,
      "shape": "rect",
      "width": 9,
-     "height": 3.3,
+     "height": 3.2,
      "radius": 1.2,
-     "overhang": 0,
+     "overhang": 1.5,
      "margin": 0.5
     },
     {
@@ -147,9 +147,9 @@
      "elevation": 0,
      "shape": "rect",
      "width": 7,
-     "height": 3.6,
+     "height": 3.4,
      "radius": 0.5,
-     "overhang": 0,
+     "overhang": 2,
      "margin": 0.5
     },
     {
@@ -159,9 +159,9 @@
      "elevation": 0,
      "shape": "rect",
      "width": 7,
-     "height": 3.6,
+     "height": 3.4,
      "radius": 0.5,
-     "overhang": 0,
+     "overhang": 2,
      "margin": 0.5
     },
     {
@@ -173,7 +173,7 @@
      "width": 16,
      "height": 13.5,
      "radius": 0.5,
-     "overhang": 2,
+     "overhang": 3,
      "margin": 0.5
     },
     {
@@ -185,7 +185,7 @@
      "width": 13.5,
      "height": 16,
      "radius": 0.5,
-     "overhang": 2,
+     "overhang": 3,
      "margin": 0.5
     },
     {
@@ -197,7 +197,7 @@
      "width": 13.5,
      "height": 16,
      "radius": 0.5,
-     "overhang": 2,
+     "overhang": 3,
      "margin": 0.5
     }
    ]
@@ -242,9 +242,9 @@
      "elevation": 0,
      "shape": "rect",
      "width": 9,
-     "height": 3.3,
+     "height": 3.2,
      "radius": 1.2,
-     "overhang": 0,
+     "overhang": 1,
      "margin": 0.5
     },
     {
@@ -254,9 +254,9 @@
      "elevation": 0,
      "shape": "rect",
      "width": 7,
-     "height": 3.6,
+     "height": 3,
      "radius": 0.5,
-     "overhang": 0,
+     "overhang": 1,
      "margin": 0.5
     },
     {
@@ -266,21 +266,21 @@
      "elevation": 0,
      "shape": "rect",
      "width": 7,
-     "height": 3.6,
+     "height": 3,
      "radius": 0.5,
-     "overhang": 0,
+     "overhang": 1,
      "margin": 0.5
     },
     {
      "type": "audio",
      "edge": "front",
-     "offset": 53.5,
+     "offset": 54,
      "elevation": 0,
      "shape": "circle",
      "width": 6.5,
      "height": 6.5,
      "radius": 0,
-     "overhang": 0,
+     "overhang": 2.5,
      "margin": 0.5
     },
     {
@@ -292,7 +292,7 @@
      "width": 13.5,
      "height": 16,
      "radius": 0.5,
-     "overhang": 2,
+     "overhang": 3,
      "margin": 0.5
     },
     {
@@ -304,7 +304,7 @@
      "width": 13.5,
      "height": 16,
      "radius": 0.5,
-     "overhang": 2,
+     "overhang": 3,
      "margin": 0.5
     },
     {
@@ -316,7 +316,7 @@
      "width": 16,
      "height": 13.5,
      "radius": 0.5,
-     "overhang": 2,
+     "overhang": 3,
      "margin": 0.5
     }
    ]
@@ -363,7 +363,7 @@
      "width": 8,
      "height": 3,
      "radius": 0.6,
-     "overhang": 0,
+     "overhang": 1,
      "margin": 0.5
     },
     {
@@ -373,9 +373,9 @@
      "elevation": 0,
      "shape": "rect",
      "width": 15.2,
-     "height": 5.8,
+     "height": 6.5,
      "radius": 0.5,
-     "overhang": 0,
+     "overhang": 1.5,
      "margin": 0.5
     },
     {
@@ -387,41 +387,41 @@
      "width": 6.5,
      "height": 6.5,
      "radius": 0,
-     "overhang": 0,
-     "margin": 0.5
-    },
-    {
-     "type": "usbA2",
-     "edge": "right",
-     "offset": 9,
-     "elevation": 0,
-     "shape": "rect",
-     "width": 13.5,
-     "height": 16,
-     "radius": 0.5,
-     "overhang": 2,
-     "margin": 0.5
-    },
-    {
-     "type": "usbA2",
-     "edge": "right",
-     "offset": 27,
-     "elevation": 0,
-     "shape": "rect",
-     "width": 13.5,
-     "height": 16,
-     "radius": 0.5,
-     "overhang": 2,
+     "overhang": 2.5,
      "margin": 0.5
     },
     {
      "type": "rj45",
      "edge": "right",
-     "offset": 45.75,
+     "offset": 10.25,
      "elevation": 0,
      "shape": "rect",
      "width": 16,
      "height": 13.5,
+     "radius": 0.5,
+     "overhang": 2,
+     "margin": 0.5
+    },
+    {
+     "type": "usbA2",
+     "edge": "right",
+     "offset": 29,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 13.5,
+     "height": 16,
+     "radius": 0.5,
+     "overhang": 2,
+     "margin": 0.5
+    },
+    {
+     "type": "usbA2",
+     "edge": "right",
+     "offset": 47,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 13.5,
+     "height": 16,
      "radius": 0.5,
      "overhang": 2,
      "margin": 0.5
@@ -470,7 +470,7 @@
      "width": 11.2,
      "height": 3.4,
      "radius": 0.5,
-     "overhang": 0,
+     "overhang": 0.5,
      "margin": 0.5
     },
     {
@@ -482,7 +482,7 @@
      "width": 8,
      "height": 3,
      "radius": 0.6,
-     "overhang": 0,
+     "overhang": 1,
      "margin": 0.5
     },
     {
@@ -494,7 +494,7 @@
      "width": 8,
      "height": 3,
      "radius": 0.6,
-     "overhang": 0,
+     "overhang": 1,
      "margin": 0.5
     }
    ]
@@ -504,8 +504,8 @@
    "name": "Raspberry Pi Pico / Pico 2",
    "width": 51,
    "length": 21,
-   "thickness": 1.6,
-   "clearance": 3,
+   "thickness": 1,
+   "clearance": 10,
    "componentHeight": 4,
    "padDiameter": 4,
    "boreDiameter": 1.8,
@@ -549,8 +549,8 @@
   {
    "id": "arduinoUno",
    "name": "Arduino Uno R3",
-   "width": 68.6,
-   "length": 53.3,
+   "width": 68.58,
+   "length": 53.34,
    "thickness": 1.6,
    "clearance": 5,
    "componentHeight": 12,
@@ -608,8 +608,8 @@
   {
    "id": "arduinoUnoR4",
    "name": "Arduino Uno R4 Minima / WiFi",
-   "width": 68.6,
-   "length": 53.3,
+   "width": 68.58,
+   "length": 53.34,
    "thickness": 1.6,
    "clearance": 5,
    "componentHeight": 12,
@@ -641,13 +641,13 @@
     {
      "type": "usbC",
      "edge": "left",
-     "offset": 38.1,
+     "offset": 37.8,
      "elevation": 0,
      "shape": "rect",
      "width": 9,
      "height": 3.3,
      "radius": 1.2,
-     "overhang": 1,
+     "overhang": 0.6,
      "margin": 0.5
     },
     {
@@ -737,7 +737,7 @@
    "id": "arduinoNano",
    "name": "Arduino Nano",
    "width": 18,
-   "length": 45,
+   "length": 43.2,
    "thickness": 1.6,
    "clearance": 10,
    "componentHeight": 5,
@@ -745,23 +745,23 @@
    "boreDiameter": 1.5,
    "holes": [
     {
-     "x": 1.7,
-     "y": 1.7,
+     "x": 1.38,
+     "y": 1.28,
      "diameter": 1.8
     },
     {
-     "x": 16.3,
-     "y": 1.7,
+     "x": 16.62,
+     "y": 1.28,
      "diameter": 1.8
     },
     {
-     "x": 1.7,
-     "y": 43.3,
+     "x": 1.38,
+     "y": 41.92,
      "diameter": 1.8
     },
     {
-     "x": 16.3,
-     "y": 43.3,
+     "x": 16.62,
+     "y": 41.92,
      "diameter": 1.8
     }
    ],
@@ -775,7 +775,7 @@
      "width": 7.8,
      "height": 4,
      "radius": 0.5,
-     "overhang": 1,
+     "overhang": 1.8,
      "margin": 0.5
     }
    ]
@@ -783,8 +783,8 @@
   {
    "id": "esp32DevkitC",
    "name": "ESP32-DevKitC",
-   "width": 28,
-   "length": 54.4,
+   "width": 27.94,
+   "length": 54.3,
    "thickness": 1.6,
    "clearance": 10,
    "componentHeight": 5,
@@ -795,13 +795,135 @@
     {
      "type": "microUsb",
      "edge": "front",
-     "offset": 14,
+     "offset": 13.97,
      "elevation": 0,
      "shape": "rect",
      "width": 8,
      "height": 3,
      "radius": 0.6,
      "overhang": 1,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "esp32S3DevkitC",
+   "name": "ESP32-S3-DevKitC-1 (N16R8)",
+   "width": 25.4,
+   "length": 69,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 5,
+   "padDiameter": 5,
+   "boreDiameter": 2,
+   "holes": [],
+   "ports": [
+    {
+     "type": "usbC",
+     "edge": "front",
+     "offset": 5.99,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 9,
+     "height": 3.3,
+     "radius": 1.2,
+     "overhang": 0.9,
+     "margin": 0.5
+    },
+    {
+     "type": "usbC",
+     "edge": "front",
+     "offset": 19.41,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 9,
+     "height": 3.3,
+     "radius": 1.2,
+     "overhang": 0.9,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "huzzah32Feather",
+   "name": "Adafruit HUZZAH32 ESP32 Feather",
+   "width": 50.8,
+   "length": 22.86,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 6,
+   "padDiameter": 3.5,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 2.54,
+     "y": 20.32,
+     "diameter": 2.5
+    },
+    {
+     "x": 48.26,
+     "y": 1.84,
+     "diameter": 2.2
+    },
+    {
+     "x": 48.26,
+     "y": 20.96,
+     "diameter": 2.2
+    }
+   ],
+   "ports": [
+    {
+     "type": "microUsb",
+     "edge": "left",
+     "offset": 11.43,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 8,
+     "height": 3,
+     "radius": 0.6,
+     "overhang": 0,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "lolinD32",
+   "name": "LOLIN D32 (ESP32)",
+   "width": 25.4,
+   "length": 57,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 6,
+   "padDiameter": 4,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2,
+     "y": 55,
+     "diameter": 2.1
+    },
+    {
+     "x": 23.4,
+     "y": 55,
+     "diameter": 2.1
+    }
+   ],
+   "ports": [
+    {
+     "type": "microUsb",
+     "edge": "front",
+     "offset": 19.5,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 8,
+     "height": 3,
+     "radius": 0.6,
+     "overhang": 0.5,
      "margin": 0.5
     }
    ]
@@ -855,25 +977,36 @@
   },
   {
    "id": "wemosD1Mini",
-   "name": "Wemos D1 mini (ESP8266)",
-   "width": 25.6,
-   "length": 34.2,
+   "name": "LOLIN (Wemos) D1 mini v4 (ESP8266)",
+   "width": 25.4,
+   "length": 34.3,
    "thickness": 1.6,
-   "clearance": 3,
+   "clearance": 10,
    "componentHeight": 5,
-   "padDiameter": 5,
-   "boreDiameter": 2,
-   "holes": [],
+   "padDiameter": 4,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.5,
+     "y": 31,
+     "diameter": 2
+    },
+    {
+     "x": 22.9,
+     "y": 31,
+     "diameter": 2
+    }
+   ],
    "ports": [
     {
-     "type": "microUsb",
+     "type": "usbC",
      "edge": "front",
-     "offset": 12.8,
+     "offset": 12.7,
      "elevation": 0,
      "shape": "rect",
-     "width": 8,
-     "height": 3,
-     "radius": 0.6,
+     "width": 9,
+     "height": 3.3,
+     "radius": 1.2,
      "overhang": 0.5,
      "margin": 0.5
     }
