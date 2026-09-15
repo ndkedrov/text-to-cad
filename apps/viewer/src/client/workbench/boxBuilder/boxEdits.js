@@ -1,11 +1,13 @@
-// Box builder: edits on the selected hole or standoff group. Each mutating
+// Box builder: edits on the selected hole, standoff group or board. Each mutating
 // function edits a spec draft in place (the shape useBoxBuilder's `edit` hands
 // out); planArray only reports where an array's copies would go.
 
 import {
+  MAX_BOARDS,
   MAX_HOLES,
   MAX_STANDOFF_GROUPS,
   boxDimensions,
+  clampBoardPosition,
   clampHolePosition,
   clampStandoffPosition,
   isWallFace,
@@ -28,6 +30,9 @@ function listFor(spec, selection) {
   if (selection?.kind === "standoff") {
     return spec.standoffs;
   }
+  if (selection?.kind === "board") {
+    return spec.boards;
+  }
   return null;
 }
 
@@ -40,6 +45,8 @@ export function removeSelected(draft, selection) {
     draft.holes = draft.holes.filter((hole) => hole.id !== selection.id);
   } else if (selection?.kind === "standoff") {
     draft.standoffs = draft.standoffs.filter((group) => group.id !== selection.id);
+  } else if (selection?.kind === "board") {
+    draft.boards = draft.boards.filter((board) => board.id !== selection.id);
   }
 }
 
@@ -58,6 +65,17 @@ export function duplicateSelected(draft, selection) {
     draft.holes.splice(index + 1, 0, copy);
     return { kind: "hole", id: copy.id };
   }
+  if (selection.kind === "board") {
+    if (draft.boards.length >= MAX_BOARDS) {
+      return null;
+    }
+    const copy = { ...JSON.parse(JSON.stringify(source)), id: nextId("board", draft.boards) };
+    if (copy.mounted) {
+      Object.assign(copy, clampBoardPosition(dims, copy, copy.x + 10, copy.y + 10));
+    }
+    draft.boards.splice(index + 1, 0, copy);
+    return { kind: "board", id: copy.id };
+  }
   const copy = { ...source, id: nextId("standoff", draft.standoffs) };
   const offset = copy.outerDiameter + 4;
   Object.assign(copy, clampStandoffPosition(dims, copy, copy.x + offset, copy.y + offset));
@@ -70,12 +88,16 @@ export function centerSelected(draft, selection) {
   if (!item) {
     return;
   }
+  const dims = boxDimensions(draft);
+  if (selection.kind === "board") {
+    Object.assign(item, clampBoardPosition(dims, item, 0, 0));
+    return;
+  }
   if (selection.kind === "standoff") {
     item.x = 0;
     item.y = 0;
     return;
   }
-  const dims = boxDimensions(draft);
   item.u = 0;
   item.v = isWallFace(item.face) ? roundMm(dims.floorTop + dims.wallHeight / 2, 2) : 0;
 }
@@ -86,7 +108,9 @@ export function nudgeSelected(draft, selection, deltaU, deltaV) {
     return;
   }
   const dims = boxDimensions(draft);
-  if (selection.kind === "standoff") {
+  if (selection.kind === "board") {
+    Object.assign(item, clampBoardPosition(dims, item, item.x + deltaU, item.y + deltaV));
+  } else if (selection.kind === "standoff") {
     Object.assign(item, clampStandoffPosition(dims, item, item.x + deltaU, item.y + deltaV));
   } else {
     Object.assign(item, clampHolePosition(dims, item, item.u + deltaU, item.v + deltaV));
@@ -118,7 +142,7 @@ function holeHalfExtents(hole) {
 // the walls. Returns { u: [min, max], v: [min, max] } in the item's own coordinates.
 export function arrayBounds(spec, selection) {
   const item = findSelected(spec, selection);
-  if (!item) {
+  if (!item || selection.kind === "board") {
     return null;
   }
   const dims = boxDimensions(spec);
