@@ -49,6 +49,7 @@ import {
   newBoard,
   newBoardHole,
   newBoardPort,
+  newBoardRail,
   resizeBoard,
   rotateBoard,
   setPortType,
@@ -65,11 +66,13 @@ import {
   MAX_BOARDS,
   MAX_BOARD_HOLES,
   MAX_BOARD_PORTS,
+  MAX_BOARD_RAILS,
   PORT_SHAPES,
   STANDOFF_PATTERNS,
   boardPortCutout,
   boxDimensions,
   clampBoardPosition,
+  clampStemLength,
   clampHolePosition,
   connectorHole,
   connectorHoleMargin,
@@ -920,6 +923,56 @@ function BoardItem({ builder, board, index }) {
             })}
           >
             {t("action.addHole")}
+          </CompactButton>
+        </FileSheetButtonRow>
+      </FileSheetDisclosure>
+
+      <FileSheetDisclosure
+        label={t("board.part.hold")}
+        summary={[
+          board.rails.length ? t("board.railsCount", { n: board.rails.length }) : "",
+          board.clamp ? t("board.clampOn") : ""
+        ].filter(Boolean).join(" · ") || t("summary.none")}
+      >
+        <FileSheetStatusText>{t("board.holdHint")}</FileSheetStatusText>
+        <FileSheetToggleRow label={t("field.boardClamp")} checked={board.clamp} onCheckedChange={(clamp) => patch({ clamp })} />
+        {board.clamp ? (
+          <>
+            <NumberRow label={t("field.clampHeight")} value={board.clampHeight} min={1} max={200} step={0.5} onCommit={(clampHeight) => patch({ clampHeight })} />
+            <FileSheetStatusText>{t("board.clampStem", { stem: formatNumber(clampStemLength(board), 1) })}</FileSheetStatusText>
+          </>
+        ) : null}
+        {board.rails.map((rail, railIndex) => {
+          const patchRail = (values) => update((target) => {
+            const entry = target.rails.find((candidate) => candidate.id === rail.id);
+            if (entry) {
+              Object.assign(entry, values);
+            }
+          });
+          return (
+            <FileSheetFieldGrid key={rail.id} columns={4} className="items-end">
+              <NumberField label={`${railIndex + 1} · ${t("field.railOffset")}`} value={rail.offset} min={0} max={Math.max(board.width, board.length)} step={0.5} onCommit={(offset) => patchRail({ offset })} />
+              <NumberField label={t("field.railLength")} value={rail.length} min={1} max={400} step={0.5} onCommit={(length) => patchRail({ length })} />
+              <NumberField label={t("field.railThickness")} value={rail.thickness} min={0.5} max={50} step={0.5} onCommit={(thickness) => patchRail({ thickness })} />
+              <IconButton
+                icon={X}
+                label={t("action.removeRail")}
+                onClick={() => update((target) => {
+                  target.rails = target.rails.filter((entry) => entry.id !== rail.id);
+                })}
+              />
+            </FileSheetFieldGrid>
+          );
+        })}
+        <FileSheetButtonRow>
+          <CompactButton
+            icon={Plus}
+            disabled={board.rails.length >= MAX_BOARD_RAILS}
+            onClick={() => update((target) => {
+              target.rails.push(newBoardRail(target));
+            })}
+          >
+            {t("action.addRail")}
           </CompactButton>
         </FileSheetButtonRow>
       </FileSheetDisclosure>

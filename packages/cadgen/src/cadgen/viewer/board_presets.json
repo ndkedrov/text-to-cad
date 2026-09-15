@@ -1226,7 +1226,7 @@
    "width": 25.4,
    "length": 69,
    "thickness": 1.6,
-   "clearance": 10,
+   "clearance": 2,
    "componentHeight": 5,
    "padDiameter": 5,
    "boreDiameter": 2,
@@ -1256,7 +1256,21 @@
      "overhang": 0.9,
      "margin": 0.5
     }
-   ]
+   ],
+   "rails": [
+    {
+     "offset": 8,
+     "length": 22,
+     "thickness": 4
+    },
+    {
+     "offset": 67,
+     "length": 22,
+     "thickness": 4
+    }
+   ],
+   "clamp": true,
+   "clampHeight": 14
   },
   {
    "id": "huzzah32Feather",
@@ -2550,10 +2564,10 @@
    "id": "rs485AutoDirSlimGeneric",
    "name": "TTL-RS485 auto-direction module (slim, 3P, no holes)",
    "category": "interface",
-   "width": 42.8,
-   "length": 15.22,
+   "width": 43,
+   "length": 16,
    "thickness": 1.6,
-   "clearance": 3,
+   "clearance": 2,
    "componentHeight": 10,
    "padDiameter": 5,
    "boreDiameter": 2,
@@ -2562,7 +2576,7 @@
     {
      "type": "custom",
      "edge": "right",
-     "offset": 7.61,
+     "offset": 8,
      "elevation": 0,
      "shape": "rect",
      "width": 15.2,
@@ -2570,6 +2584,18 @@
      "radius": 0,
      "overhang": 0,
      "margin": 0.5
+    }
+   ],
+   "rails": [
+    {
+     "offset": 8.75,
+     "length": 12,
+     "thickness": 4
+    },
+    {
+     "offset": 30.25,
+     "length": 12,
+     "thickness": 4
     }
    ]
   },
@@ -2663,8 +2689,8 @@
    "id": "sn65hvd230CanBlueGeneric",
    "name": "SN65HVD230 CAN transceiver module (blue, generic)",
    "category": "interface",
-   "width": 15.31,
-   "length": 15.82,
+   "width": 16,
+   "length": 14,
    "thickness": 1.6,
    "clearance": 10,
    "componentHeight": 2,
@@ -2672,13 +2698,13 @@
    "boreDiameter": 2.6,
    "holes": [
     {
-     "x": 12.44,
-     "y": 13.37,
+     "x": 2.5,
+     "y": 2.5,
      "diameter": 3.3
     },
     {
-     "x": 12.44,
-     "y": 2.38,
+     "x": 13.5,
+     "y": 2.5,
      "diameter": 3.3
     }
    ],
@@ -3047,9 +3073,20 @@
    "thickness": 1.6,
    "clearance": 10,
    "componentHeight": 2,
-   "padDiameter": 5,
-   "boreDiameter": 2,
-   "holes": [],
+   "padDiameter": 4,
+   "boreDiameter": 1.6,
+   "holes": [
+    {
+     "x": 4.5,
+     "y": 1.5,
+     "diameter": 2
+    },
+    {
+     "x": 13.5,
+     "y": 1.5,
+     "diameter": 2
+    }
+   ],
    "ports": []
   },
   {

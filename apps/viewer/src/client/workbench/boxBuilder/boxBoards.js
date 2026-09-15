@@ -4,12 +4,15 @@
 // Each mutating function edits a spec draft in place (useBoxBuilder's `edit`).
 
 import {
+  CLAMP_BAR,
   PCB_THICKNESS,
   PORT_TYPES,
   boardEdgeWall,
-  boardFootprint,
+  boardLongAxis,
+  boardOutline,
   boxDimensions,
   clampBoardPosition,
+  defaultClampHeight,
   nextId,
   roundMm,
   wallInnerHalf
@@ -50,7 +53,7 @@ export const CUSTOM_BOARD = Object.freeze({
 export function newBoard(spec, preset = null) {
   const source = preset && typeof preset === "object" ? preset : CUSTOM_BOARD;
   const pick = (key) => (Number.isFinite(Number(source[key])) ? Number(source[key]) : CUSTOM_BOARD[key]);
-  return {
+  const board = {
     id: nextId("board", spec.boards),
     preset: source === CUSTOM_BOARD ? "custom" : String(source.id || "custom"),
     name: source === CUSTOM_BOARD ? "" : String(source.name || ""),
@@ -72,11 +75,23 @@ export function newBoard(spec, preset = null) {
       ...entry,
       id: `port-${index + 1}`
     })),
+    rails: (Array.isArray(source.rails) ? source.rails : []).map((rail, index) => ({
+      id: `rail-${index + 1}`,
+      offset: rail.offset,
+      length: rail.length,
+      thickness: rail.thickness
+    })),
     mounted: false,
     x: 0,
     y: 0,
     rotation: 0
   };
+  // With no mounting holes, the board is clamped down unless the template says not to.
+  board.clamp = typeof source.clamp === "boolean" ? source.clamp : board.holes.length === 0;
+  board.clampHeight = source.clampHeight != null && Number.isFinite(Number(source.clampHeight))
+    ? Number(source.clampHeight)
+    : defaultClampHeight(board);
+  return board;
 }
 
 export function newBoardHole(board) {
@@ -91,6 +106,18 @@ export function newBoardHole(board) {
 
 export function newBoardPort(board, type = "usbC") {
   return { id: nextId("port", board.ports), ...port(type, "front", roundMm(board.width / 2, 2)) };
+}
+
+// A 4 mm rib across the middle of the board, 1 mm short of each side.
+export function newBoardRail(board) {
+  const long = Math.max(board.width, board.length);
+  const across = Math.min(board.width, board.length);
+  return {
+    id: nextId("rail", board.rails),
+    offset: roundMm(long / 2 - 2, 2),
+    length: roundMm(Math.max(across - 2, 1), 2),
+    thickness: 4
+  };
 }
 
 // Switching a port's type takes that connector's body size.
@@ -194,6 +221,12 @@ export function resizeBoard(draft, id, { width, length }) {
       ? keep(entry.offset, board.width, nextWidth)
       : keep(entry.offset, board.length, nextLength);
   }
+  // Ribs keep their middle's distance to the nearer end of the long side.
+  const alongX = boardLongAxis(board) === "x";
+  for (const rail of board.rails || []) {
+    const centre = keep(rail.offset + rail.thickness / 2, alongX ? board.width : board.length, alongX ? nextWidth : nextLength);
+    rail.offset = roundMm(Math.max(centre - rail.thickness / 2, 0), 3);
+  }
   board.width = nextWidth;
   board.length = nextLength;
   if (board.mounted) {
@@ -218,7 +251,7 @@ export function boardWallGaps(spec, board) {
 // exactly one wall, push it against that wall.
 function placeBoard(draft, board, { keep = false } = {}) {
   const dims = boxDimensions(draft);
-  const [sizeX, sizeY] = boardFootprint(board);
+  const [sizeX, sizeY] = boardOutline(board);
   const gaps = boardWallGaps(draft, board);
   let { x, y } = keep ? board : { x: 0, y: 0 };
   const along = (low, high, size, current) => {
@@ -247,7 +280,7 @@ export function mountBoard(draft, id) {
   }
   const dims = boxDimensions(draft);
   const fits = (rotation) => {
-    const [sizeX, sizeY] = boardFootprint({ ...board, rotation });
+    const [sizeX, sizeY] = boardOutline({ ...board, rotation });
     return (
       sizeX + 2 * BOARD_WALL_GAP <= dims.innerWidth + 1e-6 &&
       sizeY + 2 * BOARD_WALL_GAP <= dims.innerDepth + 1e-6
@@ -310,9 +343,9 @@ export function fitBoxToBoard(draft, id) {
   if (!board) {
     return;
   }
-  const [sizeX, sizeY] = boardFootprint(board);
+  const [sizeX, sizeY] = boardOutline(board);
   const gaps = boardWallGaps(draft, board);
-  const inside = (size, low, high) => size + (gaps[low] ?? BOARD_WALL_GAP) + (gaps[high] ?? BOARD_WALL_GAP);
+  const inside =(size, low, high) => size + (gaps[low] ?? BOARD_WALL_GAP) + (gaps[high] ?? BOARD_WALL_GAP);
   const up = (value) => Math.ceil(value * 2 - 1e-6) / 2;
   const wall = draft.walls.thickness;
   draft.walls.enabled = true;
@@ -322,7 +355,9 @@ export function fitBoxToBoard(draft, id) {
   const lip = draft.lid.enabled && draft.lid.lip ? draft.lid.lipHeight : 0;
   // Upside down, the parts hang inside the clearance and nothing rises above the board.
   const above = board.flipped ? 0 : Math.max(board.componentHeight, tallestPort);
-  const height = board.clearance + board.thickness + above + HEADROOM + lip;
+  // A clamp's bar lies on its posts and must pass under the lid too.
+  const top = Math.max(board.clearance + board.thickness + above, board.clamp ? board.clampHeight + CLAMP_BAR : 0);
+  const height = top + HEADROOM + lip;
   draft.walls.height = Math.min(500, Math.max(draft.walls.height, up(height)));
   if (board.mounted) {
     placeBoard(draft, board);

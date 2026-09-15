@@ -4,9 +4,14 @@
 // Grammar: packages/cadgen/src/cadgen/box_plan.py.
 
 import {
+  CLAMP_BAR,
+  boardClampPostPoints,
+  boardClampSpan,
   boardHolePoints,
   boardPortCutout,
+  boardRailRect,
   boxDimensions,
+  clampStemLength,
   faceFrame,
   isWallFace,
   roundMm,
@@ -162,6 +167,73 @@ function boardStandoffNodes(board, dims) {
   );
 }
 
+// Ribs under a mounted board, as tall as its clearance: it rests on them.
+function boardRailNodes(board, dims) {
+  if (board.clearance <= 0) {
+    return [];
+  }
+  return (board.rails || []).map((rail) => {
+    const rect = boardRailRect(board, rail);
+    return roundedPrism(rect.sizeX, rect.sizeY, board.clearance + FUSE_OVERLAP, 0, {
+      rot: [0, 0, board.rotation],
+      pos: [rect.x, rect.y, dims.floorTop - FUSE_OVERLAP]
+    });
+  });
+}
+
+// The screw posts a clamped board's T piece is screwed onto.
+function boardClampPostNodes(board, dims) {
+  return padNodes(
+    boardClampPostPoints(board),
+    { outerDiameter: board.padDiameter, holeDiameter: board.boreDiameter, height: board.clampHeight },
+    dims
+  );
+}
+
+// The T piece lies flat on the bed, `CLAMP_DEPTH` tall.
+export const CLAMP_DEPTH = 10;
+const CLAMP_STEM_WIDTH = 4;
+const CLAMP_PRINT_GAP = 5;
+// A screw passes freely through the T's bar into the post's bore.
+const CLAMP_SCREW_PLAY = 0.8;
+
+// The T pieces of the clamped boards, side by side on the bed to the right of the
+// box: where each starts along X, how wide it lies (bar plus stem) and its sizes.
+export function clampPieces(spec, dims) {
+  let x = dims.width / 2 + CLAMP_PRINT_GAP;
+  return spec.boards
+    .filter((board) => board.mounted && board.clamp)
+    .map((board) => {
+      const span = boardClampSpan(board);
+      const stem = Math.max(clampStemLength(board), 0);
+      const piece = { board, x, span, length: span + board.padDiameter, stem, width: CLAMP_BAR + stem };
+      x += piece.width + CLAMP_PRINT_GAP;
+      return piece;
+    });
+}
+
+// Seen from above as it prints: the bar along Y at X 0..CLAMP_BAR with a screw hole
+// through it over each post, the stem out along +X. In the box the bar lies across
+// the post tops and the stem hangs down onto the middle of the board.
+function clampPieceNode(piece) {
+  const { board } = piece;
+  const half = piece.length / 2;
+  const stemHalf = CLAMP_STEM_WIDTH / 2;
+  const tip = CLAMP_BAR + piece.stem;
+  const points = piece.stem > 0.05
+    ? [[0, -half], [CLAMP_BAR, -half], [CLAMP_BAR, -stemHalf], [tip, -stemHalf], [tip, stemHalf], [CLAMP_BAR, stemHalf], [CLAMP_BAR, half], [0, half]]
+    : [[0, -half], [CLAMP_BAR, -half], [CLAMP_BAR, half], [0, half]];
+  const body = { type: "poly", points: points.map(([x, y]) => [tidy(x), tidy(y)]), h: CLAMP_DEPTH };
+  const screw = board.boreDiameter > 0 ? Math.min(board.boreDiameter + CLAMP_SCREW_PLAY, CLAMP_DEPTH - 2) : 0;
+  const holes = screw > 0
+    ? [-1, 1].map((side) => cylinder(screw / 2, CLAMP_BAR + 2 * CUT_MARGIN, {
+      rot: [0, 90, 0],
+      pos: [-CUT_MARGIN, side * piece.span / 2, CLAMP_DEPTH / 2]
+    }))
+    : [];
+  return group([difference(body, holes)], { pos: [piece.x, 0, 0] });
+}
+
 // Wall cut-outs for the ports of every mounted board.
 export function boardPortCutouts(spec, dims) {
   if (!dims.wallsEnabled) {
@@ -189,10 +261,14 @@ function basePlan(spec, dims) {
   const portCutters = boardPortCutouts(spec, dims).map((cutout) => holeCutter(cutout, dims));
   const shell = difference(body, [cavity, ...cutters, ...portCutters]);
   const standoffs = spec.standoffs.flatMap((groupSpec) => standoffNodes(groupSpec, dims));
-  const boardStandoffs = spec.boards
-    .filter((board) => board.mounted)
-    .flatMap((board) => boardStandoffNodes(board, dims));
-  return union([shell, ...standoffs, ...boardStandoffs]);
+  const mounted = spec.boards.filter((board) => board.mounted);
+  const boardSupports = mounted.flatMap((board) => [
+    ...boardStandoffNodes(board, dims),
+    ...boardRailNodes(board, dims),
+    ...boardClampPostNodes(board, dims)
+  ]);
+  const clamps = clampPieces(spec, dims).map(clampPieceNode);
+  return union([shell, ...standoffs, ...boardSupports, ...clamps]);
 }
 
 function lidPlan(spec, dims) {

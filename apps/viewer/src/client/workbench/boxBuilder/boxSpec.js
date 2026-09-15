@@ -28,6 +28,18 @@ export const PCB_THICKNESS = 1.6;
 // A connector whose front stops further than this from the inside of its wall is
 // reported: a plug will not reach it through the cut-out.
 export const PORT_REACH_TOLERANCE = 2;
+export const MAX_BOARD_RAILS = 4;
+// A board with nothing to screw it down by is clamped: a screw post beside each of
+// its long sides, halfway along, and a T piece printed next to the box that is
+// screwed onto both posts and presses the board down with its stem.
+// Space between the board edge and a post.
+export const CLAMP_POST_GAP = 0.5;
+// How thick the T's bar is from the post top up.
+export const CLAMP_BAR = 3;
+// The shortest post a clamp starts with.
+export const CLAMP_POST_HEIGHT = 14;
+// The shortest stem worth printing.
+const CLAMP_MIN_STEM = 0.5;
 
 // Connector bodies as they stand on the board: width along the board edge, height
 // up from `elevation` above the board top.
@@ -270,6 +282,24 @@ function normalizePort(raw, used, width, length) {
   };
 }
 
+// A rib under a board: `offset` along the board's long side from its front (or
+// left) edge to the rib, `length` across the board, `thickness` along it.
+function normalizeBoardRail(raw, used, span) {
+  const source = raw && typeof raw === "object" ? raw : {};
+  return {
+    id: uniqueId(source.id, "rail", used),
+    offset: numberIn(source.offset, 0, 0, span),
+    length: numberIn(source.length, 20, 1, 400),
+    thickness: numberIn(source.thickness, 4, 0.5, 50)
+  };
+}
+
+// Clamp posts start tall enough for the T's bar to pass over the board's parts.
+export function defaultClampHeight(board) {
+  const above = board.flipped ? 0 : board.componentHeight;
+  return Math.max(CLAMP_POST_HEIGHT, Math.ceil(board.clearance + board.thickness + above - 1e-6));
+}
+
 function normalizeBoard(raw, used) {
   const source = raw && typeof raw === "object" ? raw : {};
   const width = numberIn(source.width, 50, 5, 400);
@@ -278,7 +308,8 @@ function normalizeBoard(raw, used) {
   const quarter = ((Math.round(finiteOr(source.rotation, 0) / 90) % 4) + 4) % 4;
   const holeIds = new Set();
   const portIds = new Set();
-  return {
+  const railIds = new Set();
+  const board = {
     id: uniqueId(source.id, "board", used),
     preset: typeof source.preset === "string" && /^[A-Za-z0-9][A-Za-z0-9-]{0,39}$/u.test(source.preset) ? source.preset : "custom",
     // The template's name, shown in the board's heading.
@@ -297,12 +328,19 @@ function normalizeBoard(raw, used) {
     ports: (Array.isArray(source.ports) ? source.ports : [])
       .slice(0, MAX_BOARD_PORTS)
       .map((port) => normalizePort(port, portIds, width, length)),
+    rails: (Array.isArray(source.rails) ? source.rails : [])
+      .slice(0, MAX_BOARD_RAILS)
+      .map((rail) => normalizeBoardRail(rail, railIds, Math.max(width, length))),
     mounted: booleanOr(source.mounted, false),
     flipped: booleanOr(source.flipped, false),
     x: numberIn(source.x, 0, -2000, 2000),
     y: numberIn(source.y, 0, -2000, 2000),
     rotation: quarter * 90
   };
+  // A board with no mounting holes is clamped unless told otherwise.
+  board.clamp = booleanOr(source.clamp, board.holes.length === 0);
+  board.clampHeight = numberIn(source.clampHeight, defaultClampHeight(board), 1, 200);
+  return board;
 }
 
 // Clamp every value into a buildable range. Never throws: whatever arrives (a
@@ -573,6 +611,54 @@ export function boardHolePoints(board) {
   return board.holes.map((hole) => boardPoint(board, hole.x, hole.y));
 }
 
+// The board's long side runs along its own X when it is wider than long, else along Y.
+export function boardLongAxis(board) {
+  return board.width > board.length ? "x" : "y";
+}
+
+// A rib under the board, across its short side: the rib's centre in box
+// coordinates and its size along the board's own X and Y.
+export function boardRailRect(board, rail) {
+  const alongY = boardLongAxis(board) === "y";
+  const centre = rail.offset + rail.thickness / 2;
+  const [x, y] = alongY
+    ? boardPoint(board, board.width / 2, centre)
+    : boardPoint(board, centre, board.length / 2);
+  return { x, y, sizeX: alongY ? rail.length : rail.thickness, sizeY: alongY ? rail.thickness : rail.length };
+}
+
+// Clamp posts in the board's own coordinates: beside its long sides, halfway along.
+function boardClampPostsLocal(board) {
+  const offset = CLAMP_POST_GAP + board.padDiameter / 2;
+  if (boardLongAxis(board) === "x") {
+    return [[board.width / 2, -offset], [board.width / 2, board.length + offset]];
+  }
+  return [[-offset, board.length / 2], [board.width + offset, board.length / 2]];
+}
+
+export function boardClampPostPoints(board) {
+  return board.clamp ? boardClampPostsLocal(board).map(([x, y]) => boardPoint(board, x, y)) : [];
+}
+
+// From one clamp post's centre to the other's.
+export function boardClampSpan(board) {
+  return Math.min(board.width, board.length) + 2 * (CLAMP_POST_GAP + board.padDiameter / 2);
+}
+
+// How far the T's stem reaches down from the post tops to the board's top.
+export function clampStemLength(board) {
+  return roundMm(board.clampHeight - board.clearance - board.thickness, 3);
+}
+
+// The board's extent along the box's X and Y, clamp posts included.
+export function boardOutline(board) {
+  const reach = board.clamp ? 2 * (CLAMP_POST_GAP + board.padDiameter) : 0;
+  const [sizeX, sizeY] = boardLongAxis(board) === "x"
+    ? [board.width, board.length + reach]
+    : [board.width + reach, board.length];
+  return board.rotation % 180 === 0 ? [sizeX, sizeY] : [sizeY, sizeX];
+}
+
 // Heights above the box bottom: the board's underside, its top, and how far its
 // parts reach up (or, upside down, down).
 export function boardLevels(dims, board) {
@@ -641,9 +727,9 @@ export function boardPortCutout(dims, board, port) {
   };
 }
 
-// Keep a mounted board between the walls.
+// Keep a mounted board, and its clamp posts, between the walls.
 export function clampBoardPosition(dims, board, x, y) {
-  const [sizeX, sizeY] = boardFootprint(board);
+  const [sizeX, sizeY] = boardOutline(board);
   const limitX = Math.max(dims.innerWidth / 2 - sizeX / 2, 0);
   const limitY = Math.max(dims.innerDepth / 2 - sizeY / 2, 0);
   // `|| 0` turns a -0 from a centred placement into 0.
@@ -707,18 +793,31 @@ export function boxSpecWarnings(spec) {
     }
     const n = index + 1;
     const target = { kind: "board", id: board.id };
-    const [sizeX, sizeY] = boardFootprint(board);
+    const [sizeX, sizeY] = boardOutline(board);
     if (
       Math.abs(board.x) + sizeX / 2 > dims.innerWidth / 2 + 1e-6 ||
       Math.abs(board.y) + sizeY / 2 > dims.innerDepth / 2 + 1e-6
     ) {
       warnings.push({ key: "warning.boardOutside", params: { n }, target });
     }
-    if (dims.wallsEnabled && boardLevels(dims, board).partsTop > dims.wallTop + 1e-6) {
+    const levels = boardLevels(dims, board);
+    if (dims.wallsEnabled && levels.partsTop > dims.wallTop + 1e-6) {
       warnings.push({ key: "warning.boardTall", params: { n }, target });
     }
     if (board.flipped && board.componentHeight > board.clearance + 1e-6) {
       warnings.push({ key: "warning.boardPartsBelow", params: { n }, target });
+    }
+    if (board.clearance > 0 && !board.holes.length && !(board.rails || []).length) {
+      warnings.push({ key: "warning.boardUnsupported", params: { n, clearance: roundMm(board.clearance, 2) }, target });
+    }
+    if (board.clamp) {
+      if (clampStemLength(board) < CLAMP_MIN_STEM || dims.floorTop + board.clampHeight < levels.partsTop - 1e-6) {
+        warnings.push({ key: "warning.clampLow", params: { n }, target });
+      }
+      const roof = dims.wallTop - (dims.lipEnabled ? dims.lipHeight : 0);
+      if (dims.lidEnabled && dims.floorTop + board.clampHeight + CLAMP_BAR > roof + 1e-6) {
+        warnings.push({ key: "warning.clampTall", params: { n }, target });
+      }
     }
     if (!board.ports.length) {
       return;

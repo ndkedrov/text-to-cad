@@ -34,6 +34,7 @@ MAX_PRESET_REQUEST_BYTES = 512 * 1024
 MAX_PRESETS = 200
 MAX_HOLES = 8
 MAX_PORTS = 8
+MAX_RAILS = 4
 BOARD_EDGES = ("front", "back", "left", "right")
 PORT_SHAPES = ("rect", "circle")
 _PRESET_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{0,39}")
@@ -126,7 +127,10 @@ def normalize_board_presets(boards: Any, port_types, categories) -> list[dict]:
         ports = source.get("ports", [])
         if not isinstance(ports, list) or len(ports) > MAX_PORTS:
             raise PresetError(f"{where}.ports: a list of at most {MAX_PORTS}")
-        clean.append({
+        rails = source.get("rails", [])
+        if not isinstance(rails, list) or len(rails) > MAX_RAILS:
+            raise PresetError(f"{where}.rails: a list of at most {MAX_RAILS}")
+        entry = {
             "id": preset_id,
             "name": name.strip(),
             "category": category,
@@ -149,7 +153,25 @@ def normalize_board_presets(boards: Any, port_types, categories) -> list[dict]:
                 _normalize_port(port, f"{where}.ports[{port_index}]", width, length, port_types)
                 for port_index, port in enumerate(ports)
             ],
-        })
+        }
+        # Ribs under the board (offset along its long side), and whether a board is
+        # clamped down, are written only when a preset sets them.
+        if rails:
+            entry["rails"] = [
+                {
+                    "offset": _number(_object(rail, f"{where}.rails[{rail_index}]"), "offset", f"{where}.rails[{rail_index}]", 0, max(width, length)),
+                    "length": _number(rail, "length", f"{where}.rails[{rail_index}]", 1, 400),
+                    "thickness": _number(rail, "thickness", f"{where}.rails[{rail_index}]", 0.5, 50),
+                }
+                for rail_index, rail in enumerate(rails)
+            ]
+        if "clamp" in source:
+            if not isinstance(source["clamp"], bool):
+                raise PresetError(f"{where}.clamp: expected true or false")
+            entry["clamp"] = source["clamp"]
+        if "clampHeight" in source:
+            entry["clampHeight"] = _number(source, "clampHeight", where, 1, 200)
+        clean.append(entry)
     return clean
 
 

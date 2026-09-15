@@ -185,6 +185,8 @@
       pickPreset: "Pick a preset to edit, or add a new one. Every save is published at once; an open builder picks it up when you return to its tab.",
       fWidth: "Width X, mm", fLength: "Length Y, mm", fThickness: "Thickness", fClearance: "Floor to board", fComponent: "Parts on top",
       fPad: "Pad ⌀", fBore: "Screw hole ⌀", holesTitle: "Mounting holes, from the board's lower-left corner", portsTitle: "Ports",
+      fClamp: "Posts and T clamp", fClampHeight: "Post height (empty: auto)", railsTitle: "Ribs under the board, from its front (or left) end",
+      rOffset: "From end", rLength: "Length", rThickness: "Width", addRail: "Add rib",
       addHole: "Add hole", addPort: "Add port", hX: "X", hY: "Y", hD: "⌀", portType: "Type", portEdge: "Edge", portShape: "Cut-out",
       portOffset: "Along edge", portElevation: "Above board", portWidth: "Width", portHeight: "Height", portRadius: "Radius",
       portOverhang: "Sticks out", portMargin: "Gap", edge_front: "Bottom (Y = 0)", edge_back: "Top", edge_left: "Left (X = 0)",
@@ -236,6 +238,8 @@
       pickPreset: "Оберіть пресет для редагування або додайте новий. Кожне збереження публікується одразу; відкритий конструктор підхопить його, щойно ви повернетесь на його вкладку.",
       fWidth: "Ширина X, мм", fLength: "Довжина Y, мм", fThickness: "Товщина", fClearance: "Від дна до плати", fComponent: "Деталі зверху",
       fPad: "Опора ⌀", fBore: "Отвір під гвинт ⌀", holesTitle: "Отвори кріплення, від лівого нижнього кута плати", portsTitle: "Порти",
+      fClamp: "Стовпчики й Т-притискач", fClampHeight: "Висота стовпчиків (порожньо: авто)", railsTitle: "Ребра під платою, від переднього (або лівого) краю",
+      rOffset: "Від краю", rLength: "Довжина", rThickness: "Ширина", addRail: "Додати ребро",
       addHole: "Додати отвір", addPort: "Додати порт", hX: "X", hY: "Y", hD: "⌀", portType: "Тип", portEdge: "Край", portShape: "Виріз",
       portOffset: "Вздовж краю", portElevation: "Над платою", portWidth: "Ширина", portHeight: "Висота", portRadius: "Радіус",
       portOverhang: "Виступ", portMargin: "Зазор", edge_front: "Нижній (Y = 0)", edge_back: "Верхній", edge_left: "Лівий (X = 0)",
@@ -726,6 +730,13 @@
     function sy(y) { return margin + (length - y) * scale; }
     svg.appendChild(svgNode("rect", { x: sx(0), y: sy(length), width: width * scale, height: length * scale, rx: 3,
       fill: "#2f8f5b", "fill-opacity": 0.3, stroke: "#2f8f5b" }));
+    // Ribs run across the board's short side.
+    (draft.rails || []).forEach(function (rail) {
+      var from = Number(rail.offset) || 0; var thick = Number(rail.thickness) || 0; var span = Number(rail.length) || 0;
+      var box = width > length ? [from, (length - span) / 2, thick, span] : [(width - span) / 2, from, span, thick];
+      svg.appendChild(svgNode("rect", { x: sx(box[0]), y: sy(box[1] + box[3]), width: box[2] * scale, height: box[3] * scale,
+        fill: "var(--muted)", "fill-opacity": 0.35, stroke: "var(--muted)" }));
+    });
     draft.holes.forEach(function (hole) {
       svg.appendChild(svgNode("circle", { cx: sx(hole.x), cy: sy(hole.y), r: Math.max((Number(draft.padDiameter) || 0) / 2 * scale, 1),
         fill: "none", stroke: "var(--muted)", "stroke-dasharray": "3 2" }));
@@ -756,6 +767,26 @@
     nameInput.addEventListener("input", function () { draft.name = nameInput.value; drawPreview(); });
     var idInput = el("input", { type: "text", maxlength: "40", value: draft.id, placeholder: "auto" });
     idInput.addEventListener("input", function () { draft.id = idInput.value.trim(); drawPreview(); });
+    // Without a stored choice, a board with no holes is clamped (as in the builder).
+    var clampBox = el("input", { type: "checkbox" });
+    clampBox.checked = draft.clamp != null ? Boolean(draft.clamp) : !draft.holes.length;
+    clampBox.addEventListener("change", function () { draft.clamp = clampBox.checked; drawPreview(); });
+    var clampHeightInput = el("input", { type: "number", step: "0.5", value: draft.clampHeight != null ? String(draft.clampHeight) : "", placeholder: "auto" });
+    clampHeightInput.addEventListener("input", function () {
+      var value = parseFloat(clampHeightInput.value);
+      if (isFinite(value)) { draft.clampHeight = value; } else { delete draft.clampHeight; }
+      drawPreview();
+    });
+    var railRows = (draft.rails || []).map(function (rail, index) {
+      return el("tr", {}, [
+        el("td", {}, [numberInput(rail, "offset", 0.5)]), el("td", {}, [numberInput(rail, "length", 0.5)]), el("td", {}, [numberInput(rail, "thickness", 0.5)]),
+        el("td", {}, [actionButton(t("remove"), function () {
+          draft.rails.splice(index, 1);
+          if (!draft.rails.length) { delete draft.rails; }
+          renderEditor();
+        })])
+      ]);
+    });
     var holeRows = draft.holes.map(function (hole, index) {
       return el("tr", {}, [
         el("td", {}, [numberInput(hole, "x", 0.1)]), el("td", {}, [numberInput(hole, "y", 0.1)]), el("td", {}, [numberInput(hole, "diameter", 0.1)]),
@@ -796,7 +827,8 @@
         labelled(t("fWidth"), numberInput(draft, "width", 0.1)), labelled(t("fLength"), numberInput(draft, "length", 0.1)),
         labelled(t("fThickness"), numberInput(draft, "thickness", 0.1)), labelled(t("fClearance"), numberInput(draft, "clearance", 0.5)),
         labelled(t("fComponent"), numberInput(draft, "componentHeight", 0.5)), labelled(t("fPad"), numberInput(draft, "padDiameter", 0.5)),
-        labelled(t("fBore"), numberInput(draft, "boreDiameter", 0.1))
+        labelled(t("fBore"), numberInput(draft, "boreDiameter", 0.1)),
+        labelled(t("fClamp"), clampBox), labelled(t("fClampHeight"), clampHeightInput)
       ]),
       el("h3", { text: t("holesTitle") }),
       el("div", { class: "scroll" }, [el("table", {}, [header([t("hX"), t("hY"), t("hD"), ""]), el("tbody", {}, holeRows)])]),
@@ -804,6 +836,14 @@
         draft.holes.push({ x: Math.round(draft.width * 5) / 10, y: Math.round(draft.length * 5) / 10, diameter: 3.2 });
         renderEditor();
       }, draft.holes.length >= MAX_ITEMS)]),
+      el("h3", { text: t("railsTitle") }),
+      el("div", { class: "scroll" }, [el("table", {}, [header([t("rOffset"), t("rLength"), t("rThickness"), ""]), el("tbody", {}, railRows)])]),
+      el("div", { class: "row" }, [actionButton(t("addRail"), function () {
+        var long = Math.max(Number(draft.width) || 0, Number(draft.length) || 0);
+        var across = Math.min(Number(draft.width) || 0, Number(draft.length) || 0);
+        draft.rails = (draft.rails || []).concat([{ offset: Math.max(Math.round((long / 2 - 2) * 10) / 10, 0), length: Math.max(across - 2, 1), thickness: 4 }]);
+        renderEditor();
+      }, (draft.rails || []).length >= 4)]),
       el("h3", { text: t("portsTitle") }),
       el("div", { class: "scroll" }, [el("table", {}, [header([t("portType"), t("portEdge"), t("portShape"), t("portOffset"), t("portElevation"),
         t("portWidth"), t("portHeight"), t("portRadius"), t("portOverhang"), t("portMargin"), ""]), el("tbody", {}, portRows)])]),
