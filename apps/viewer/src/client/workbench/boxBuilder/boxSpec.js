@@ -389,9 +389,37 @@ export function isWallFace(face) {
   return WALL_FACES.includes(face);
 }
 
-// Position label keys (i18n.js): u and v of a hole on this face.
+// Position label keys (i18n.js): u and v of a hole on this face. On a wall the
+// second one is shown as the hole's bottom edge above the floor (holeLift).
 export function faceAxisLabels(face) {
-  return isWallFace(face) ? ["axis.along", "axis.fromBottom"] : ["axis.x", "axis.y"];
+  return isWallFace(face) ? ["axis.along", "axis.aboveFloor"] : ["axis.x", "axis.y"];
+}
+
+// Half the hole's extent along u and along v, rotation included.
+export function holeHalfExtents(hole) {
+  if (hole.shape === "circle") {
+    return [hole.width / 2, hole.width / 2];
+  }
+  if (hole.shape === "hex") {
+    const circumradius = hole.width / Math.sqrt(3);
+    return [circumradius, circumradius];
+  }
+  const angle = (hole.rotation * Math.PI) / 180;
+  const cos = Math.abs(Math.cos(angle));
+  const sin = Math.abs(Math.sin(angle));
+  const halfWidth = hole.width / 2;
+  const halfHeight = hole.height / 2;
+  return [halfWidth * cos + halfHeight * sin, halfWidth * sin + halfHeight * cos];
+}
+
+// A wall hole is stored by its centre above the box bottom (v) but read and
+// typed as the height of its bottom edge above the inside of the floor.
+export function holeLift(dims, hole) {
+  return roundMm(hole.v - holeHalfExtents(hole)[1] - dims.floorTop, 3);
+}
+
+export function holeCentreForLift(dims, hole, lift) {
+  return roundMm(dims.floorTop + lift + holeHalfExtents(hole)[1], 4);
 }
 
 // Size label keys (i18n.js): a rectangular hole's extent along u and along v.
@@ -402,11 +430,12 @@ export function faceSizeLabels(face) {
 export function faceRange(dims, face) {
   const halfWidth = dims.width / 2;
   const halfDepth = dims.depth / 2;
+  // A wall hole belongs above the floor: one reaching below its top cuts the floor.
   if (face === "front" || face === "back") {
-    return { u: [-halfWidth, halfWidth], v: [0, dims.wallTop] };
+    return { u: [-halfWidth, halfWidth], v: [dims.floorTop, dims.wallTop] };
   }
   if (face === "left" || face === "right") {
-    return { u: [-halfDepth, halfDepth], v: [0, dims.wallTop] };
+    return { u: [-halfDepth, halfDepth], v: [dims.floorTop, dims.wallTop] };
   }
   return { u: [-halfWidth, halfWidth], v: [-halfDepth, halfDepth] };
 }

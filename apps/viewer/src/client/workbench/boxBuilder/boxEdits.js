@@ -10,6 +10,7 @@ import {
   clampBoardPosition,
   clampHolePosition,
   clampStandoffPosition,
+  holeHalfExtents,
   isWallFace,
   nextId,
   roundMm,
@@ -118,23 +119,6 @@ export function nudgeSelected(draft, selection, deltaU, deltaV) {
 }
 
 // --- arrays --------------------------------------------------------------------
-
-// Half the hole's extent along u and v, rotation included.
-function holeHalfExtents(hole) {
-  if (hole.shape === "circle") {
-    return [hole.width / 2, hole.width / 2];
-  }
-  if (hole.shape === "hex") {
-    const circumradius = hole.width / Math.sqrt(3);
-    return [circumradius, circumradius];
-  }
-  const angle = (hole.rotation * Math.PI) / 180;
-  const cos = Math.abs(Math.cos(angle));
-  const sin = Math.abs(Math.sin(angle));
-  const halfWidth = hole.width / 2;
-  const halfHeight = hole.height / 2;
-  return [halfWidth * cos + halfHeight * sin, halfWidth * sin + halfHeight * cos];
-}
 
 // Where the centre of a copy may go so that the whole element stays in place:
 // a floor hole inside the cavity, a wall hole on the flat of its wall between

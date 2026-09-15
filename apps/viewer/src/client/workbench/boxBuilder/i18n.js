@@ -68,7 +68,7 @@ const EN = {
   "pattern.rect": "Rectangle",
 
   "axis.along": "Along",
-  "axis.fromBottom": "From bottom",
+  "axis.aboveFloor": "Bottom above floor",
   "axis.x": "X",
   "axis.y": "Y",
   "size.width": "Width",
@@ -364,7 +364,7 @@ const UK = {
   "pattern.rect": "Прямокутник",
 
   "axis.along": "Вздовж",
-  "axis.fromBottom": "Від низу",
+  "axis.aboveFloor": "Низ над дном",
   "axis.x": "X",
   "axis.y": "Y",
   "size.width": "Ширина",

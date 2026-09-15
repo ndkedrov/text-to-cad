@@ -2,7 +2,16 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { applyArray, arrayBounds, planArray } from "./boxEdits.js";
-import { defaultBoxSpec, newHole, newStandoffGroup, normalizeBoxSpec } from "./boxSpec.js";
+import {
+  boxDimensions,
+  boxSpecWarnings,
+  defaultBoxSpec,
+  holeCentreForLift,
+  holeLift,
+  newHole,
+  newStandoffGroup,
+  normalizeBoxSpec
+} from "./boxSpec.js";
 
 // The default box: 100 x 70 outside, 2 mm walls (96 x 66 inside), 4 mm corners, 30 mm walls on a 2 mm floor.
 function specWith(mutate) {
@@ -46,6 +55,18 @@ test("wall holes stay between the floor and the wall top and off the rounded cor
   assert.deepEqual(bounds.v, [5, 29]);
   const up = planArray(spec, selection, { direction: "+v", mode: "fill", step: 6 });
   assert.deepEqual(up.positions.map(([, v]) => v), [23, 29]);
+});
+
+test("a wall hole's height is its bottom edge above the floor, and it may not dip into the floor", () => {
+  // A 16.4 mm keystone cut-out centred 10 mm above the box bottom starts 0.2 mm inside the 2 mm floor.
+  const spec = specWith((draft) => draft.holes.push({ ...newHole(draft, "front"), shape: "rect", width: 14.7, height: 16.4, v: 10 }));
+  const dims = boxDimensions(spec);
+  const [hole] = spec.holes;
+  assert.equal(holeLift(dims, hole), -0.2);
+  assert.ok(boxSpecWarnings(spec).some((warning) => warning.key === "warning.holeOutside"));
+  const raised = { ...hole, v: holeCentreForLift(dims, hole, 10) };
+  assert.equal(raised.v, 2 + 10 + 8.2);
+  assert.equal(holeLift(dims, raised), 10);
 });
 
 test("rotated rectangular holes count their rotated extent", () => {

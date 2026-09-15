@@ -78,6 +78,9 @@ import {
   faceRange,
   faceSizeLabels,
   holeAvailable,
+  holeCentreForLift,
+  holeHalfExtents,
+  holeLift,
   isWallFace,
   newHole,
   newStandoffGroup,
@@ -399,6 +402,14 @@ function HoleItem({ builder, hole, index }) {
     }
   });
   const patch = (values) => update((target) => Object.assign(target, values));
+  // On a wall, a new size, shape or turn keeps the hole's bottom edge where it was.
+  const reshape = (values) => update((target) => {
+    const lift = isWallFace(target.face) ? holeLift(dims, target) : null;
+    Object.assign(target, values);
+    if (lift !== null) {
+      target.v = holeCentreForLift(dims, target, lift);
+    }
+  });
   const [labelU, labelV] = faceAxisLabels(hole.face).map((key) => t(key));
   const [sizeU, sizeV] = faceSizeLabels(hole.face).map((key) => t(key));
   const range = faceRange(dims, hole.face);
@@ -431,7 +442,7 @@ function HoleItem({ builder, hole, index }) {
       <FileSheetSelectRow
         label={t("field.shape")}
         value={hole.connector ? `connector:${hole.connector}` : hole.shape}
-        onValueChange={(value) => patch(
+        onValueChange={(value) => reshape(
           value.startsWith("connector:") ? connectorHole(value.slice("connector:".length)) : { shape: value, connector: "" }
         )}
         options={[
@@ -446,14 +457,14 @@ function HoleItem({ builder, hole, index }) {
           min={0.3}
           max={500}
           step={0.5}
-          onCommit={(width) => patch({ width, height: width, connector: "" })}
+          onCommit={(width) => reshape({ width, height: width, connector: "" })}
         />
       ) : (
         <FileSheetFieldGrid columns={hole.shape === "rect" ? 3 : 2}>
-          <NumberField label={sizeU} value={hole.width} min={0.3} max={500} step={0.5} onCommit={(width) => patch({ width, connector: "" })} />
-          <NumberField label={sizeV} value={hole.height} min={0.3} max={500} step={0.5} onCommit={(height) => patch({ height, connector: "" })} />
+          <NumberField label={sizeU} value={hole.width} min={0.3} max={500} step={0.5} onCommit={(width) => reshape({ width, connector: "" })} />
+          <NumberField label={sizeV} value={hole.height} min={0.3} max={500} step={0.5} onCommit={(height) => reshape({ height, connector: "" })} />
           {hole.shape === "rect" ? (
-            <NumberField label={t("field.radius")} value={hole.radius} min={0} max={Math.min(hole.width, hole.height) / 2} step={0.25} onCommit={(radius) => patch({ radius, connector: "" })} />
+            <NumberField label={t("field.radius")} value={hole.radius} min={0} max={Math.min(hole.width, hole.height) / 2} step={0.25} onCommit={(radius) => reshape({ radius, connector: "" })} />
           ) : null}
         </FileSheetFieldGrid>
       )}
@@ -466,9 +477,20 @@ function HoleItem({ builder, hole, index }) {
       ) : null}
       <FileSheetFieldGrid columns={hole.shape === "circle" ? 2 : 3}>
         <NumberField label={labelU} value={hole.u} min={range.u[0]} max={range.u[1]} step={0.5} onCommit={(u) => patch({ u })} />
-        <NumberField label={labelV} value={hole.v} min={range.v[0]} max={range.v[1]} step={0.5} onCommit={(v) => patch({ v })} />
+        {isWallFace(hole.face) ? (
+          <NumberField
+            label={labelV}
+            value={holeLift(dims, hole)}
+            min={0}
+            max={Math.max(0, dims.wallHeight - 2 * holeHalfExtents(hole)[1])}
+            step={0.5}
+            onCommit={(lift) => patch({ v: holeCentreForLift(dims, hole, lift) })}
+          />
+        ) : (
+          <NumberField label={labelV} value={hole.v} min={range.v[0]} max={range.v[1]} step={0.5} onCommit={(v) => patch({ v })} />
+        )}
         {hole.shape !== "circle" ? (
-          <NumberField label={t("field.rotation")} unit="°" digits={1} value={hole.rotation} min={-360} max={360} step={15} onCommit={(rotation) => patch({ rotation })} />
+          <NumberField label={t("field.rotation")} unit="°" digits={1} value={hole.rotation} min={-360} max={360} step={15} onCommit={(rotation) => reshape({ rotation })} />
         ) : null}
       </FileSheetFieldGrid>
       <ItemActions builder={builder} selection={itemSelection} />
