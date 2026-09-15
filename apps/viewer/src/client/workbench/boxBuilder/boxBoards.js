@@ -12,8 +12,10 @@ import {
   boardOutline,
   boxDimensions,
   clampBoardPosition,
+  defaultBoxSpec,
   defaultClampHeight,
   nextId,
+  normalizeBoxSpec,
   roundMm,
   wallInnerHalf
 } from "./boxSpec.js";
@@ -91,7 +93,98 @@ export function newBoard(spec, preset = null) {
   board.clampHeight = source.clampHeight != null && Number.isFinite(Number(source.clampHeight))
     ? Number(source.clampHeight)
     : defaultClampHeight(board);
+  board.template = source === CUSTOM_BOARD ? "" : boardTemplateStamp(normalizedBoard(board));
   return board;
+}
+
+function normalizedBoard(board) {
+  return normalizeBoxSpec({ ...defaultBoxSpec(), boards: [board] }).boards[0];
+}
+
+// --- templates -------------------------------------------------------------------
+
+// What a board takes from its template; where it sits in the box is its own.
+const TEMPLATE_FIELDS = Object.freeze([
+  "name", "width", "length", "thickness", "clearance", "componentHeight", "padDiameter", "boreDiameter", "clamp", "clampHeight"
+]);
+const PORT_FIELDS = Object.freeze(["type", "edge", "offset", "elevation", "shape", "width", "height", "radius", "overhang", "margin"]);
+
+// A short fingerprint (FNV-1a) of everything a normalized board takes from its template.
+export function boardTemplateStamp(board) {
+  const text = JSON.stringify([
+    TEMPLATE_FIELDS.map((key) => board[key]),
+    board.holes.map((hole) => [hole.x, hole.y, hole.diameter]),
+    board.ports.map((entry) => PORT_FIELDS.map((key) => entry[key])),
+    (board.rails || []).map((rail) => [rail.offset, rail.length, rail.thickness])
+  ]);
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = Math.imul(hash ^ text.charCodeAt(index), 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+
+// A board against the template it was made from, as { state, latest }:
+// "none" - no such template; "current" - the template has not changed since;
+// "restamp" - it changed, but the board already matches it; "update" - it changed
+// and the board was not edited since it was made (or it predates fingerprints),
+// so the board follows on its own; "edited" - it changed and so did the board.
+export function boardTemplateState(board, presets) {
+  const preset = board.preset === "custom" ? null : (presets || []).find((entry) => entry.id === board.preset);
+  if (!preset) {
+    return { state: "none", latest: null };
+  }
+  const latest = normalizedBoard(newBoard({ boards: [] }, preset));
+  if (board.template === latest.template) {
+    return { state: "current", latest };
+  }
+  const own = boardTemplateStamp(board);
+  if (own === latest.template) {
+    return { state: "restamp", latest };
+  }
+  return { state: !board.template || board.template === own ? "update" : "edited", latest };
+}
+
+function applyTemplate(draft, board, latest) {
+  for (const key of TEMPLATE_FIELDS) {
+    board[key] = latest[key];
+  }
+  board.holes = latest.holes.map((hole) => ({ ...hole }));
+  board.ports = latest.ports.map((entry) => ({ ...entry }));
+  board.rails = latest.rails.map((rail) => ({ ...rail }));
+  board.template = latest.template;
+  if (board.mounted) {
+    placeBoard(draft, board, { keep: true });
+  }
+}
+
+// Boards follow their changed templates unless they were edited; returns whether any changed.
+export function syncBoardTemplates(draft, presets) {
+  let changed = false;
+  for (const board of draft.boards) {
+    const { state, latest } = boardTemplateState(board, presets);
+    if (state === "restamp") {
+      board.template = latest.template;
+      changed = true;
+    } else if (state === "update") {
+      applyTemplate(draft, board, latest);
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+export function boardTemplatesPending(spec, presets) {
+  return spec.boards.some((board) => ["restamp", "update"].includes(boardTemplateState(board, presets).state));
+}
+
+// An edited board taken back to its current template, where it sits kept.
+export function updateBoardFromTemplate(draft, id, presets) {
+  const board = findBoard(draft, id);
+  const latest = board ? boardTemplateState(board, presets).latest : null;
+  if (latest) {
+    applyTemplate(draft, board, latest);
+  }
 }
 
 export function newBoardHole(board) {

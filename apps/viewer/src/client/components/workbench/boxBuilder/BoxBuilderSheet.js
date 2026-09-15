@@ -12,6 +12,7 @@ import {
   Maximize2,
   Plus,
   Redo2,
+  RefreshCw,
   Save,
   Trash2,
   Undo2,
@@ -43,6 +44,10 @@ import {
   PORT_TYPE_IDS,
   boardMinimumSize,
   boardNameMatches,
+  boardTemplateState,
+  boardTemplatesPending,
+  syncBoardTemplates,
+  updateBoardFromTemplate,
   fitBoxToBoard,
   flipBoard,
   mountBoard,
@@ -811,7 +816,7 @@ function BoardPortEditor({ builder, board, port, index, update }) {
   );
 }
 
-function BoardItem({ builder, board, index }) {
+function BoardItem({ builder, board, index, presets }) {
   const { t } = useBoxLanguage();
   const { edit, selection, setSelection } = builder;
   const itemSelection = { kind: "board", id: board.id };
@@ -870,6 +875,17 @@ function BoardItem({ builder, board, index }) {
           </Button>
         </FileSheetButtonRow>
       )}
+
+      {boardTemplateState(board, presets).state === "edited" ? (
+        <>
+          <FileSheetStatusText>{t("board.templateChanged")}</FileSheetStatusText>
+          <FileSheetButtonRow>
+            <CompactButton icon={RefreshCw} onClick={() => run(updateBoardFromTemplate, presets)}>
+              {t("action.updateFromTemplate")}
+            </CompactButton>
+          </FileSheetButtonRow>
+        </>
+      ) : null}
 
       <FileSheetDisclosure
         label={t("board.part.size")}
@@ -1072,7 +1088,7 @@ function BoardsTab({ builder }) {
       <FileSheetSubsection title={t("section.boards")} contentClassName="space-y-0.5">
         {spec.boards.length ? (
           spec.boards.map((board, index) => (
-            <BoardItem key={board.id} builder={builder} board={board} index={index} />
+            <BoardItem key={board.id} builder={builder} board={board} index={index} presets={presets} />
           ))
         ) : (
           <FileSheetStatusText>{t("boards.empty")}</FileSheetStatusText>
@@ -1404,6 +1420,18 @@ export default function BoxBuilderSheet({
   const [openSectionIds, setOpenSectionIds] = useState([SECTION_IDS.BODY]);
   const selectionKind = builder.selection?.kind || "";
   const selectionId = builder.selection?.id || "";
+  const { boards: boardPresets } = useBoardPresets();
+  const { spec, edit } = builder;
+
+  // Boards in the box follow their templates when those change, unless edited
+  // since (those offer an update in their own item). Whatever tab is open.
+  useEffect(() => {
+    if (boardPresets.length && boardTemplatesPending(spec, boardPresets)) {
+      edit((draft) => {
+        syncBoardTemplates(draft, boardPresets);
+      });
+    }
+  }, [boardPresets, spec, edit]);
 
   // Picking a hole, standoff group or board in the viewport brings its tab forward.
   useEffect(() => {

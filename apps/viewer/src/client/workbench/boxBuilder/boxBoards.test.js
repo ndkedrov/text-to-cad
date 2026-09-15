@@ -4,6 +4,10 @@ import test from "node:test";
 
 import {
   boardNameMatches,
+  boardTemplateState,
+  boardTemplatesPending,
+  syncBoardTemplates,
+  updateBoardFromTemplate,
   fitBoxToBoard,
   flipBoard,
   mountBoard,
@@ -106,7 +110,7 @@ test("the dual USB-C ESP32-S3 rests on two ribs and a T piece next to the box cl
   assert.deepEqual([board.x, board.y], [0, -12.5]);
   const { base } = buildBoxPlan(spec);
   const ribs = findNodes(base, (node) => node.type === "rrect" && node.w === 22 && node.d === 4);
-  assert.deepEqual(ribs.map((rib) => [rib.pos, rib.h]), [[[0, -37, 1.99], 2.01], [[0, 22, 1.99], 2.01]]);
+  assert.deepEqual(ribs.map((rib) => [rib.pos, rib.h]), [[[0, -37, 1.99], 2.01], [[0, 20, 1.99], 2.01]]);
   const posts = findNodes(base, (node) => node.type === "cyl" && node.r === 2.5 && node.h === 14.01);
   assert.deepEqual(posts.map((post) => post.pos), [[-15.7, -12.5, 1.99], [15.7, -12.5, 1.99]]);
   const tee = findNodes(base, (node) => node.type === "poly" && node.h === CLAMP_DEPTH);
@@ -135,6 +139,47 @@ test("a clamped board is reported when nothing holds it up or its posts are too 
   assert.ok(keys().includes("warning.clampLow"));
   spec.boards[0].clampHeight = 30;
   assert.ok(keys().includes("warning.clampTall"));
+});
+
+test("a board in a box follows its changed template unless it was edited since", () => {
+  const current = presetFor("microSdSpiMini33v");
+  // The template as it was when the board went into the box: no mounting holes.
+  const old = { ...current, holes: [], padDiameter: 5, boreDiameter: 2 };
+  const boxWith = (mutate) => {
+    const draft = normalizeBoxSpec(defaultBoxSpec());
+    draft.boards.push(newBoard(draft, old));
+    mountBoard(draft, draft.boards[0].id);
+    mutate?.(draft.boards[0]);
+    return normalizeBoxSpec(draft);
+  };
+  const shipped = SHIPPED.boards;
+
+  const untouched = boxWith();
+  assert.deepEqual([untouched.boards[0].clamp, untouched.boards[0].holes.length], [true, 0]);
+  assert.equal(boardTemplateState(untouched.boards[0], shipped).state, "update");
+  assert.ok(boardTemplatesPending(untouched, shipped));
+  assert.equal(syncBoardTemplates(untouched, shipped), true);
+  const synced = normalizeBoxSpec(untouched).boards[0];
+  assert.deepEqual([synced.clamp, synced.holes.map(({ x, y }) => [x, y]), synced.mounted], [false, [[4.5, 1.5], [13.5, 1.5]], true]);
+  assert.equal(boardTemplateState(synced, shipped).state, "current");
+
+  const legacy = boxWith((board) => {
+    board.template = "";
+  });
+  assert.equal(boardTemplateState(legacy.boards[0], shipped).state, "update", "a board from before fingerprints follows too");
+
+  const edited = boxWith((board) => {
+    board.clearance = 7;
+  });
+  assert.equal(boardTemplateState(edited.boards[0], shipped).state, "edited");
+  assert.equal(syncBoardTemplates(edited, shipped), false, "an edited board is left alone");
+  updateBoardFromTemplate(edited, edited.boards[0].id, shipped);
+  assert.equal(normalizeBoxSpec(edited).boards[0].holes.length, 2);
+
+  const fresh = mounted("microSdSpiMini33v", (draft, board) => {
+    board.clearance = 4;
+  });
+  assert.equal(boardTemplateState(fresh.boards[0], shipped).state, "current", "editing a board with an unchanged template asks nothing");
 });
 
 test("a board without a template is the custom one", () => {
