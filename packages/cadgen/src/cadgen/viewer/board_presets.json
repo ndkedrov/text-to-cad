@@ -1037,6 +1037,1398 @@
      "margin": 0.5
     }
    ]
+  },
+  {
+   "id": "esp32C3DevkitM1",
+   "name": "ESP32-C3-DevKitM-1",
+   "category": "wireless",
+   "width": 25.4,
+   "length": 44.26,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 3,
+   "padDiameter": 5.2,
+   "boreDiameter": 2.2,
+   "holes": [],
+   "ports": [
+    {
+     "type": "microUsb",
+     "edge": "front",
+     "offset": 12.7,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 8,
+     "height": 3,
+     "radius": 0.6,
+     "overhang": 0.65,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "esp32C6DevkitC1",
+   "name": "ESP32-C6-DevKitC-1",
+   "category": "wireless",
+   "width": 25.4,
+   "length": 58.15,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 3.3,
+   "padDiameter": 5.2,
+   "boreDiameter": 2.2,
+   "holes": [],
+   "ports": [
+    {
+     "type": "usbC",
+     "edge": "front",
+     "offset": 5.5,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 9,
+     "height": 3.3,
+     "radius": 1.2,
+     "overhang": 0.4,
+     "margin": 0.5
+    },
+    {
+     "type": "usbC",
+     "edge": "front",
+     "offset": 19.9,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 9,
+     "height": 3.3,
+     "radius": 1.2,
+     "overhang": 0.4,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "esp32S3DevkitM1",
+   "name": "ESP32-S3-DevKitM-1",
+   "category": "wireless",
+   "width": 25.4,
+   "length": 67.44,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 3,
+   "padDiameter": 5.2,
+   "boreDiameter": 2.2,
+   "holes": [],
+   "ports": [
+    {
+     "type": "microUsb",
+     "edge": "front",
+     "offset": 6.0,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 8,
+     "height": 3,
+     "radius": 0.6,
+     "overhang": 0.87,
+     "margin": 0.5
+    },
+    {
+     "type": "microUsb",
+     "edge": "front",
+     "offset": 19.4,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 8,
+     "height": 3,
+     "radius": 0.6,
+     "overhang": 0.87,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "xiaoEsp32C3",
+   "name": "Seeed Studio XIAO ESP32C3",
+   "category": "wireless",
+   "width": 17.78,
+   "length": 20.955,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 3.3,
+   "padDiameter": 5.2,
+   "boreDiameter": 2.2,
+   "holes": [],
+   "ports": [
+    {
+     "type": "usbC",
+     "edge": "front",
+     "offset": 8.89,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 9,
+     "height": 3.3,
+     "radius": 1.2,
+     "overhang": 1.5,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "olimexEsp32Poe",
+   "name": "Olimex ESP32-PoE",
+   "category": "wireless",
+   "width": 28,
+   "length": 80,
+   "thickness": 1.6,
+   "clearance": 5,
+   "componentHeight": 13.5,
+   "padDiameter": 5.2,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.56,
+     "y": 52.68,
+     "diameter": 2.2
+    },
+    {
+     "x": 25.42,
+     "y": 52.68,
+     "diameter": 2.2
+    },
+    {
+     "x": 7.39,
+     "y": 2.64,
+     "diameter": 2.2
+    }
+   ],
+   "ports": [
+    {
+     "type": "rj45",
+     "edge": "front",
+     "offset": 18.18,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 16,
+     "height": 13.5,
+     "radius": 0.5,
+     "overhang": 5.7,
+     "margin": 0.5
+    },
+    {
+     "type": "microUsb",
+     "edge": "left",
+     "offset": 11.91,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 8,
+     "height": 3,
+     "radius": 0.6,
+     "overhang": 0,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "olimexEsp32PoeIso",
+   "name": "Olimex ESP32-PoE-ISO",
+   "category": "wireless",
+   "width": 28,
+   "length": 98.15,
+   "thickness": 1.6,
+   "clearance": 5,
+   "componentHeight": 13.5,
+   "padDiameter": 5.2,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 7.64,
+     "y": 2.73,
+     "diameter": 2.2
+    },
+    {
+     "x": 2.56,
+     "y": 70.68,
+     "diameter": 2.2
+    },
+    {
+     "x": 25.42,
+     "y": 70.68,
+     "diameter": 2.2
+    }
+   ],
+   "ports": [
+    {
+     "type": "rj45",
+     "edge": "front",
+     "offset": 19.05,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 16,
+     "height": 13.5,
+     "radius": 0.5,
+     "overhang": 8.14,
+     "margin": 0.5
+    },
+    {
+     "type": "microUsb",
+     "edge": "left",
+     "offset": 35.5,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 8,
+     "height": 3,
+     "radius": 0.6,
+     "overhang": 0,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "olimexEsp32Evb",
+   "name": "Olimex ESP32-EVB",
+   "category": "wireless",
+   "width": 75.184,
+   "length": 74.676,
+   "thickness": 1.6,
+   "clearance": 5,
+   "componentHeight": 15.3,
+   "padDiameter": 6.2,
+   "boreDiameter": 2.6,
+   "holes": [
+    {
+     "x": 71.37,
+     "y": 71.37,
+     "diameter": 3.3
+    },
+    {
+     "x": 71.37,
+     "y": 3.81,
+     "diameter": 3.3
+    },
+    {
+     "x": 3.81,
+     "y": 3.81,
+     "diameter": 3.3
+    }
+   ],
+   "ports": [
+    {
+     "type": "microUsb",
+     "edge": "front",
+     "offset": 63.4,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 8,
+     "height": 3,
+     "radius": 0.6,
+     "overhang": 0.1,
+     "margin": 0.5
+    },
+    {
+     "type": "rj45",
+     "edge": "back",
+     "offset": 32.0,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 16,
+     "height": 13.5,
+     "radius": 0.5,
+     "overhang": 0,
+     "margin": 0.5
+    },
+    {
+     "type": "dcJack",
+     "edge": "right",
+     "offset": 19.3,
+     "elevation": 1.75,
+     "shape": "circle",
+     "width": 9.5,
+     "height": 9.5,
+     "radius": 0,
+     "overhang": 0,
+     "margin": 0.5
+    },
+    {
+     "type": "custom",
+     "edge": "right",
+     "offset": 44.9,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 15.8,
+     "height": 10,
+     "radius": 0,
+     "overhang": 0,
+     "margin": 0.5
+    },
+    {
+     "type": "custom",
+     "edge": "right",
+     "offset": 59.9,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 15.8,
+     "height": 10,
+     "radius": 0,
+     "overhang": 0,
+     "margin": 0.5
+    },
+    {
+     "type": "custom",
+     "edge": "left",
+     "offset": 29.87,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 11.2,
+     "height": 2,
+     "radius": 0,
+     "overhang": 0,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "raspberryPiPicoW",
+   "name": "Raspberry Pi Pico W",
+   "category": "wireless",
+   "width": 21,
+   "length": 51,
+   "thickness": 1.0,
+   "clearance": 10,
+   "componentHeight": 3,
+   "padDiameter": 5.1,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 4.8,
+     "y": 2.0,
+     "diameter": 2.1
+    },
+    {
+     "x": 16.2,
+     "y": 2.0,
+     "diameter": 2.1
+    },
+    {
+     "x": 4.8,
+     "y": 49.0,
+     "diameter": 2.1
+    },
+    {
+     "x": 16.2,
+     "y": 49.0,
+     "diameter": 2.1
+    }
+   ],
+   "ports": [
+    {
+     "type": "microUsb",
+     "edge": "front",
+     "offset": 10.5,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 8,
+     "height": 3,
+     "radius": 0.6,
+     "overhang": 1.3,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "arduinoNanoEsp32",
+   "name": "Arduino Nano ESP32",
+   "category": "wireless",
+   "width": 17.78,
+   "length": 43.18,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 3.3,
+   "padDiameter": 2.5,
+   "boreDiameter": 1.3,
+   "holes": [
+    {
+     "x": 1.27,
+     "y": 1.27,
+     "diameter": 1.66
+    },
+    {
+     "x": 16.51,
+     "y": 1.27,
+     "diameter": 1.66
+    },
+    {
+     "x": 1.27,
+     "y": 41.91,
+     "diameter": 1.66
+    },
+    {
+     "x": 16.51,
+     "y": 41.91,
+     "diameter": 1.66
+    }
+   ],
+   "ports": [
+    {
+     "type": "usbC",
+     "edge": "front",
+     "offset": 8.89,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 9,
+     "height": 3.3,
+     "radius": 1.2,
+     "overhang": 1.0,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "adafruitQtPyEsp32S3",
+   "name": "Adafruit QT Py ESP32-S3",
+   "category": "wireless",
+   "width": 17.78,
+   "length": 20.7,
+   "thickness": 1.6,
+   "clearance": 3,
+   "componentHeight": 3.3,
+   "padDiameter": 5.2,
+   "boreDiameter": 2.2,
+   "holes": [],
+   "ports": [
+    {
+     "type": "usbC",
+     "edge": "front",
+     "offset": 8.89,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 9,
+     "height": 3.3,
+     "radius": 1.2,
+     "overhang": 1.02,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "adafruitFeatherEsp32S3",
+   "name": "Adafruit ESP32-S3 Feather (8MB Flash, No PSRAM)",
+   "category": "wireless",
+   "width": 22.86,
+   "length": 50.8,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 6,
+   "padDiameter": 5.2,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 20.32,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 1.905,
+     "y": 48.26,
+     "diameter": 2.2
+    },
+    {
+     "x": 21.0185,
+     "y": 48.26,
+     "diameter": 2.2
+    }
+   ],
+   "ports": [
+    {
+     "type": "usbC",
+     "edge": "front",
+     "offset": 11.43,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 9,
+     "height": 3.3,
+     "radius": 1.2,
+     "overhang": 1.14,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "sparkfunThingPlusEsp32WroomC",
+   "name": "SparkFun Thing Plus - ESP32 WROOM (USB-C)",
+   "category": "wireless",
+   "width": 22.86,
+   "length": 59.69,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 3.3,
+   "padDiameter": 6.0,
+   "boreDiameter": 2.2,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 2.54,
+     "diameter": 3.048
+    },
+    {
+     "x": 20.32,
+     "y": 2.54,
+     "diameter": 3.048
+    }
+   ],
+   "ports": [
+    {
+     "type": "usbC",
+     "edge": "front",
+     "offset": 11.43,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 9,
+     "height": 3.3,
+     "radius": 1.2,
+     "overhang": 1.5,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "heltecWifiLora32V3",
+   "name": "Heltec WiFi LoRa 32 (V3)",
+   "category": "wireless",
+   "width": 25.5,
+   "length": 50.2,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 5,
+   "padDiameter": 5.2,
+   "boreDiameter": 2.2,
+   "holes": [],
+   "ports": [
+    {
+     "type": "usbC",
+     "edge": "front",
+     "offset": 12.75,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 9,
+     "height": 3.3,
+     "radius": 1.2,
+     "overhang": 0.6,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "sparkfunQwiicPir170ua",
+   "name": "SparkFun Qwiic PIR - 170uA (EKMC4607112K)",
+   "category": "motion",
+   "width": 25.4,
+   "length": 25.4,
+   "thickness": 1.6,
+   "clearance": 3,
+   "componentHeight": 10.9,
+   "padDiameter": 6.3,
+   "boreDiameter": 2.6,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 22.86,
+     "diameter": 3.302
+    },
+    {
+     "x": 22.86,
+     "y": 22.86,
+     "diameter": 3.302
+    }
+   ],
+   "ports": []
+  },
+  {
+   "id": "sparkfunPirBreakout170ua",
+   "name": "SparkFun PIR Breakout - 170uA (EKMC4607112K)",
+   "category": "motion",
+   "width": 12.7,
+   "length": 21.59,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 10.9,
+   "padDiameter": 6.3,
+   "boreDiameter": 2.6,
+   "holes": [
+    {
+     "x": 6.35,
+     "y": 19.05,
+     "diameter": 3.302
+    }
+   ],
+   "ports": []
+  },
+  {
+   "id": "adafruitVl53l0xStemmaQt",
+   "name": "Adafruit VL53L0X ToF Distance Sensor (STEMMA QT)",
+   "category": "motion",
+   "width": 25.4,
+   "length": 17.78,
+   "thickness": 1.6,
+   "clearance": 3,
+   "componentHeight": 3.0,
+   "padDiameter": 5.5,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 22.86,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 2.54,
+     "y": 15.24,
+     "diameter": 2.5
+    },
+    {
+     "x": 22.86,
+     "y": 15.24,
+     "diameter": 2.5
+    }
+   ],
+   "ports": []
+  },
+  {
+   "id": "adafruitVl53l1x",
+   "name": "Adafruit VL53L1X ToF Distance Sensor (STEMMA QT)",
+   "category": "motion",
+   "width": 25.4,
+   "length": 17.78,
+   "thickness": 1.6,
+   "clearance": 3,
+   "componentHeight": 3.0,
+   "padDiameter": 5.5,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 22.86,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 2.54,
+     "y": 15.24,
+     "diameter": 2.5
+    },
+    {
+     "x": 22.86,
+     "y": 15.24,
+     "diameter": 2.5
+    }
+   ],
+   "ports": []
+  },
+  {
+   "id": "sparkfunQwiicVl53l1x",
+   "name": "SparkFun Qwiic Distance Sensor VL53L1X",
+   "category": "motion",
+   "width": 25.4,
+   "length": 25.4,
+   "thickness": 1.6,
+   "clearance": 3,
+   "componentHeight": 3.0,
+   "padDiameter": 6.3,
+   "boreDiameter": 2.6,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 22.86,
+     "diameter": 3.302
+    },
+    {
+     "x": 22.86,
+     "y": 22.86,
+     "diameter": 3.302
+    }
+   ],
+   "ports": []
+  },
+  {
+   "id": "adafruitBno055StemmaQt",
+   "name": "Adafruit BNO055 9-DOF Orientation IMU (STEMMA QT)",
+   "category": "motion",
+   "width": 25.4,
+   "length": 20.32,
+   "thickness": 1.6,
+   "clearance": 3,
+   "componentHeight": 3.0,
+   "padDiameter": 5.5,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 22.86,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 2.54,
+     "y": 17.78,
+     "diameter": 2.5
+    },
+    {
+     "x": 22.86,
+     "y": 17.78,
+     "diameter": 2.5
+    }
+   ],
+   "ports": []
+  },
+  {
+   "id": "adafruitBno085",
+   "name": "Adafruit BNO085 9-DOF Orientation IMU (STEMMA QT)",
+   "category": "motion",
+   "width": 25.4,
+   "length": 22.86,
+   "thickness": 1.6,
+   "clearance": 3,
+   "componentHeight": 3.0,
+   "padDiameter": 5.5,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 22.86,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 2.54,
+     "y": 20.32,
+     "diameter": 2.5
+    },
+    {
+     "x": 22.86,
+     "y": 20.32,
+     "diameter": 2.5
+    }
+   ],
+   "ports": []
+  },
+  {
+   "id": "sparkfunQwiicIcm20948",
+   "name": "SparkFun Qwiic 9DoF IMU Breakout ICM-20948",
+   "category": "motion",
+   "width": 25.4,
+   "length": 25.4,
+   "thickness": 1.6,
+   "clearance": 3,
+   "componentHeight": 3.0,
+   "padDiameter": 6.3,
+   "boreDiameter": 2.6,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 2.54,
+     "diameter": 3.302
+    },
+    {
+     "x": 22.86,
+     "y": 2.54,
+     "diameter": 3.302
+    },
+    {
+     "x": 2.54,
+     "y": 22.86,
+     "diameter": 3.302
+    },
+    {
+     "x": 22.86,
+     "y": 22.86,
+     "diameter": 3.302
+    }
+   ],
+   "ports": []
+  },
+  {
+   "id": "adafruitMpu6050",
+   "name": "Adafruit MPU-6050 6-DoF Accel and Gyro (STEMMA QT)",
+   "category": "motion",
+   "width": 25.4,
+   "length": 17.78,
+   "thickness": 1.6,
+   "clearance": 3,
+   "componentHeight": 3.0,
+   "padDiameter": 5.5,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 22.86,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 2.54,
+     "y": 15.24,
+     "diameter": 2.5
+    },
+    {
+     "x": 22.86,
+     "y": 15.24,
+     "diameter": 2.5
+    }
+   ],
+   "ports": []
+  },
+  {
+   "id": "adafruitLsm6dsox",
+   "name": "Adafruit LSM6DSOX 6-DoF Accel and Gyro (STEMMA QT)",
+   "category": "motion",
+   "width": 25.4,
+   "length": 17.78,
+   "thickness": 1.6,
+   "clearance": 3,
+   "componentHeight": 3.0,
+   "padDiameter": 5.5,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 15.24,
+     "diameter": 2.5
+    },
+    {
+     "x": 22.86,
+     "y": 15.24,
+     "diameter": 2.5
+    }
+   ],
+   "ports": []
+  },
+  {
+   "id": "adafruitBme680",
+   "name": "Adafruit BME680 Temp/Humidity/Pressure/Gas (STEMMA QT)",
+   "category": "sensor",
+   "width": 25.4,
+   "length": 17.78,
+   "thickness": 1.6,
+   "clearance": 3,
+   "componentHeight": 3.0,
+   "padDiameter": 5.5,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 2.54,
+     "diameter": 2.54
+    },
+    {
+     "x": 22.86,
+     "y": 2.54,
+     "diameter": 2.54
+    },
+    {
+     "x": 2.54,
+     "y": 15.24,
+     "diameter": 2.5
+    },
+    {
+     "x": 22.86,
+     "y": 15.24,
+     "diameter": 2.5
+    }
+   ],
+   "ports": []
+  },
+  {
+   "id": "adafruitBmp280StemmaQt",
+   "name": "Adafruit BMP280 Barometric Pressure (STEMMA QT)",
+   "category": "sensor",
+   "width": 25.4,
+   "length": 17.78,
+   "thickness": 1.6,
+   "clearance": 3,
+   "componentHeight": 3.0,
+   "padDiameter": 5.5,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 2.54,
+     "diameter": 2.54
+    },
+    {
+     "x": 22.86,
+     "y": 2.54,
+     "diameter": 2.54
+    },
+    {
+     "x": 2.54,
+     "y": 15.24,
+     "diameter": 2.5
+    },
+    {
+     "x": 22.86,
+     "y": 15.24,
+     "diameter": 2.5
+    }
+   ],
+   "ports": []
+  },
+  {
+   "id": "adafruitSht40",
+   "name": "Adafruit SHT40 Temperature & Humidity (STEMMA QT)",
+   "category": "sensor",
+   "width": 25.4,
+   "length": 17.78,
+   "thickness": 1.6,
+   "clearance": 3,
+   "componentHeight": 3.0,
+   "padDiameter": 5.5,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 22.86,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 2.54,
+     "y": 15.24,
+     "diameter": 2.5
+    },
+    {
+     "x": 22.86,
+     "y": 15.24,
+     "diameter": 2.5
+    }
+   ],
+   "ports": []
+  },
+  {
+   "id": "adafruitScd4x",
+   "name": "Adafruit SCD-40 / SCD-41 CO2 Sensor (STEMMA QT)",
+   "category": "sensor",
+   "width": 25.4,
+   "length": 22.86,
+   "thickness": 1.6,
+   "clearance": 3,
+   "componentHeight": 6.5,
+   "padDiameter": 6.0,
+   "boreDiameter": 2.2,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 2.54,
+     "diameter": 3.0
+    },
+    {
+     "x": 22.86,
+     "y": 2.54,
+     "diameter": 3.0
+    },
+    {
+     "x": 2.54,
+     "y": 20.32,
+     "diameter": 3.0
+    },
+    {
+     "x": 22.86,
+     "y": 20.32,
+     "diameter": 3.0
+    }
+   ],
+   "ports": []
+  },
+  {
+   "id": "adafruitVeml7700StemmaQt",
+   "name": "Adafruit VEML7700 Lux Sensor (STEMMA QT)",
+   "category": "sensor",
+   "width": 25.4,
+   "length": 17.78,
+   "thickness": 1.6,
+   "clearance": 3,
+   "componentHeight": 3.0,
+   "padDiameter": 5.5,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 22.86,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 2.54,
+     "y": 15.24,
+     "diameter": 2.5
+    },
+    {
+     "x": 22.86,
+     "y": 15.24,
+     "diameter": 2.5
+    }
+   ],
+   "ports": []
+  },
+  {
+   "id": "sparkfunQwiicBme280",
+   "name": "SparkFun Qwiic Atmospheric Sensor BME280",
+   "category": "sensor",
+   "width": 25.4,
+   "length": 25.4,
+   "thickness": 1.6,
+   "clearance": 3,
+   "componentHeight": 3.0,
+   "padDiameter": 6.3,
+   "boreDiameter": 2.6,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 22.86,
+     "diameter": 3.302
+    },
+    {
+     "x": 22.86,
+     "y": 22.86,
+     "diameter": 3.302
+    },
+    {
+     "x": 22.86,
+     "y": 2.54,
+     "diameter": 3.302
+    }
+   ],
+   "ports": []
+  },
+  {
+   "id": "adafruitIna219StemmaQt",
+   "name": "Adafruit INA219 Current Sensor (STEMMA QT)",
+   "category": "voltage",
+   "width": 25.4,
+   "length": 20.32,
+   "thickness": 1.6,
+   "clearance": 3,
+   "componentHeight": 8.9,
+   "padDiameter": 5.5,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 22.86,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 2.54,
+     "y": 17.78,
+     "diameter": 2.5
+    },
+    {
+     "x": 22.86,
+     "y": 17.78,
+     "diameter": 2.5
+    }
+   ],
+   "ports": [
+    {
+     "type": "custom",
+     "edge": "back",
+     "offset": 12.7,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 7.0,
+     "height": 8.9,
+     "radius": 0,
+     "overhang": 0,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "adafruitIna260",
+   "name": "Adafruit INA260 Current/Voltage/Power Sensor",
+   "category": "voltage",
+   "width": 22.86,
+   "length": 22.86,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 10.0,
+   "padDiameter": 5.5,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 20.32,
+     "diameter": 2.5
+    },
+    {
+     "x": 20.32,
+     "y": 20.32,
+     "diameter": 2.5
+    }
+   ],
+   "ports": [
+    {
+     "type": "custom",
+     "edge": "back",
+     "offset": 11.43,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 10.16,
+     "height": 10.0,
+     "radius": 0,
+     "overhang": 0,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "adafruitIna3221",
+   "name": "Adafruit INA3221 3-Channel Power Monitor (STEMMA QT)",
+   "category": "voltage",
+   "width": 38.354,
+   "length": 22.86,
+   "thickness": 1.6,
+   "clearance": 3,
+   "componentHeight": 8.9,
+   "padDiameter": 5.5,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 20.32,
+     "diameter": 2.5
+    },
+    {
+     "x": 35.814,
+     "y": 20.32,
+     "diameter": 2.5
+    }
+   ],
+   "ports": [
+    {
+     "type": "custom",
+     "edge": "back",
+     "offset": 10.16,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 7.0,
+     "height": 8.9,
+     "radius": 0,
+     "overhang": 0,
+     "margin": 0.5
+    },
+    {
+     "type": "custom",
+     "edge": "back",
+     "offset": 19.05,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 7.0,
+     "height": 8.9,
+     "radius": 0,
+     "overhang": 0,
+     "margin": 0.5
+    },
+    {
+     "type": "custom",
+     "edge": "back",
+     "offset": 27.94,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 7.0,
+     "height": 8.9,
+     "radius": 0,
+     "overhang": 0,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "adafruitAds1115StemmaQt",
+   "name": "Adafruit ADS1115 16-bit ADC (STEMMA QT)",
+   "category": "voltage",
+   "width": 25.4,
+   "length": 17.78,
+   "thickness": 1.6,
+   "clearance": 3,
+   "componentHeight": 3.0,
+   "padDiameter": 5.5,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 22.86,
+     "y": 2.54,
+     "diameter": 2.5
+    },
+    {
+     "x": 2.54,
+     "y": 15.24,
+     "diameter": 2.5
+    },
+    {
+     "x": 22.86,
+     "y": 15.24,
+     "diameter": 2.5
+    }
+   ],
+   "ports": []
+  },
+  {
+   "id": "sparkfunQwiicCurrentIna2xx",
+   "name": "SparkFun Qwiic Current Sensor INA228/INA237",
+   "category": "voltage",
+   "width": 25.4,
+   "length": 25.4,
+   "thickness": 1.6,
+   "clearance": 3,
+   "componentHeight": 10.0,
+   "padDiameter": 6.1,
+   "boreDiameter": 2.6,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 2.54,
+     "diameter": 3.1
+    },
+    {
+     "x": 22.86,
+     "y": 2.54,
+     "diameter": 3.1
+    },
+    {
+     "x": 2.54,
+     "y": 22.86,
+     "diameter": 3.1
+    },
+    {
+     "x": 22.86,
+     "y": 22.86,
+     "diameter": 3.1
+    }
+   ],
+   "ports": [
+    {
+     "type": "custom",
+     "edge": "back",
+     "offset": 12.7,
+     "elevation": 0,
+     "shape": "rect",
+     "width": 11.5,
+     "height": 10.0,
+     "radius": 0,
+     "overhang": 0.79,
+     "margin": 0.5
+    }
+   ]
+  },
+  {
+   "id": "sparkfunAcs723",
+   "name": "SparkFun Current Sensor Breakout ACS723",
+   "category": "voltage",
+   "width": 24.13,
+   "length": 15.24,
+   "thickness": 1.6,
+   "clearance": 10,
+   "componentHeight": 1.75,
+   "padDiameter": 6.0,
+   "boreDiameter": 2.6,
+   "holes": [
+    {
+     "x": 21.59,
+     "y": 2.54,
+     "diameter": 3.048
+    }
+   ],
+   "ports": []
+  },
+  {
+   "id": "pololuAcs724Carrier",
+   "name": "Pololu ACS724 Current Sensor Carrier (4040-4049)",
+   "category": "voltage",
+   "width": 17.8,
+   "length": 20.3,
+   "thickness": 1.57,
+   "clearance": 10,
+   "componentHeight": 1.9,
+   "padDiameter": 5.2,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 2.54,
+     "diameter": 2.18
+    },
+    {
+     "x": 15.24,
+     "y": 2.54,
+     "diameter": 2.18
+    }
+   ],
+   "ports": []
+  },
+  {
+   "id": "pololuAcs711exCarrier",
+   "name": "Pololu ACS711EX Current Sensor Carrier (2452/2453)",
+   "category": "voltage",
+   "width": 17.8,
+   "length": 20.3,
+   "thickness": 1.57,
+   "clearance": 10,
+   "componentHeight": 0.9,
+   "padDiameter": 5.2,
+   "boreDiameter": 1.8,
+   "holes": [
+    {
+     "x": 2.54,
+     "y": 5.08,
+     "diameter": 2.18
+    },
+    {
+     "x": 15.24,
+     "y": 5.08,
+     "diameter": 2.18
+    }
+   ],
+   "ports": []
   }
  ]
 }
