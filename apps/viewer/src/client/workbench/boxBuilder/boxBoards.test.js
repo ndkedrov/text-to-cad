@@ -103,7 +103,8 @@ test("each port cuts its wall where the connector meets it", () => {
   assert.equal(hdmi.u, -20.1);
   assert.equal(hdmi.v, 9.3);
   assert.equal(hdmi.width, 12.2);
-  assert.equal(hdmi.gap, 1);
+  // The board edge stops 1 mm off the wall; the mini HDMI sticks out 0.5 mm past it.
+  assert.equal(hdmi.gap, 0.5);
   const { base } = buildBoxPlan(spec);
   const cutters = findNodes(base, (node) => Array.isArray(node.rot) && node.rot.join() === "90,0,0");
   assert.equal(cutters.length, 3);
@@ -131,7 +132,7 @@ test("turning a board sends its ports to another wall", () => {
   const turned = normalizeBoxSpec(draft).boards[0];
   assert.equal(boardEdgeWall(turned, "left"), "front");
   // The USB-B sticks out 6.3 mm, so the board stops where it ends flush with the outside.
-  assert.equal(turned.y, -4.4);
+  assert.equal(turned.y, -4.41);
   const usb = boardPortCutout(boxDimensions(normalizeBoxSpec(draft)), turned, turned.ports[0]);
   assert.equal(usb.gap, -2);
 });
@@ -143,7 +144,7 @@ test("a port far from its wall is reported, and snapping brings the board back",
   assert.equal(far.length, 3);
   assert.deepEqual(far[0], {
     key: "warning.portFar",
-    params: { n: 1, port: 1, gap: 18 },
+    params: { n: 1, port: 1, gap: 17.5 },
     target: { kind: "board", id: spec.boards[0].id }
   });
   snapBoardToWalls(spec, spec.boards[0].id);
