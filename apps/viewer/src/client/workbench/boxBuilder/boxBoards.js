@@ -146,6 +146,34 @@ export function findBoard(spec, id) {
   return spec.boards.find((board) => board.id === id) || null;
 }
 
+// A new board size. Holes and ports keep their distance to the nearer edge, so
+// corner holes (and the standoffs under them) stay in the corners; a mounted
+// board stays between the walls.
+export function resizeBoard(draft, id, { width, length }) {
+  const board = findBoard(draft, id);
+  if (!board) {
+    return;
+  }
+  const nextWidth = width ?? board.width;
+  const nextLength = length ?? board.length;
+  const keep = (value, from, to) => roundMm(value > from / 2 ? to - (from - value) : value, 3);
+  for (const hole of board.holes) {
+    hole.x = keep(hole.x, board.width, nextWidth);
+    hole.y = keep(hole.y, board.length, nextLength);
+  }
+  for (const entry of board.ports) {
+    const alongWidth = entry.edge === "front" || entry.edge === "back";
+    entry.offset = alongWidth
+      ? keep(entry.offset, board.width, nextWidth)
+      : keep(entry.offset, board.length, nextLength);
+  }
+  board.width = nextWidth;
+  board.length = nextLength;
+  if (board.mounted) {
+    Object.assign(board, clampBoardPosition(boxDimensions(draft), board, board.x, board.y));
+  }
+}
+
 // For each wall some of the board's ports go through: how far the board edge
 // stays from it. Never less than BOARD_WALL_GAP, and more when a connector sticks
 // out past the edge, so that it ends flush with the outside of the wall.
