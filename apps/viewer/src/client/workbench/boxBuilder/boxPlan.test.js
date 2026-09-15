@@ -126,6 +126,15 @@ test("a connector hole is the connector's body plus a margin, and cuts as its sh
   assert.equal(findNodes(base, (node) => node.type === "rrect" && node.w === 17 && node.d === 14.5).length, 1);
 });
 
+test("a keystone hole is its exact cut-out and needs a thin enough wall", () => {
+  assert.deepEqual(connectorHole("keystone"), { connector: "keystone", shape: "rect", width: 14.7, height: 16.4, radius: 0 });
+  const spec = normalizeBoxSpec({ ...defaultBoxSpec(), holes: [{ face: "front", u: 0, v: 16, ...connectorHole("keystone") }] });
+  const keystoneWarning = () => boxSpecWarnings(spec).find((warning) => warning.key === "warning.keystoneWall");
+  assert.deepEqual(keystoneWarning()?.params, { n: 1, thickness: 2 });
+  spec.walls.thickness = 1.6;
+  assert.equal(keystoneWarning(), undefined);
+});
+
 test("warnings name standoffs outside the floor", () => {
   const spec = normalizeBoxSpec(defaultBoxSpec());
   spec.standoffs.push({ ...newStandoffGroup(spec), x: 40 });

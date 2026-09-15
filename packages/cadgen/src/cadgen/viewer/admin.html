@@ -194,6 +194,9 @@
       pt_hdmi: "HDMI", pt_miniHdmi: "Mini-HDMI", pt_microHdmi: "Micro-HDMI", pt_rj45: "Ethernet", pt_dcJack: "DC jack",
       pt_audio: "Audio 3.5 mm", pt_custom: "Custom", pCategory: "Type", filterAll: "All types",
       cat_sbc: "Single-board computers", cat_mcu: "Microcontroller boards", cat_wireless: "Wi-Fi, Bluetooth, LoRa (ESP32…)",
+      cat_interface: "Interface converters: CAN, RS485, RS232, USB-UART", cat_storage: "Memory cards (microSD)",
+      pt_microSd: "microSD card slot", pt_db9: "D-sub 9 (RS232)", pt_keystone: "RJ45 keystone jack (Cat5/Cat6)",
+      pt_rj45Pass: "RJ45 plug pass-through",
       cat_motion: "Motion and presence sensors", cat_sensor: "Other sensors", cat_voltage: "Voltage and current sensing",
       cat_power: "Power: converters and chargers", cat_driver: "Motor drivers and relays", cat_display: "Displays"
     },
@@ -242,6 +245,9 @@
       pt_hdmi: "HDMI", pt_miniHdmi: "Mini-HDMI", pt_microHdmi: "Micro-HDMI", pt_rj45: "Ethernet", pt_dcJack: "Гніздо живлення",
       pt_audio: "Аудіо 3,5 мм", pt_custom: "Свій", pCategory: "Тип", filterAll: "Усі типи",
       cat_sbc: "Одноплатні комп'ютери", cat_mcu: "Мікроконтролерні плати", cat_wireless: "Wi-Fi, Bluetooth, LoRa (ESP32…)",
+      cat_interface: "Перетворювачі інтерфейсів: CAN, RS485, RS232, USB-UART", cat_storage: "Карти пам'яті (microSD)",
+      pt_microSd: "Слот microSD", pt_db9: "D-sub 9 (RS232)", pt_keystone: "Keystone RJ45 (Cat5/Cat6)",
+      pt_rj45Pass: "Прохід для вилки RJ45",
       cat_motion: "Датчики руху й присутності", cat_sensor: "Інші датчики", cat_voltage: "Вимірювання напруги й струму",
       cat_power: "Живлення: перетворювачі й зарядки", cat_driver: "Драйвери двигунів і реле", cat_display: "Дисплеї"
     }
@@ -596,7 +602,7 @@
   function newPort(type) {
     var size = presets.portTypes[type] || presets.portTypes.custom || { shape: "rect", width: 10, height: 5, radius: 0, elevation: 0 };
     return { type: presets.portTypes[type] ? type : "custom", edge: "front", offset: 10, elevation: size.elevation || 0, shape: size.shape,
-      width: size.width, height: size.height, radius: size.radius, overhang: 0, margin: 0.5 };
+      width: size.width, height: size.height, radius: size.radius, overhang: 0, margin: size.margin != null ? size.margin : 0.5 };
   }
 
   function blankPreset() {

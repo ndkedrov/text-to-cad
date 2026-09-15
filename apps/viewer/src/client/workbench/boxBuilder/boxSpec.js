@@ -44,6 +44,15 @@ export const PORT_TYPES = Object.freeze({
   rj45: Object.freeze({ shape: "rect", width: 16, height: 13.5, radius: 0.5, elevation: 0 }),
   dcJack: Object.freeze({ shape: "circle", width: 9.5, height: 9.5, radius: 0, elevation: 1.75 }),
   audio: Object.freeze({ shape: "circle", width: 6.5, height: 6.5, radius: 0, elevation: 0 }),
+  // The opening a card goes in through, not the whole socket.
+  microSd: Object.freeze({ shape: "rect", width: 12, height: 2, radius: 0.3, elevation: 0 }),
+  // The D-shaped face of a right-angle D-sub 9 (RS232) connector.
+  db9: Object.freeze({ shape: "rect", width: 19.5, height: 11.5, radius: 1, elevation: 0.5 }),
+  // A keystone jack's suggested cut-out for a plastic panel 1.5-1.6 mm thick,
+  // with no gap so the jack snaps in.
+  keystone: Object.freeze({ shape: "rect", width: 14.7, height: 16.4, radius: 0, elevation: 0, margin: 0 }),
+  // Room for an RJ45 plug (up to a shielded Cat6A one) to pass through a wall.
+  rj45Pass: Object.freeze({ shape: "rect", width: 15, height: 15.3, radius: 1, elevation: 0 }),
   custom: Object.freeze({ shape: "rect", width: 10, height: 5, radius: 0, elevation: 0 })
 });
 
@@ -183,17 +192,26 @@ function normalizeHole(raw, used) {
 export const CONNECTOR_TYPES = Object.freeze(Object.keys(PORT_TYPES).filter((type) => type !== "custom"));
 // Room left around a connector's body in its hole, on every side.
 export const CONNECTOR_HOLE_MARGIN = 0.5;
+// A keystone jack's latches only catch a panel up to this thick.
+const KEYSTONE_PANEL_MAX = 1.6;
+
+// The room a connector type leaves around its body in a hole: its own `margin`
+// when it has one (a snap-in keystone needs its exact cut-out), else the default.
+export function connectorHoleMargin(type) {
+  return (PORT_TYPES[type] || PORT_TYPES.custom).margin ?? CONNECTOR_HOLE_MARGIN;
+}
 
 // The shape and size of a hole for a connector: its body plus the margin all
 // round, a rounded rectangle or, for round connectors, a circle.
 export function connectorHole(type) {
   const size = PORT_TYPES[type] || PORT_TYPES.custom;
-  const width = roundMm(size.width + 2 * CONNECTOR_HOLE_MARGIN, 3);
+  const margin = connectorHoleMargin(type);
+  const width = roundMm(size.width + 2 * margin, 3);
   if (size.shape === "circle") {
     return { connector: type, shape: "circle", width, height: width, radius: 0 };
   }
-  const height = roundMm(size.height + 2 * CONNECTOR_HOLE_MARGIN, 3);
-  const radius = roundMm(Math.min(size.radius + CONNECTOR_HOLE_MARGIN, Math.min(width, height) / 2), 3);
+  const height = roundMm(size.height + 2 * margin, 3);
+  const radius = roundMm(Math.min(size.radius + margin, Math.min(width, height) / 2), 3);
   return { connector: type, shape: "rect", width, height, radius };
 }
 
@@ -646,6 +664,12 @@ export function boxSpecWarnings(spec) {
       hole.v - extent < range.v[0] - 1e-6 || hole.v + extent > range.v[1] + 1e-6
     ) {
       warnings.push({ key: "warning.holeOutside", params: { n } });
+    }
+    if (hole.connector === "keystone") {
+      const thickness = isWallFace(hole.face) ? dims.wallThickness : hole.face === "lid" ? dims.lidThickness : dims.floorThickness;
+      if (thickness > KEYSTONE_PANEL_MAX + 1e-6) {
+        warnings.push({ key: "warning.keystoneWall", params: { n, thickness: roundMm(thickness, 2) } });
+      }
     }
   });
   spec.boards.forEach((board, index) => {
