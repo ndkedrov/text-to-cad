@@ -12,6 +12,7 @@ from pathlib import Path
 
 from cadgen.box_plan import PlanError, normalize_box_plan, normalize_plan_node
 from cadgen.viewer.boxes import (
+    MAX_SPEC_BYTES,
     BoxBuilder,
     BoxBusy,
     BoxError,
@@ -114,7 +115,10 @@ class PlanGrammar(unittest.TestCase):
         with self.assertRaises(PlanError):
             normalize_plan_node(many)
         square = [[0, 0], [1, 0], [1, 1], [0, 1]]
-        points = {"type": "union", "children": [{"type": "poly", "points": square * 16, "h": 1}] * 40}
+        # One polygon past what a polygon may hold, and then more points than a plan may.
+        with self.assertRaises(PlanError):
+            normalize_plan_node({"type": "poly", "points": square * 101, "h": 1})
+        points = {"type": "union", "children": [{"type": "poly", "points": square * 100, "h": 1}] * 16}
         with self.assertRaises(PlanError):
             normalize_plan_node(points)
 
@@ -189,7 +193,7 @@ class SavingABox(BuilderTestCase):
             self.builder.save("case", b" " * (1024 * 1024 + 1))
         self.assertEqual(caught.exception.status, 413)
         with self.assertRaises(BoxError) as caught:
-            self.builder.save("case", body(spec={"junk": "x" * 70000}))
+            self.builder.save("case", body(spec={"junk": "x" * (MAX_SPEC_BYTES + 1000)}))
         self.assertEqual(caught.exception.status, 413)
 
     def test_switching_the_lid_off_removes_only_generated_lid_files(self):

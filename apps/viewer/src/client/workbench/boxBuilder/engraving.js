@@ -8,12 +8,11 @@
 
 export const ENGRAVING_MODES = Object.freeze(["cut", "inlay"]);
 export const MAX_ENGRAVING_CONTOURS = 80;
-export const MAX_CONTOUR_POINTS = 64;
-// The plan grammar allows 2000 polygon points in all; the rest is for the box.
-export const MAX_ENGRAVING_POINTS = 1600;
-// A groove is cut as one rounded slot per step along its line, and every slot is
-// a node of the plan, which allows 1000 in all.
-export const MAX_GROOVE_SEGMENTS = 400;
+export const MAX_CONTOUR_POINTS = 400;
+// The plan grammar allows 6000 polygon points in all; the rest is for the box.
+export const MAX_ENGRAVING_POINTS = 4000;
+// A groove whose outline cannot be drawn at all is cut as rounded slots instead,
+// one per step along its line; every slot is a node of the plan, which holds 1000.
 // The smallest contour worth cutting, in the drawing's own units.
 const MIN_CONTOUR_SPAN = 1e-6;
 
@@ -99,6 +98,104 @@ export function simplifyContour(points, tolerance, limit = MAX_CONTOUR_POINTS) {
   return kept.map(([x, y]) => [round(x), round(y)]);
 }
 
+// --- the outline of a drawn line -------------------------------------------------
+
+// Where two segments cross, if they do.
+function crossing(a1, a2, b1, b2) {
+  const ax = a2[0] - a1[0];
+  const ay = a2[1] - a1[1];
+  const bx = b2[0] - b1[0];
+  const by = b2[1] - b1[1];
+  const denominator = ax * by - ay * bx;
+  if (Math.abs(denominator) < 1e-12) {
+    return null;
+  }
+  const along = ((b1[0] - a1[0]) * by - (b1[1] - a1[1]) * bx) / denominator;
+  const other = ((b1[0] - a1[0]) * ay - (b1[1] - a1[1]) * ax) / denominator;
+  if (along <= 1e-9 || along >= 1 - 1e-9 || other <= 1e-9 || other >= 1 - 1e-9) {
+    return null;
+  }
+  return [a1[0] + ax * along, a1[1] + ay * along];
+}
+
+// An offset line loops back on itself on the inside of a tight bend. Each loop is
+// cut out at the crossing, which is what a pen would have covered anyway.
+function withoutLoops(points, closed) {
+  let kept = points;
+  for (let pass = 0; pass < 200 && kept.length > 3; pass += 1) {
+    let cut = null;
+    const last = closed ? kept.length : kept.length - 1;
+    for (let first = 0; first < last && !cut; first += 1) {
+      const firstEnd = kept[(first + 1) % kept.length];
+      for (let second = first + 2; second < last; second += 1) {
+        if (closed && first === 0 && second === kept.length - 1) {
+          continue;
+        }
+        const point = crossing(kept[first], firstEnd, kept[second], kept[(second + 1) % kept.length]);
+        if (point) {
+          cut = { first, second, point };
+          break;
+        }
+      }
+    }
+    if (!cut) {
+      return kept;
+    }
+    kept = [...kept.slice(0, cut.first + 1), cut.point, ...kept.slice(cut.second + 1)];
+  }
+  return kept;
+}
+
+// A line's outward normals, one per point: the average of the two steps meeting
+// there, so an offset follows the line round its bends.
+function normalsAlong(points, closed) {
+  return points.map((point, index) => {
+    const before = closed ? points[(index - 1 + points.length) % points.length] : points[Math.max(index - 1, 0)];
+    const after = closed ? points[(index + 1) % points.length] : points[Math.min(index + 1, points.length - 1)];
+    const dx = after[0] - before[0];
+    const dy = after[1] - before[1];
+    const length = Math.hypot(dx, dy) || 1;
+    return [dy / length, -dx / length];
+  });
+}
+
+// The outline of a line drawn `width` thick, as the shapes to cut: a closed line
+// gives its outer edge and the hole inside it, an open one a single shape that
+// runs up one side and back down the other. Returns null when the line bends
+// tighter than the pen is wide and no honest outline comes out, which is when the
+// groove is cut as slots instead.
+export function strokeOutline(points, width, closed) {
+  if (points.length < 2 || !(width > 0)) {
+    return null;
+  }
+  const normals = normalsAlong(points, closed);
+  const side = (distance) => points.map(([x, y], index) => [
+    round(x + normals[index][0] * distance, 4),
+    round(y + normals[index][1] * distance, 4)
+  ]);
+  // A prism is built on a contour that runs counter-clockwise; which side of the
+  // line is the outer one depends on which way the line itself was drawn.
+  const forward = (points) => (contourArea(points) < 0 ? [...points].reverse() : points);
+  if (!closed) {
+    const outline = withoutLoops([...side(width / 2), ...side(-width / 2).reverse()], true);
+    return outline.length >= 3 && Math.abs(contourArea(outline)) > width * width * 0.1
+      ? { outline: forward(outline), hole: null }
+      : null;
+  }
+  const sides = [withoutLoops(side(width / 2), true), withoutLoops(side(-width / 2), true)];
+  const areaOf = (points) => (points.length >= 3 ? Math.abs(contourArea(points)) : 0);
+  const [wide, narrow] = areaOf(sides[0]) >= areaOf(sides[1]) ? sides : [sides[1], sides[0]];
+  if (areaOf(wide) < width * width * 0.2) {
+    return null;
+  }
+  // Where the line rings something wider than the pen, the middle stays; where it
+  // does not, the pen has covered the middle and the whole shape is cut.
+  const hole = areaOf(narrow) > width * width && areaOf(wide) - areaOf(narrow) > width * width * 0.2
+    ? forward(narrow)
+    : null;
+  return { outline: forward(wide), hole };
+}
+
 export function contourArea(points) {
   let sum = 0;
   for (let index = 0; index < points.length; index += 1) {
@@ -172,7 +269,6 @@ export function normalizeEngraving(raw) {
   // Lines drawn with a pen rather than filled: each is cut as a groove as wide
   // as the pen was. They are kept as lines, not as their outlines, because an
   // outline that turns sharply crosses itself and the kernel refuses the part.
-  let segments = MAX_GROOVE_SEGMENTS;
   const strokes = [];
   for (const raw of Array.isArray(source.strokes) ? source.strokes : []) {
     const line = raw && typeof raw === "object" ? raw : {};
@@ -182,11 +278,10 @@ export function normalizeEngraving(raw) {
       .slice(0, MAX_CONTOUR_POINTS)
       .map(([x, y]) => [round(Number(x)), round(Number(y))]);
     const closed = Boolean(line.closed) && points.length > 2;
-    const needed = Math.max(points.length - (closed ? 0 : 1), 0);
-    if (width <= 0 || points.length < 2 || needed > segments) {
+    if (width <= 0 || points.length < 2 || points.length > budget) {
       continue;
     }
-    segments -= needed;
+    budget -= points.length;
     strokes.push({ width: round(width), closed, points });
   }
   if (!contours.length && !strokes.length) {
