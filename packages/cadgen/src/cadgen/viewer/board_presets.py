@@ -157,14 +157,20 @@ def normalize_board_presets(boards: Any, port_types, categories) -> list[dict]:
         # Ribs under the board (offset along its long side), and whether a board is
         # clamped down, are written only when a preset sets them.
         if rails:
-            entry["rails"] = [
-                {
-                    "offset": _number(_object(rail, f"{where}.rails[{rail_index}]"), "offset", f"{where}.rails[{rail_index}]", 0, max(width, length)),
-                    "length": _number(rail, "length", f"{where}.rails[{rail_index}]", 1, 400),
-                    "thickness": _number(rail, "thickness", f"{where}.rails[{rail_index}]", 0.5, 50),
+            clean_rails = []
+            for rail_index, rail in enumerate(rails):
+                spot = f"{where}.rails[{rail_index}]"
+                clean_rail = {
+                    "offset": _number(_object(rail, spot), "offset", spot, 0, max(width, length)),
+                    "length": _number(rail, "length", spot, 1, 400),
+                    "thickness": _number(rail, "thickness", spot, 0.5, 50),
                 }
-                for rail_index, rail in enumerate(rails)
-            ]
+                # A rib without a height of its own is as tall as the board's gap to the floor.
+                height = _number(rail, "height", spot, 0, 200, 0)
+                if height:
+                    clean_rail["height"] = height
+                clean_rails.append(clean_rail)
+            entry["rails"] = clean_rails
         if "clamp" in source:
             if not isinstance(source["clamp"], bool):
                 raise PresetError(f"{where}.clamp: expected true or false")
@@ -173,6 +179,12 @@ def normalize_board_presets(boards: Any, port_types, categories) -> list[dict]:
             entry["clampHeight"] = _number(source, "clampHeight", where, 1, 200)
         if "clampOffset" in source:
             entry["clampOffset"] = _number(source, "clampOffset", where, 0, max(width, length))
+        if "clampDiameter" in source:
+            entry["clampDiameter"] = _number(source, "clampDiameter", where, 2, 30)
+        if "clampBore" in source:
+            entry["clampBore"] = _number(source, "clampBore", where, 0, entry.get("clampDiameter", pad) - 0.8)
+        if "clampGap" in source:
+            entry["clampGap"] = _number(source, "clampGap", where, 0, 20)
         clean.append(entry)
     return clean
 

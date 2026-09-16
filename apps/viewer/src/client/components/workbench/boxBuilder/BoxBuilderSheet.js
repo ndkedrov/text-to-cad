@@ -77,7 +77,9 @@ import {
   MAX_LID_SCREWS,
   PORT_SHAPES,
   STANDOFF_PATTERNS,
+  boardClampOpening,
   boardPortCutout,
+  boardRailHeight,
   boxDimensions,
   clampBoardPosition,
   clampStemLength,
@@ -1046,6 +1048,15 @@ function BoardItem({ builder, board, index, presets }) {
               step={0.5}
               onCommit={(clampOffset) => patch({ clampOffset })}
             />
+            <FileSheetFieldGrid columns={3}>
+              <NumberField label={t("field.clampDiameter")} value={board.clampDiameter} min={2} max={30} step={0.5} onCommit={(clampDiameter) => patch({ clampDiameter })} />
+              <NumberField label={t("field.clampBore")} value={board.clampBore} min={0} max={board.clampDiameter - 0.8} step={0.1} onCommit={(clampBore) => patch({ clampBore })} />
+              <NumberField label={t("field.clampGap")} value={board.clampGap} min={0} max={20} step={0.1} onCommit={(clampGap) => patch({ clampGap })} />
+            </FileSheetFieldGrid>
+            <FileSheetControlRow
+              label={t("field.clampOpening")}
+              value={`${formatNumber(boardClampOpening(board))} ${mm}`}
+            />
             <FileSheetStatusText>{t("board.clampStem", { stem: formatNumber(clampStemLength(board), 1) })}</FileSheetStatusText>
           </>
         ) : null}
@@ -1057,18 +1068,30 @@ function BoardItem({ builder, board, index, presets }) {
             }
           });
           return (
-            <FileSheetFieldGrid key={rail.id} columns={4} className="items-end">
-              <NumberField label={`${railIndex + 1} · ${t("field.railOffset")}`} value={rail.offset} min={0} max={Math.max(board.width, board.length)} step={0.5} onCommit={(offset) => patchRail({ offset })} />
-              <NumberField label={t("field.railLength")} value={rail.length} min={1} max={400} step={0.5} onCommit={(length) => patchRail({ length })} />
-              <NumberField label={t("field.railThickness")} value={rail.thickness} min={0.5} max={50} step={0.5} onCommit={(thickness) => patchRail({ thickness })} />
-              <IconButton
-                icon={X}
-                label={t("action.removeRail")}
-                onClick={() => update((target) => {
-                  target.rails = target.rails.filter((entry) => entry.id !== rail.id);
-                })}
-              />
-            </FileSheetFieldGrid>
+            <FileSheetDisclosure
+              key={rail.id}
+              label={t("item.rail", { n: railIndex + 1 })}
+              summary={`${formatNumber(rail.length)}×${formatNumber(rail.thickness)} ${mm} · ${formatNumber(rail.offset)} ${mm}`}
+            >
+              <FileSheetFieldGrid columns={2}>
+                <NumberField label={t("field.railOffset")} value={rail.offset} min={0} max={Math.max(board.width, board.length)} step={0.5} onCommit={(offset) => patchRail({ offset })} />
+                <NumberField label={t("field.railLength")} value={rail.length} min={1} max={400} step={0.5} onCommit={(length) => patchRail({ length })} />
+              </FileSheetFieldGrid>
+              <FileSheetFieldGrid columns={2}>
+                <NumberField label={t("field.railThickness")} value={rail.thickness} min={0.5} max={50} step={0.5} onCommit={(thickness) => patchRail({ thickness })} />
+                <NumberField label={t("field.railHeight")} value={boardRailHeight(board, rail)} min={0.1} max={200} step={0.5} onCommit={(height) => patchRail({ height })} />
+              </FileSheetFieldGrid>
+              <FileSheetButtonRow>
+                <CompactButton
+                  icon={X}
+                  onClick={() => update((target) => {
+                    target.rails = target.rails.filter((entry) => entry.id !== rail.id);
+                  })}
+                >
+                  {t("action.removeRail")}
+                </CompactButton>
+              </FileSheetButtonRow>
+            </FileSheetDisclosure>
           );
         })}
         <FileSheetButtonRow>
