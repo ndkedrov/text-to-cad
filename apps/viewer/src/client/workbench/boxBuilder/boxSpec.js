@@ -29,6 +29,7 @@ export const PCB_THICKNESS = 1.6;
 // reported: a plug will not reach it through the cut-out.
 export const PORT_REACH_TOLERANCE = 2;
 export const MAX_BOARD_RAILS = 4;
+export const MAX_LID_SCREWS = 8;
 // A board with nothing to screw it down by is clamped: a screw post beside each of
 // its long sides, halfway along, and a T piece printed next to the box that is
 // screwed onto both posts and presses the board down with its stem.
@@ -107,7 +108,11 @@ export function defaultBoxSpec() {
       screwDepth: 10,
       screwDiameter: 7,
       screwPilot: 2.5,
-      screwHole: 3.4
+      screwHole: 3.4,
+      // How far a boss sinks into the wall it stands against.
+      screwInset: 0,
+      // Empty: one in each inner corner, following them as the box changes.
+      screwPoints: []
     },
     holes: [],
     standoffs: [],
@@ -162,6 +167,8 @@ export function boxDimensions(spec) {
     screwDiameter: lid.screwDiameter,
     screwPilot: lid.screwPilot,
     screwHole: lid.screwHole,
+    screwInset: lid.screwInset,
+    screwPoints: lid.screwPoints,
     totalHeight: lidEnabled ? lidTop : wallTop
   };
 }
@@ -184,13 +191,116 @@ export function lidScrewCorner(dims, radius) {
   return [halfX - inner + along, halfY - inner + along];
 }
 
-// Box coordinates of the four lid screws: back-right, back-left, front-left, front-right.
+// How close to a wall a boss counts as standing against it.
+const LID_SCREW_TOUCH = 0.5;
+
+// The lid screws as { id, x, y }: the ones the box carries, or one in each inner
+// corner (back-right, back-left, front-left, front-right) while none are placed.
 export function lidScrewPoints(dims) {
   if (!dims.lidScrews) {
     return [];
   }
+  if (dims.screwPoints.length) {
+    return dims.screwPoints;
+  }
   const [x, y] = lidScrewCorner(dims, dims.screwDiameter / 2);
-  return [[x, y], [-x, y], [-x, -y], [x, -y]].map(([px, py]) => [roundMm(px, 4), roundMm(py, 4)]);
+  return [[x, y], [-x, y], [-x, -y], [x, -y]].map(([px, py], index) => ({
+    id: `screw-${index + 1}`,
+    x: roundMm(px, 4),
+    y: roundMm(py, 4)
+  }));
+}
+
+// Which walls a boss stands against: -1, 0 or +1 along each axis. In a rounded
+// corner the boundary is the arc, not the flat walls, so the reach is measured
+// against whichever of them the boss is nearest.
+export function lidScrewAnchor(dims, point) {
+  const reach = dims.screwDiameter / 2 + LID_SCREW_TOUCH;
+  const halfX = dims.innerWidth / 2;
+  const halfY = dims.innerDepth / 2;
+  const across = Math.abs(point.x);
+  const along = Math.abs(point.y);
+  const signX = Math.sign(point.x) || 1;
+  const signY = Math.sign(point.y) || 1;
+  const cornerX = halfX - dims.innerRadius;
+  const cornerY = halfY - dims.innerRadius;
+  if (across > cornerX && along > cornerY) {
+    const gap = dims.innerRadius - Math.hypot(across - cornerX, along - cornerY);
+    return gap <= reach ? { x: signX, y: signY } : { x: 0, y: 0 };
+  }
+  return {
+    x: halfX - across <= reach ? signX : 0,
+    y: halfY - along <= reach ? signY : 0
+  };
+}
+
+// Whether a circle this wide at (x, y) is still inside the box's outside.
+function circleInsideBox(dims, x, y, radius) {
+  const halfX = dims.width / 2;
+  const halfY = dims.depth / 2;
+  const across = Math.abs(x);
+  const along = Math.abs(y);
+  if (across + radius > halfX + 1e-9 || along + radius > halfY + 1e-9) {
+    return false;
+  }
+  const corner = Math.min(dims.radius, halfX, halfY);
+  const cornerX = halfX - corner;
+  const cornerY = halfY - corner;
+  if (across <= cornerX || along <= cornerY) {
+    return true;
+  }
+  return Math.hypot(across - cornerX, along - cornerY) + radius <= corner + 1e-9;
+}
+
+// Where a boss sits before it is sunk into its walls.
+function lidScrewSeat(dims, point, radius) {
+  const anchor = lidScrewAnchor(dims, point);
+  if (anchor.x && anchor.y) {
+    const [cornerX, cornerY] = lidScrewCorner(dims, radius);
+    return [anchor.x * cornerX, anchor.y * cornerY];
+  }
+  return [
+    anchor.x ? anchor.x * (dims.innerWidth / 2 - radius + LID_SCREW_FUSE) : point.x,
+    anchor.y ? anchor.y * (dims.innerDepth / 2 - radius + LID_SCREW_FUSE) : point.y
+  ];
+}
+
+// How far the boss really sinks into its walls: what was asked for, less whatever
+// would push it out through the outside of the box (a rounded corner runs out
+// first). Bisected, so the answer holds for any wall thickness or corner.
+export function lidScrewSink(dims, point) {
+  const radius = dims.screwDiameter / 2;
+  const anchor = lidScrewAnchor(dims, point);
+  if (!dims.screwInset || (!anchor.x && !anchor.y)) {
+    return 0;
+  }
+  const [seatX, seatY] = lidScrewSeat(dims, point, radius);
+  const fits = (sink) => circleInsideBox(dims, seatX + anchor.x * sink, seatY + anchor.y * sink, radius);
+  if (fits(dims.screwInset)) {
+    return dims.screwInset;
+  }
+  let low = 0;
+  let high = dims.screwInset;
+  for (let step = 0; step < 24; step += 1) {
+    const middle = (low + high) / 2;
+    if (fits(middle)) {
+      low = middle;
+    } else {
+      high = middle;
+    }
+  }
+  return roundMm(low, 3);
+}
+
+// Where a part of the boss this wide sits: pressed into the walls it stands
+// against (into the corner when both) and sunk into them by `screwInset`, keeping
+// the placed position otherwise. Narrower parts sit further into the wall, which
+// is what tapers the boss's underside.
+export function lidScrewStepCentre(dims, point, radius) {
+  const anchor = lidScrewAnchor(dims, point);
+  const sink = lidScrewSink(dims, point);
+  const [seatX, seatY] = lidScrewSeat(dims, point, radius);
+  return [roundMm(seatX + anchor.x * sink, 4), roundMm(seatY + anchor.y * sink, 4)];
 }
 
 function uniqueId(candidate, prefix, used) {
@@ -423,12 +533,26 @@ export function normalizeBoxSpec(raw) {
     clearance
   };
   const screwDiameter = numberIn(sourceLid.screwDiameter, defaults.lid.screwDiameter, 4, 20);
+  const screwIds = new Set();
+  // A boss stays inside the box, tangent to a wall at the far end of its range.
+  const screwLimit = (size) => Math.max(size / 2 - (walls.enabled ? walls.thickness : 0) - screwDiameter / 2 + LID_SCREW_FUSE, 0);
   Object.assign(lid, {
     screws: booleanOr(sourceLid.screws, defaults.lid.screws),
     screwDepth: numberIn(sourceLid.screwDepth, defaults.lid.screwDepth, 2, walls.height),
     screwDiameter,
     screwPilot: numberIn(sourceLid.screwPilot, defaults.lid.screwPilot, 0.5, screwDiameter - 2),
-    screwHole: numberIn(sourceLid.screwHole, defaults.lid.screwHole, 0.5, screwDiameter)
+    screwHole: numberIn(sourceLid.screwHole, defaults.lid.screwHole, 0.5, screwDiameter),
+    screwInset: numberIn(sourceLid.screwInset, defaults.lid.screwInset, 0, walls.thickness),
+    screwPoints: (Array.isArray(sourceLid.screwPoints) ? sourceLid.screwPoints : [])
+      .slice(0, MAX_LID_SCREWS)
+      .map((raw) => {
+        const point = raw && typeof raw === "object" ? raw : {};
+        return {
+          id: uniqueId(point.id, "screw", screwIds),
+          x: numberIn(point.x, 0, -screwLimit(width), screwLimit(width)),
+          y: numberIn(point.y, 0, -screwLimit(depth), screwLimit(depth))
+        };
+      })
   });
 
   const holeIds = new Set();
@@ -802,10 +926,19 @@ export function boxSpecWarnings(spec) {
   const warnings = [];
   if (dims.lidScrews) {
     const radius = dims.screwDiameter / 2;
-    const [x, y] = lidScrewCorner(dims, radius);
-    if (x < radius + 0.5 || y < radius + 0.5) {
+    const [cornerX, cornerY] = lidScrewCorner(dims, radius);
+    if (cornerX < radius + 0.5 || cornerY < radius + 0.5) {
       warnings.push({ key: "warning.lidScrewsTight", params: {} });
     }
+    lidScrewPoints(dims).forEach((point, index) => {
+      const anchor = lidScrewAnchor(dims, point);
+      const n = index + 1;
+      if (!anchor.x && !anchor.y) {
+        warnings.push({ key: "warning.lidScrewFree", params: { n } });
+      } else if (dims.screwInset - lidScrewSink(dims, point) > 0.05) {
+        warnings.push({ key: "warning.lidScrewInset", params: { n, sink: roundMm(lidScrewSink(dims, point), 2) } });
+      }
+    });
   }
   spec.standoffs.forEach((group, index) => {
     const n = index + 1;

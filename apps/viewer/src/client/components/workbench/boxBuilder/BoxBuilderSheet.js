@@ -72,6 +72,7 @@ import {
   MAX_BOARD_HOLES,
   MAX_BOARD_PORTS,
   MAX_BOARD_RAILS,
+  MAX_LID_SCREWS,
   PORT_SHAPES,
   STANDOFF_PATTERNS,
   boardPortCutout,
@@ -90,8 +91,10 @@ import {
   holeHalfExtents,
   holeLift,
   isWallFace,
+  lidScrewPoints,
   newHole,
   newStandoffGroup,
+  nextId,
   roundMm
 } from "@/workbench/boxBuilder/boxSpec.js";
 import { formatWarning } from "@/workbench/boxBuilder/i18n.js";
@@ -360,6 +363,15 @@ function LidTab({ builder }) {
   const set = (key) => (value) => edit((draft) => {
     draft.lid[key] = value;
   });
+  // Editing any screw fixes all of them where they are: the corners are only the
+  // starting point, and they move with the box until someone places them.
+  const editScrews = (mutate) => edit((draft) => {
+    const placed = draft.lid.screwPoints.length
+      ? draft.lid.screwPoints
+      : lidScrewPoints(boxDimensions(draft)).map(({ id, x, y }) => ({ id, x, y }));
+    mutate(placed);
+    draft.lid.screwPoints = placed;
+  });
   if (!spec.walls.enabled) {
     return (
       <div className="pt-2">
@@ -407,6 +419,59 @@ function LidTab({ builder }) {
               <NumberRow label={t("field.screwDiameter")} value={spec.lid.screwDiameter} min={4} max={20} step={0.5} onCommit={set("screwDiameter")} />
               <NumberRow label={t("field.screwPilot")} value={spec.lid.screwPilot} min={0.5} max={spec.lid.screwDiameter - 2} step={0.1} onCommit={set("screwPilot")} />
               <NumberRow label={t("field.screwHole")} value={spec.lid.screwHole} min={0.5} max={spec.lid.screwDiameter} step={0.1} onCommit={set("screwHole")} />
+              <NumberRow label={t("field.screwInset")} value={spec.lid.screwInset} min={0} max={spec.walls.thickness} step={0.1} onCommit={set("screwInset")} />
+              {spec.lid.screwPoints.length ? null : <FileSheetStatusText>{t("lid.screwsAuto")}</FileSheetStatusText>}
+              {lidScrewPoints(dims).map((point, index) => (
+                <FileSheetFieldGrid key={point.id} columns={3} className="items-end">
+                  <NumberField
+                    label={`${index + 1} · ${t("field.centerX")}`}
+                    value={point.x}
+                    min={-2000}
+                    max={2000}
+                    step={0.5}
+                    onCommit={(x) => editScrews((points) => {
+                      points[index].x = x;
+                    })}
+                  />
+                  <NumberField
+                    label={t("field.centerY")}
+                    value={point.y}
+                    min={-2000}
+                    max={2000}
+                    step={0.5}
+                    onCommit={(y) => editScrews((points) => {
+                      points[index].y = y;
+                    })}
+                  />
+                  <IconButton
+                    icon={X}
+                    label={t("action.removeScrew")}
+                    onClick={() => editScrews((points) => {
+                      points.splice(index, 1);
+                    })}
+                  />
+                </FileSheetFieldGrid>
+              ))}
+              <FileSheetButtonRow columns={2}>
+                <CompactButton
+                  icon={Plus}
+                  disabled={lidScrewPoints(dims).length >= MAX_LID_SCREWS}
+                  onClick={() => editScrews((points) => {
+                    points.push({ id: nextId("screw", points), x: 0, y: dims.innerDepth / 2 });
+                  })}
+                >
+                  {t("action.addScrew")}
+                </CompactButton>
+                <CompactButton
+                  icon={Crosshair}
+                  disabled={!spec.lid.screwPoints.length}
+                  onClick={() => edit((draft) => {
+                    draft.lid.screwPoints = [];
+                  })}
+                >
+                  {t("action.screwsToCorners")}
+                </CompactButton>
+              </FileSheetButtonRow>
             </>
           ) : null}
         </FileSheetSubsection>

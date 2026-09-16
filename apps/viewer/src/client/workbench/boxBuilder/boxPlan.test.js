@@ -9,6 +9,7 @@ import {
   connectorHole,
   defaultBoxSpec,
   lidScrewPoints,
+  lidScrewSink,
   newHole,
   newStandoffGroup,
   normalizeBoxSpec,
@@ -143,9 +144,9 @@ test("lid screws: corner bosses hang from the wall top, and the lid and its lip 
   const { base, lid } = buildBoxPlan(spec);
   // Inside 96 x 66 with 2 mm inner corners: a 7 mm boss touches both walls, 0.3 mm into them.
   const points = lidScrewPoints(dims);
-  assert.deepEqual(points, [[44.8, 29.8], [-44.8, 29.8], [-44.8, -29.8], [44.8, -29.8]]);
+  assert.deepEqual(points.map(({ x, y }) => [x, y]), [[44.8, 29.8], [-44.8, 29.8], [-44.8, -29.8], [44.8, -29.8]]);
   const posts = findNodes(base, (node) => node.type === "cyl" && node.r === 3.5);
-  assert.deepEqual(posts.map((post) => [post.pos, post.h]), points.map(([x, y]) => [[x, y, 24], 8]));
+  assert.deepEqual(posts.map((post) => [post.pos, post.h]), points.map(({ x, y }) => [[x, y, 24], 8]));
   // The pilot holes run the boss's 8 mm and 1 mm past its top.
   assert.equal(findNodes(base, (node) => node.type === "cyl" && node.r === 1.25 && node.h === 9).length, 4, "a pilot hole in each");
   const narrowest = findNodes(base, (node) => node.type === "cyl" && node.r === 0.5);
@@ -156,6 +157,34 @@ test("lid screws: corner bosses hang from the wall top, and the lid and its lip 
   assert.deepEqual(boxSpecWarnings(spec), []);
   const tiny = normalizeBoxSpec({ ...spec, base: { ...spec.base, width: 20, depth: 20, radius: 2 }, lid: { ...spec.lid, screwDiameter: 12 } });
   assert.ok(boxSpecWarnings(tiny).some((warning) => warning.key === "warning.lidScrewsTight"));
+});
+
+test("a lid screw can be moved along a wall, sunk into it, or stood free of it", () => {
+  const defaults = defaultBoxSpec();
+  const screwed = (lid) => normalizeBoxSpec({ ...defaults, lid: { ...defaults.lid, screws: true, screwDepth: 8, ...lid } });
+  const postOf = (spec) => findNodes(buildBoxPlan(spec).base, (node) => node.type === "cyl" && node.r === 3.5);
+  const lidHoleOf = (spec) => findNodes(buildBoxPlan(spec).lid, (node) => node.type === "cyl" && node.r === 1.7);
+
+  // Against the right wall, halfway along it, sunk 1.2 mm into the 2 mm wall.
+  const sunk = screwed({ screwInset: 1.2, screwPoints: [{ id: "screw-1", x: 45, y: 0 }] });
+  const sunkDims = boxDimensions(sunk);
+  assert.equal(lidScrewSink(sunkDims, lidScrewPoints(sunkDims)[0]), 1.2);
+  assert.deepEqual(postOf(sunk).map((post) => post.pos), [[46, 0, 24]], "against the wall at 44.8, sunk to 46");
+  assert.deepEqual(lidHoleOf(sunk).map((hole) => hole.pos), [[46, 0, 31]], "the hole in the lid follows");
+  assert.deepEqual(boxSpecWarnings(sunk), []);
+
+  // Asking for more than the wall has leaves the boss inside the box and says so.
+  const deep = screwed({ screwInset: 5, screwPoints: [{ id: "screw-1", x: 45, y: 0 }] });
+  assert.deepEqual(postOf(deep).map((post) => post.pos), [[46.5, 0, 24]], "50 mm to the outside, less the 3.5 radius");
+  assert.deepEqual(boxSpecWarnings(deep), [{ key: "warning.lidScrewInset", params: { n: 1, sink: 1.7 } }]);
+
+  // Clear of every wall: nothing to hang from, so the boss reaches the floor.
+  const free = screwed({ screwPoints: [{ id: "screw-1", x: 0, y: 0 }] });
+  assert.deepEqual(
+    postOf(free).map((post) => [post.pos, post.h]),
+    [[[0, 0, 24], 8], [[0, 0, 1.99], 22.01]]
+  );
+  assert.deepEqual(boxSpecWarnings(free), [{ key: "warning.lidScrewFree", params: { n: 1 } }]);
 });
 
 test("warnings name standoffs outside the floor", () => {
