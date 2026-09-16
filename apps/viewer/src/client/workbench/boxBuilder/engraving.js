@@ -38,40 +38,59 @@ function lineDistance(point, start, end) {
   return Math.abs(dy * (point[0] - start[0]) - dx * (point[1] - start[1])) / length;
 }
 
-// Ramer-Douglas-Peucker: drop the points that say nothing about the shape.
+// Before thinning, a contour walked in tiny steps is cut down to this many points:
+// the shape survives, and the thinning has a bounded amount of work to do.
+const PRE_THIN_POINTS = 600;
+
+// Ramer-Douglas-Peucker, kept to a stack of its own: a contour of thousands of
+// points would otherwise recurse deep enough to matter.
 function thin(points, tolerance) {
   if (points.length < 3) {
     return points;
   }
-  let worst = 0;
-  let index = 0;
-  for (let step = 1; step < points.length - 1; step += 1) {
-    const distance = lineDistance(points[step], points[0], points[points.length - 1]);
-    if (distance > worst) {
-      worst = distance;
-      index = step;
+  const keep = new Array(points.length).fill(false);
+  keep[0] = true;
+  keep[points.length - 1] = true;
+  const spans = [[0, points.length - 1]];
+  while (spans.length) {
+    const [from, to] = spans.pop();
+    let worst = 0;
+    let index = -1;
+    for (let step = from + 1; step < to; step += 1) {
+      const distance = lineDistance(points[step], points[from], points[to]);
+      if (distance > worst) {
+        worst = distance;
+        index = step;
+      }
+    }
+    if (index > 0 && worst > tolerance) {
+      keep[index] = true;
+      spans.push([from, index], [index, to]);
     }
   }
-  if (worst <= tolerance) {
-    return [points[0], points[points.length - 1]];
+  return points.filter((_, index) => keep[index]);
+}
+
+// Every nth point, so a long walk starts from something the thinning can chew.
+function decimate(points, limit) {
+  if (points.length <= limit) {
+    return points;
   }
-  return [
-    ...thin(points.slice(0, index + 1), tolerance).slice(0, -1),
-    ...thin(points.slice(index), tolerance)
-  ];
+  return Array.from({ length: limit }, (_, index) => points[Math.round((index * (points.length - 1)) / (limit - 1))]);
 }
 
 // A closed contour with at most `limit` points: thinned harder until it fits.
 export function simplifyContour(points, tolerance, limit = MAX_CONTOUR_POINTS) {
-  let kept = thin(points, tolerance);
+  const walked = decimate(points, PRE_THIN_POINTS);
+  let kept = thin(walked, tolerance);
   let step = tolerance || 1e-3;
   while (kept.length > limit && step < 1e6) {
     step *= 1.6;
-    kept = thin(points, step);
+    kept = thin(walked, step);
   }
   if (kept.length > limit) {
     // Evenly spaced, as a last resort.
-    kept = Array.from({ length: limit }, (_, index) => points[Math.round((index * (points.length - 1)) / (limit - 1))]);
+    kept = decimate(walked, limit);
   }
   return kept.map(([x, y]) => [round(x), round(y)]);
 }

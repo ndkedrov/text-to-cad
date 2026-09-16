@@ -8,8 +8,19 @@ import { MAX_CONTOUR_POINTS, MAX_ENGRAVING_CONTOURS, MAX_ENGRAVING_POINTS, conto
 // How finely a shape is walked before it is simplified, and what counts as the
 // jump from the end of one subpath to the start of the next.
 const SAMPLE_STEP = 0.4;
-const MAX_SAMPLES = 4000;
+const MAX_SAMPLES = 800;
 const JUMP = 6;
+// A drawing is read on the page's own thread, so the work is bounded on every
+// side: a crowded file would otherwise walk millions of points and the browser
+// would sit there, looking hung.
+const MAX_FILE_BYTES = 2 * 1024 * 1024;
+const MAX_SHAPES = 300;
+const MAX_TOTAL_SAMPLES = 40000;
+const TIME_BUDGET_MS = 2500;
+// How often the walk stops to let the page draw.
+const SHAPES_PER_BREATH = 12;
+
+const pause = () => new Promise((resolve) => { setTimeout(resolve, 0); });
 
 export class EngravingError extends Error {}
 
@@ -32,12 +43,12 @@ function viewportSize(svg) {
 // Every shape the drawing fills, walked into contours. A shape with several
 // subpaths (a letter with a counter, a logo of separate marks) breaks where the
 // pen jumps.
-function sampleShape(shape, matrix) {
+function sampleShape(shape, matrix, budget = MAX_SAMPLES) {
   const length = shape.getTotalLength();
   if (!Number.isFinite(length) || length <= 0) {
     return [];
   }
-  const step = Math.max(length / MAX_SAMPLES, SAMPLE_STEP);
+  const step = Math.max(length / Math.max(Math.min(MAX_SAMPLES, budget), 1), SAMPLE_STEP);
   const contours = [];
   let current = [];
   let previous = null;
@@ -67,9 +78,12 @@ function isFilled(element, window) {
 
 // Reads an SVG file into { name, width, height, contours } for engraving.js.
 // Needs a document to lay the drawing out in, so this runs in the browser only.
-export function drawingFromSvg(text, { name = "", documentRef = globalThis.document, windowRef = globalThis.window } = {}) {
+export async function drawingFromSvg(text, { name = "", documentRef = globalThis.document, windowRef = globalThis.window } = {}) {
   if (!documentRef || !windowRef) {
     throw new EngravingError("no-browser");
+  }
+  if (String(text).length > MAX_FILE_BYTES) {
+    throw new EngravingError("too-complex");
   }
   const parsed = new windowRef.DOMParser().parseFromString(String(text), "image/svg+xml");
   if (parsed.querySelector("parsererror") || parsed.documentElement?.tagName?.toLowerCase() !== "svg") {
@@ -85,16 +99,29 @@ export function drawingFromSvg(text, { name = "", documentRef = globalThis.docum
   try {
     const size = viewportSize(svg);
     const root = svg.getCTM ? svg.getCTM() : null;
-    const shapes = [...svg.querySelectorAll("path,rect,circle,ellipse,polygon,polyline,line")];
+    const shapes = [...svg.querySelectorAll("path,rect,circle,ellipse,polygon,polyline,line")].slice(0, MAX_SHAPES);
     const walked = [];
+    const deadline = Date.now() + TIME_BUDGET_MS;
+    let samples = MAX_TOTAL_SAMPLES;
+    let shapeIndex = 0;
     for (const shape of shapes) {
+      shapeIndex += 1;
+      if (samples <= 0 || Date.now() > deadline) {
+        break;
+      }
+      if (shapeIndex % SHAPES_PER_BREATH === 0) {
+        // Let the page draw: this runs where the user is waiting.
+        await pause();
+      }
       if (typeof shape.getTotalLength !== "function" || !isFilled(shape, windowRef)) {
         continue;
       }
       const matrix = shape.getCTM ? shape.getCTM() : null;
       // Back out the viewport's own transform: the drawing keeps its own units.
       const local = matrix && root ? root.inverse().multiply(matrix) : matrix;
-      walked.push(...sampleShape(shape, local));
+      const contours = sampleShape(shape, local, samples);
+      samples -= contours.reduce((total, points) => total + points.length, 0);
+      walked.push(...contours);
     }
     if (!walked.length) {
       throw new EngravingError("nothing-filled");
