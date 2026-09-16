@@ -3,6 +3,8 @@
 // The box's outer footprint is centred on the origin, X to the right, Y to the
 // back, and its bottom sits on z = 0.
 
+import { engravingIslands, normalizeEngraving } from "./engraving.js";
+
 export const BOX_SPEC_VERSION = 1;
 
 export const HOLE_FACES = Object.freeze(["floor", "front", "back", "left", "right", "lid"]);
@@ -111,6 +113,8 @@ export function defaultBoxSpec() {
       screwHole: 3.4,
       // How far a boss sinks into the wall it stands against.
       screwInset: 0,
+      // A drawing cut into the top of the lid (engraving.js), or null.
+      engraving: null,
       // Empty: one in each inner corner, following them as the box changes.
       screwPoints: []
     },
@@ -557,6 +561,7 @@ export function normalizeBoxSpec(raw) {
     screwPilot: numberIn(sourceLid.screwPilot, defaults.lid.screwPilot, 0.5, screwDiameter - 2),
     screwHole: numberIn(sourceLid.screwHole, defaults.lid.screwHole, 0.5, screwDiameter),
     screwInset: numberIn(sourceLid.screwInset, defaults.lid.screwInset, 0, walls.thickness),
+    engraving: normalizeEngraving(sourceLid.engraving),
     screwPoints: (Array.isArray(sourceLid.screwPoints) ? sourceLid.screwPoints : [])
       .slice(0, MAX_LID_SCREWS)
       .map((raw) => {
@@ -960,6 +965,19 @@ export function boxSpecWarnings(spec) {
         warnings.push({ key: "warning.lidScrewInset", params: { n, sink: roundMm(lidScrewSink(dims, point), 2) } });
       }
     });
+  }
+  if (spec.lid.engraving && dims.lidEnabled) {
+    const engraving = spec.lid.engraving;
+    const islands = engravingIslands(engraving);
+    if (islands.flatMap((island) => [island.outline, ...island.holes]).flat().some(([x, y]) => (
+      Math.abs(x) > dims.width / 2 + 1e-6 || Math.abs(y) > dims.depth / 2 + 1e-6
+    ))) {
+      warnings.push({ key: "warning.engravingOutside", params: {} });
+    }
+    // Cut through, the middle of a ring (a letter "O", say) has nothing holding it.
+    if (engraving.depth >= dims.lidThickness - 1e-9 && islands.some((island) => island.holes.length)) {
+      warnings.push({ key: "warning.engravingLoose", params: {} });
+    }
   }
   spec.standoffs.forEach((group, index) => {
     const n = index + 1;

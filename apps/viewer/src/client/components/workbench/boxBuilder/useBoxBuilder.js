@@ -196,7 +196,8 @@ export function useBoxBuilder() {
   const warnings = useMemo(() => {
     const list = boxSpecWarnings(spec);
     // The saved lid is turned over for printing: one more node than the preview's.
-    const nodes = countPlanNodes(plan.base) + countPlanNodes(plan.lid) + (plan.lid ? 1 : 0);
+    const nodes = countPlanNodes(plan.base) + countPlanNodes(plan.lid) + (plan.lid ? 1 : 0)
+      + countPlanNodes(plan.inlay) + (plan.inlay ? 1 : 0);
     if (nodes > PLAN_NODE_LIMIT) {
       list.push({ key: "warning.tooComplex", params: { count: nodes, limit: PLAN_NODE_LIMIT } });
     }

@@ -31,6 +31,8 @@ import { useBoxLanguage } from "./useBoxLanguage";
 
 const BASE_COLOR = 0xc3cad1;
 const LID_COLOR = 0x93b4cc;
+// The engraving's filling, when it is a part of its own.
+const INLAY_COLOR = 0xe0a33c;
 const EDGE_COLOR = 0x1f252b;
 const HIGHLIGHT_COLOR = 0xf97316;
 const BOARD_COLOR = 0x2f8f5b;
@@ -215,7 +217,7 @@ function replacePartMesh(runtime, part, geometry) {
     return;
   }
   const mesh = new THREE.Mesh(geometry, addMillimetreGrid(new THREE.MeshStandardMaterial({
-    color: part === "base" ? BASE_COLOR : LID_COLOR,
+    color: part === "base" ? BASE_COLOR : part === "inlay" ? INLAY_COLOR : LID_COLOR,
     roughness: 0.78,
     metalness: 0,
     polygonOffset: true,
@@ -592,6 +594,8 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
       baseEdges: null,
       lidMesh: null,
       lidEdges: null,
+      inlayMesh: null,
+      inlayEdges: null,
       baseProxies: null,
       lidProxies: null,
       boardVisuals: null,
@@ -902,6 +906,7 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
       try {
         replacePartMesh(runtime, "base", plan.base ? geometryFromPlan(wasm, plan.base) : null);
         replacePartMesh(runtime, "lid", plan.lid ? geometryFromPlan(wasm, plan.lid) : null);
+        replacePartMesh(runtime, "inlay", plan.inlay ? geometryFromPlan(wasm, plan.inlay) : null);
         setBuildError("");
       } catch (error) {
         setBuildError(String(error?.message || error));
