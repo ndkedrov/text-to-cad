@@ -1,18 +1,18 @@
 // Box builder: an engraving cut into the top of the lid. A drawing arrives as
 // closed contours in its own units (SVG's, Y pointing down); the box keeps those
 // contours, where they sit on the lid and how deep they are cut, so both geometry
-// engines build the same thing and no SVG has to be parsed again.
+// engines build the same thing and no SVG has to be parsed again. A drawing made
+// of lines rather than filled shapes is turned into the contours the pen covers
+// while it is read (engravingImport.js).
 //
-// The plan grammar holds the limits: a polygon takes at most 64 points and a plan
-// 2000 of them, so contours are simplified when they come in.
+// The plan grammar holds the limits: a polygon takes at most 400 points and a
+// plan 6000 of them, so contours are simplified when they come in.
 
 export const ENGRAVING_MODES = Object.freeze(["cut", "inlay"]);
 export const MAX_ENGRAVING_CONTOURS = 80;
 export const MAX_CONTOUR_POINTS = 400;
 // The plan grammar allows 6000 polygon points in all; the rest is for the box.
 export const MAX_ENGRAVING_POINTS = 4000;
-// A groove whose outline cannot be drawn at all is cut as rounded slots instead,
-// one per step along its line; every slot is a node of the plan, which holds 1000.
 // The smallest contour worth cutting, in the drawing's own units.
 const MIN_CONTOUR_SPAN = 1e-6;
 
@@ -98,104 +98,6 @@ export function simplifyContour(points, tolerance, limit = MAX_CONTOUR_POINTS) {
   return kept.map(([x, y]) => [round(x), round(y)]);
 }
 
-// --- the outline of a drawn line -------------------------------------------------
-
-// Where two segments cross, if they do.
-function crossing(a1, a2, b1, b2) {
-  const ax = a2[0] - a1[0];
-  const ay = a2[1] - a1[1];
-  const bx = b2[0] - b1[0];
-  const by = b2[1] - b1[1];
-  const denominator = ax * by - ay * bx;
-  if (Math.abs(denominator) < 1e-12) {
-    return null;
-  }
-  const along = ((b1[0] - a1[0]) * by - (b1[1] - a1[1]) * bx) / denominator;
-  const other = ((b1[0] - a1[0]) * ay - (b1[1] - a1[1]) * ax) / denominator;
-  if (along <= 1e-9 || along >= 1 - 1e-9 || other <= 1e-9 || other >= 1 - 1e-9) {
-    return null;
-  }
-  return [a1[0] + ax * along, a1[1] + ay * along];
-}
-
-// An offset line loops back on itself on the inside of a tight bend. Each loop is
-// cut out at the crossing, which is what a pen would have covered anyway.
-function withoutLoops(points, closed) {
-  let kept = points;
-  for (let pass = 0; pass < 200 && kept.length > 3; pass += 1) {
-    let cut = null;
-    const last = closed ? kept.length : kept.length - 1;
-    for (let first = 0; first < last && !cut; first += 1) {
-      const firstEnd = kept[(first + 1) % kept.length];
-      for (let second = first + 2; second < last; second += 1) {
-        if (closed && first === 0 && second === kept.length - 1) {
-          continue;
-        }
-        const point = crossing(kept[first], firstEnd, kept[second], kept[(second + 1) % kept.length]);
-        if (point) {
-          cut = { first, second, point };
-          break;
-        }
-      }
-    }
-    if (!cut) {
-      return kept;
-    }
-    kept = [...kept.slice(0, cut.first + 1), cut.point, ...kept.slice(cut.second + 1)];
-  }
-  return kept;
-}
-
-// A line's outward normals, one per point: the average of the two steps meeting
-// there, so an offset follows the line round its bends.
-function normalsAlong(points, closed) {
-  return points.map((point, index) => {
-    const before = closed ? points[(index - 1 + points.length) % points.length] : points[Math.max(index - 1, 0)];
-    const after = closed ? points[(index + 1) % points.length] : points[Math.min(index + 1, points.length - 1)];
-    const dx = after[0] - before[0];
-    const dy = after[1] - before[1];
-    const length = Math.hypot(dx, dy) || 1;
-    return [dy / length, -dx / length];
-  });
-}
-
-// The outline of a line drawn `width` thick, as the shapes to cut: a closed line
-// gives its outer edge and the hole inside it, an open one a single shape that
-// runs up one side and back down the other. Returns null when the line bends
-// tighter than the pen is wide and no honest outline comes out, which is when the
-// groove is cut as slots instead.
-export function strokeOutline(points, width, closed) {
-  if (points.length < 2 || !(width > 0)) {
-    return null;
-  }
-  const normals = normalsAlong(points, closed);
-  const side = (distance) => points.map(([x, y], index) => [
-    round(x + normals[index][0] * distance, 4),
-    round(y + normals[index][1] * distance, 4)
-  ]);
-  // A prism is built on a contour that runs counter-clockwise; which side of the
-  // line is the outer one depends on which way the line itself was drawn.
-  const forward = (points) => (contourArea(points) < 0 ? [...points].reverse() : points);
-  if (!closed) {
-    const outline = withoutLoops([...side(width / 2), ...side(-width / 2).reverse()], true);
-    return outline.length >= 3 && Math.abs(contourArea(outline)) > width * width * 0.1
-      ? { outline: forward(outline), hole: null }
-      : null;
-  }
-  const sides = [withoutLoops(side(width / 2), true), withoutLoops(side(-width / 2), true)];
-  const areaOf = (points) => (points.length >= 3 ? Math.abs(contourArea(points)) : 0);
-  const [wide, narrow] = areaOf(sides[0]) >= areaOf(sides[1]) ? sides : [sides[1], sides[0]];
-  if (areaOf(wide) < width * width * 0.2) {
-    return null;
-  }
-  // Where the line rings something wider than the pen, the middle stays; where it
-  // does not, the pen has covered the middle and the whole shape is cut.
-  const hole = areaOf(narrow) > width * width && areaOf(wide) - areaOf(narrow) > width * width * 0.2
-    ? forward(narrow)
-    : null;
-  return { outline: forward(wide), hole };
-}
-
 export function contourArea(points) {
   let sum = 0;
   for (let index = 0; index < points.length; index += 1) {
@@ -266,9 +168,8 @@ export function normalizeEngraving(raw) {
     budget -= kept.length;
     contours.push(kept);
   }
-  // Lines drawn with a pen rather than filled: each is cut as a groove as wide
-  // as the pen was. They are kept as lines, not as their outlines, because an
-  // outline that turns sharply crosses itself and the kernel refuses the part.
+  // Boxes saved before drawn lines were turned into contours keep the lines
+  // themselves; those are cut as a chain of rounded slots.
   const strokes = [];
   for (const raw of Array.isArray(source.strokes) ? source.strokes : []) {
     const line = raw && typeof raw === "object" ? raw : {};
@@ -331,22 +232,56 @@ export function engravingContours(engraving) {
   }
   const scaleX = engraving.sizeX / engraving.width;
   const scaleY = engraving.sizeY / engraving.height;
-  return engraving.contours.map((points) => {
-    const placed = points.map(([x, y]) => [
+  return engraving.contours.map((points) => points
+    .map(([x, y]) => [
       round(engraving.x + (x - engraving.width / 2) * scaleX, 4),
       round(engraving.y - (y - engraving.height / 2) * scaleY, 4)
-    ]);
-    // Turning the drawing the right way up turns its contours the wrong way round,
-    // and a prism built on a contour that runs backwards grows downwards: one
-    // engine then loses the lid, the other cuts nothing.
-    return contourArea(placed) < 0 ? placed.reverse() : placed;
-  });
+    ])
+    // Turning the drawing the right way up turns every contour the wrong way
+    // round, and which way a contour runs is what says whether it is a shape or a
+    // hole in one; walking it backwards puts that back.
+    .reverse());
 }
 
 // The contours sorted into islands: each filled outline with the contours that
 // sit inside it and are therefore holes in it, the way a letter "O" is drawn.
 export function engravingIslands(engraving) {
-  const contours = engravingContours(engraving);
+  return groupRings(engravingContours(engraving));
+}
+
+// Rings into islands. Which way a ring runs says what it is: one way round is a
+// shape, the other a hole in the smallest shape that holds it. Nesting alone
+// cannot say, since a drawing may simply have one mark inside another.
+export function groupRings(contours) {
+  // A prism stands on a ring that runs counter-clockwise, holes included: they
+  // are built as their own solids and taken away.
+  const forward = (ring) => (contourArea(ring) < 0 ? [...ring].reverse() : ring);
+  const holes = contours.filter((ring) => contourArea(ring) < 0);
+  if (!holes.length) {
+    // A drawing from before contours carried their direction: every ring ran the
+    // same way round, and nesting was all there was to go on.
+    return groupByNesting(contours);
+  }
+  const outlines = contours.filter((ring) => contourArea(ring) > 0);
+  const islands = outlines.map((outline) => ({ outline: forward(outline), holes: [] }));
+  for (const hole of holes) {
+    // A hole belongs to the smallest shape that holds it.
+    let host = null;
+    for (const island of islands) {
+      if (pointInContour(hole[0], island.outline)) {
+        if (!host || Math.abs(contourArea(island.outline)) < Math.abs(contourArea(host.outline))) {
+          host = island;
+        }
+      }
+    }
+    host?.holes.push(forward(hole));
+  }
+  return islands;
+}
+
+// Kept for boxes saved before a drawing's contours carried their direction: there
+// every ring ran the same way round, so nesting was all there was to go on.
+function groupByNesting(contours) {
   const nesting = contours.map((points, index) => contours.reduce((depth, other, otherIndex) => (
     otherIndex !== index && pointInContour(points[0], other) ? depth + 1 : depth
   ), 0));

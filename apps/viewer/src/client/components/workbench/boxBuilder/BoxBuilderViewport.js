@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import manifoldWasmUrl from "manifold-3d/manifold.wasm?url";
+import { loadManifold } from "@/workbench/boxBuilder/manifoldRuntime.js";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/ui/utils";
 import { formatWarning } from "@/workbench/boxBuilder/i18n.js";
@@ -65,23 +65,6 @@ const LID_VIEW_OPTIONS = [
   ["hidden", "lid.hidden"]
 ];
 
-let manifoldPromise = null;
-
-function loadManifold() {
-  if (!manifoldPromise) {
-    manifoldPromise = import("manifold-3d")
-      .then(async ({ default: Module }) => {
-        const wasm = await Module({ locateFile: () => manifoldWasmUrl });
-        wasm.setup();
-        return wasm;
-      })
-      .catch((error) => {
-        manifoldPromise = null;
-        throw error;
-      });
-  }
-  return manifoldPromise;
-}
 
 function formatMm(value) {
   return String(Number(Number(value).toFixed(2)));
