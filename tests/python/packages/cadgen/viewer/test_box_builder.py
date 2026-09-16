@@ -178,6 +178,19 @@ class SavingABox(BuilderTestCase):
         self.assertEqual([path.name for path in folder.iterdir() if path.name.endswith(".tmp")], [])
         self.assertFalse(self.runner.calls[0]["ephemeral_cache"])
 
+    def test_an_inlay_is_written_together_with_the_lid_it_fills(self):
+        self.save(name="inlaid", plan={"base": BASE, "lid": LID, "inlay": BASE})
+        source = (self.root / "boxes" / "inlaid" / "inlaid_inlay.py").read_text(encoding="utf-8")
+        # One model of two coloured bodies, so a slicer opens both in their places.
+        self.assertIn("HOLDER_PLAN", source)
+        self.assertIn("bd.Compound(children=[holder, piece])", source)
+        self.assertIn('piece.label = "inlay"', source)
+        self.assertIn('holder.label = "lid"', source)
+        compile(source, "inlaid_inlay.py", "exec")
+        # The lid on its own says nothing of the inlay.
+        lid_source = (self.root / "boxes" / "inlaid" / "inlaid_lid.py").read_text(encoding="utf-8")
+        self.assertNotIn("HOLDER_PLAN", lid_source)
+
     def test_the_generated_script_compiles_and_names_a_valid_model(self):
         self.save(name="2-part")
         source = (self.root / "boxes" / "2-part" / "2-part_base.py").read_text(encoding="utf-8")
