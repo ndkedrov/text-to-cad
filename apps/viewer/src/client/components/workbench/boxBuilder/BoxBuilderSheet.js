@@ -1496,7 +1496,7 @@ function FileTab({ builder, onOpenFile, hosted = false }) {
     setError(null);
     try {
       const plan = buildBoxPlan(spec, { layout: "print" });
-      const payload = await saveBox(name, { spec, plan: { base: plan.base, lid: plan.lid } });
+      const payload = await saveBox(name, { spec, plan: { base: plan.base, lid: plan.lid, inlay: plan.inlay } });
       setStatus(payload);
       if (payload?.quota) {
         setQuota(payload.quota);

@@ -153,28 +153,65 @@ def _function_name(name: str, part: str) -> str:
     return f"{identifier}_{part}"
 
 
-def script_source(name: str, part: str, node: dict) -> str:
-    """The model script for one part: the plan as a literal, built by cadgen.box_csg."""
+def script_source(name: str, part: str, node: dict, held_by: dict | None = None) -> str:
+    """The model script for one part: the plan as a literal, built by cadgen.box_csg.
+
+    ``held_by`` is the part this one sits inside -- the lid an inlay fills. The two
+    are then written as one model of two coloured bodies, so the 3MF a slicer opens
+    holds both, each ready for its own filament.
+    """
     function = _function_name(name, part)
     plan = pprint.pformat(node, width=100, sort_dicts=False)
-    return (
+    header = (
         f'"""{GENERATED_MARKER}: box "{name}", part "{part}".\n'
         "\n"
         "Edit the box in the viewer's box builder; saving there rewrites this file.\n"
         "PLAN is the geometry in cadgen.box_plan's grammar.\n"
         '"""\n'
         "\n"
+    )
+    if held_by is None:
+        return (
+            header
+            + "from cadgen import step, stl, threemf\n"
+            "from cadgen.box_csg import shape_from_plan\n"
+            "\n"
+            f"PLAN = {plan}\n"
+            "\n"
+            "\n"
+            "@threemf\n"
+            "@stl\n"
+            "@step\n"
+            f"def {function}():\n"
+            "    return shape_from_plan(PLAN)\n"
+            "\n"
+            "\n"
+            'if __name__ == "__main__":\n'
+            f"    {function}()\n"
+        )
+    holder = pprint.pformat(held_by["plan"], width=100, sort_dicts=False)
+    return (
+        header
+        + "from cadgen import build123d as bd\n"
         "from cadgen import step, stl, threemf\n"
         "from cadgen.box_csg import shape_from_plan\n"
         "\n"
         f"PLAN = {plan}\n"
+        "\n"
+        f"HOLDER_PLAN = {holder}\n"
         "\n"
         "\n"
         "@threemf\n"
         "@stl\n"
         "@step\n"
         f"def {function}():\n"
-        "    return shape_from_plan(PLAN)\n"
+        "    piece = shape_from_plan(PLAN)\n"
+        "    holder = shape_from_plan(HOLDER_PLAN)\n"
+        f'    piece.label = "{part}"\n'
+        f'    holder.label = "{held_by["part"]}"\n'
+        "    piece.color = bd.Color(0.95, 0.65, 0.15)\n"
+        "    holder.color = bd.Color(0.78, 0.82, 0.86)\n"
+        "    return bd.Compound(children=[holder, piece])\n"
         "\n"
         "\n"
         'if __name__ == "__main__":\n'
@@ -634,7 +671,14 @@ class BoxBuilder:
                         self._remove_part(directory, name, part)
                         continue
                     script = directory / f"{name}_{part}.py"
-                    _write_text(script, script_source(name, part, node))
+                    # An inlay is written together with the lid it fills, so one
+                    # file holds both bodies, each in its own colour.
+                    held_by = (
+                        {"part": "lid", "plan": plan["lid"]}
+                        if part == "inlay" and plan.get("lid") is not None
+                        else None
+                    )
+                    _write_text(script, script_source(name, part, node, held_by))
                     scripts.append((part, script))
                 if key is not None:
                     self._quota.record(key, new_box=is_new)
