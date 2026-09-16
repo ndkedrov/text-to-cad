@@ -112,7 +112,8 @@ test("the dual USB-C ESP32-S3 rests on two ribs and a T piece next to the box cl
   const ribs = findNodes(base, (node) => node.type === "rrect" && node.w === 22 && node.d === 4);
   assert.deepEqual(ribs.map((rib) => [rib.pos, rib.h]), [[[0, -37, 1.99], 2.01], [[0, 20, 1.99], 2.01]]);
   const posts = findNodes(base, (node) => node.type === "cyl" && node.r === 2.5 && node.h === 14.01);
-  assert.deepEqual(posts.map((post) => post.pos), [[-15.7, -12.5, 1.99], [15.7, -12.5, 1.99]]);
+  // Beside the board's long sides: half its 25.4 width, the 1 mm gap and half a 5 mm post.
+  assert.deepEqual(posts.map((post) => post.pos), [[-16.2, -12.5, 1.99], [16.2, -12.5, 1.99]]);
   // The posts slide along the board: 20 mm from the USB end instead of halfway.
   const moved = mounted("esp32S3DevkitC", (draft) => {
     draft.base.width = 120;
@@ -120,14 +121,14 @@ test("the dual USB-C ESP32-S3 rests on two ribs and a T piece next to the box cl
   });
   moved.boards[0].clampOffset = 20;
   const movedPosts = findNodes(buildBoxPlan(moved).base, (node) => node.type === "cyl" && node.r === 2.5 && node.h === 14.01);
-  assert.deepEqual(movedPosts.map((post) => post.pos), [[-15.7, -27, 1.99], [15.7, -27, 1.99]]);
+  assert.deepEqual(movedPosts.map((post) => post.pos), [[-16.2, -27, 1.99], [16.2, -27, 1.99]]);
   const tee = findNodes(base, (node) => node.type === "poly" && node.h === CLAMP_DEPTH);
   assert.equal(tee.length, 1);
   // Bar 3 mm plus a stem from the 14 mm post tops down to the board top at 3.6 mm.
   assert.equal(Math.max(...tee[0].points.map(([x]) => x)), 13.4);
-  assert.deepEqual(tee[0].points.map(([, y]) => y).filter((y) => y > 0).sort((a, b) => a - b), [2, 2, 18.2, 18.2]);
+  assert.deepEqual(tee[0].points.map(([, y]) => y).filter((y) => y > 0).sort((a, b) => a - b), [2, 2, 18.7, 18.7]);
   const screwHoles = findNodes(base, (node) => node.type === "cyl" && node.r === 1.4);
-  assert.deepEqual(screwHoles.map((hole) => hole.pos), [[-1, -15.7, 5], [-1, 15.7, 5]]);
+  assert.deepEqual(screwHoles.map((hole) => hole.pos), [[-1, -16.2, 5], [-1, 16.2, 5]]);
   assert.deepEqual(clampPieces(spec, boxDimensions(spec)).map((piece) => piece.x), [65]);
   assert.deepEqual(boxSpecWarnings(spec), []);
 });

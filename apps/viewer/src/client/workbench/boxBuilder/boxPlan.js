@@ -9,6 +9,7 @@ import {
   boardClampSpan,
   boardHolePoints,
   boardPortCutout,
+  boardRailHeight,
   boardRailRect,
   boxDimensions,
   clampStemLength,
@@ -170,25 +171,27 @@ function boardStandoffNodes(board, dims) {
   );
 }
 
-// Ribs under a mounted board, as tall as its clearance: it rests on them.
+// Ribs under a mounted board: as tall as its clearance unless the rib says
+// otherwise, so the board rests on them.
 function boardRailNodes(board, dims) {
-  if (board.clearance <= 0) {
-    return [];
-  }
   return (board.rails || []).map((rail) => {
+    const height = boardRailHeight(board, rail);
+    if (height <= 0) {
+      return null;
+    }
     const rect = boardRailRect(board, rail);
-    return roundedPrism(rect.sizeX, rect.sizeY, board.clearance + FUSE_OVERLAP, 0, {
+    return roundedPrism(rect.sizeX, rect.sizeY, height + FUSE_OVERLAP, 0, {
       rot: [0, 0, board.rotation],
       pos: [rect.x, rect.y, dims.floorTop - FUSE_OVERLAP]
     });
-  });
+  }).filter(Boolean);
 }
 
 // The screw posts a clamped board's T piece is screwed onto.
 function boardClampPostNodes(board, dims) {
   return padNodes(
     boardClampPostPoints(board),
-    { outerDiameter: board.padDiameter, holeDiameter: board.boreDiameter, height: board.clampHeight },
+    { outerDiameter: board.clampDiameter, holeDiameter: board.clampBore, height: board.clampHeight },
     dims
   );
 }
@@ -209,7 +212,7 @@ export function clampPieces(spec, dims) {
     .map((board) => {
       const span = boardClampSpan(board);
       const stem = Math.max(clampStemLength(board), 0);
-      const piece = { board, x, span, length: span + board.padDiameter, stem, width: CLAMP_BAR + stem };
+      const piece = { board, x, span, length: span + board.clampDiameter, stem, width: CLAMP_BAR + stem };
       x += piece.width + CLAMP_PRINT_GAP;
       return piece;
     });
@@ -227,7 +230,7 @@ function clampPieceNode(piece) {
     ? [[0, -half], [CLAMP_BAR, -half], [CLAMP_BAR, -stemHalf], [tip, -stemHalf], [tip, stemHalf], [CLAMP_BAR, stemHalf], [CLAMP_BAR, half], [0, half]]
     : [[0, -half], [CLAMP_BAR, -half], [CLAMP_BAR, half], [0, half]];
   const body = { type: "poly", points: points.map(([x, y]) => [tidy(x), tidy(y)]), h: CLAMP_DEPTH };
-  const screw = board.boreDiameter > 0 ? Math.min(board.boreDiameter + CLAMP_SCREW_PLAY, CLAMP_DEPTH - 2) : 0;
+  const screw = board.clampBore > 0 ? Math.min(board.clampBore + CLAMP_SCREW_PLAY, CLAMP_DEPTH - 2) : 0;
   const holes = screw > 0
     ? [-1, 1].map((side) => cylinder(screw / 2, CLAMP_BAR + 2 * CUT_MARGIN, {
       rot: [0, 90, 0],

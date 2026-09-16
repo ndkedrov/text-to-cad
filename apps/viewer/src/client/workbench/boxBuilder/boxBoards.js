@@ -81,7 +81,8 @@ export function newBoard(spec, preset = null) {
       id: `rail-${index + 1}`,
       offset: rail.offset,
       length: rail.length,
-      thickness: rail.thickness
+      thickness: rail.thickness,
+      height: rail.height
     })),
     mounted: false,
     x: 0,
@@ -109,7 +110,7 @@ function normalizedBoard(board) {
 // What a board takes from its template; where it sits in the box is its own.
 const TEMPLATE_FIELDS = Object.freeze([
   "name", "width", "length", "thickness", "clearance", "componentHeight", "padDiameter", "boreDiameter",
-  "clamp", "clampHeight", "clampOffset"
+  "clamp", "clampHeight", "clampOffset", "clampDiameter", "clampBore", "clampGap"
 ]);
 const PORT_FIELDS = Object.freeze(["type", "edge", "offset", "elevation", "shape", "width", "height", "radius", "overhang", "margin"]);
 
@@ -119,7 +120,7 @@ export function boardTemplateStamp(board) {
     TEMPLATE_FIELDS.map((key) => board[key]),
     board.holes.map((hole) => [hole.x, hole.y, hole.diameter]),
     board.ports.map((entry) => PORT_FIELDS.map((key) => entry[key])),
-    (board.rails || []).map((rail) => [rail.offset, rail.length, rail.thickness])
+    (board.rails || []).map((rail) => [rail.offset, rail.length, rail.thickness, rail.height])
   ]);
   let hash = 0x811c9dc5;
   for (let index = 0; index < text.length; index += 1) {
@@ -213,7 +214,9 @@ export function newBoardRail(board) {
     id: nextId("rail", board.rails),
     offset: roundMm(long / 2 - 2, 2),
     length: roundMm(Math.max(across - 2, 1), 2),
-    thickness: 4
+    thickness: 4,
+    // 0: as tall as the board's gap to the floor.
+    height: 0
   };
 }
 

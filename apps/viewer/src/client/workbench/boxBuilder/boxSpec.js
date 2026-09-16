@@ -33,8 +33,8 @@ export const MAX_LID_SCREWS = 8;
 // A board with nothing to screw it down by is clamped: a screw post beside each of
 // its long sides, halfway along, and a T piece printed next to the box that is
 // screwed onto both posts and presses the board down with its stem.
-// Space between the board edge and a post.
-export const CLAMP_POST_GAP = 0.5;
+// Room between the board's edge and a post, so a printed board still goes in.
+export const CLAMP_POST_GAP = 1;
 // How thick the T's bar is from the post top up.
 export const CLAMP_BAR = 3;
 // The shortest post a clamp starts with.
@@ -438,8 +438,15 @@ function normalizeBoardRail(raw, used, span) {
     id: uniqueId(source.id, "rail", used),
     offset: numberIn(source.offset, 0, 0, span),
     length: numberIn(source.length, 20, 1, 400),
-    thickness: numberIn(source.thickness, 4, 0.5, 50)
+    thickness: numberIn(source.thickness, 4, 0.5, 50),
+    // 0 keeps the rib as tall as the board's gap to the floor.
+    height: numberIn(source.height, 0, 0, 200)
   };
+}
+
+// How tall a rib stands: its own height, or the board's gap to the floor.
+export function boardRailHeight(board, rail) {
+  return rail.height > 0 ? rail.height : board.clearance;
 }
 
 // Clamp posts start tall enough for the T's bar to pass over the board's parts.
@@ -490,6 +497,11 @@ function normalizeBoard(raw, used) {
   board.clampHeight = numberIn(source.clampHeight, defaultClampHeight(board), 1, 200);
   // Where the posts stand along the board's long side; halfway by default.
   board.clampOffset = numberIn(source.clampOffset, roundMm(Math.max(width, length) / 2, 3), 0, Math.max(width, length));
+  // The posts have their own size; they start from the board's standoff pads.
+  board.clampDiameter = numberIn(source.clampDiameter, padDiameter, 2, 30);
+  board.clampBore = numberIn(source.clampBore, Math.min(board.boreDiameter, board.clampDiameter - 0.8), 0, board.clampDiameter - 0.8);
+  // Room between the board's edge and each post, so a printed board still goes in.
+  board.clampGap = numberIn(source.clampGap, CLAMP_POST_GAP, 0, 20);
   // The fingerprint of the template the board was last made from (boardTemplateStamp).
   board.template = typeof source.template === "string" && /^[0-9a-f]{8}$/u.test(source.template) ? source.template : "";
   return board;
@@ -804,7 +816,7 @@ export function boardRailRect(board, rail) {
 // Clamp posts in the board's own coordinates: one beside each long side, both at
 // `clampOffset` along it so the T's bar lies square across the board.
 function boardClampPostsLocal(board) {
-  const offset = CLAMP_POST_GAP + board.padDiameter / 2;
+  const offset = board.clampGap + board.clampDiameter / 2;
   const along = board.clampOffset;
   if (boardLongAxis(board) === "x") {
     return [[along, -offset], [along, board.length + offset]];
@@ -818,7 +830,12 @@ export function boardClampPostPoints(board) {
 
 // From one clamp post's centre to the other's.
 export function boardClampSpan(board) {
-  return Math.min(board.width, board.length) + 2 * (CLAMP_POST_GAP + board.padDiameter / 2);
+  return Math.min(board.width, board.length) + 2 * (board.clampGap + board.clampDiameter / 2);
+}
+
+// The clear width between the two posts: what the board has to fit through.
+export function boardClampOpening(board) {
+  return roundMm(Math.min(board.width, board.length) + 2 * board.clampGap, 3);
 }
 
 // How far the T's stem reaches down from the post tops to the board's top.
@@ -828,7 +845,7 @@ export function clampStemLength(board) {
 
 // The board's extent along the box's X and Y, clamp posts included.
 export function boardOutline(board) {
-  const reach = board.clamp ? 2 * (CLAMP_POST_GAP + board.padDiameter) : 0;
+  const reach = board.clamp ? 2 * (board.clampGap + board.clampDiameter) : 0;
   const [sizeX, sizeY] = boardLongAxis(board) === "x"
     ? [board.width, board.length + reach]
     : [board.width + reach, board.length];
@@ -999,6 +1016,11 @@ export function boxSpecWarnings(spec) {
     if (board.flipped && board.componentHeight > board.clearance + 1e-6) {
       warnings.push({ key: "warning.boardPartsBelow", params: { n }, target });
     }
+    (board.rails || []).forEach((rail, railIndex) => {
+      if (boardRailHeight(board, rail) > board.clearance + 1e-6) {
+        warnings.push({ key: "warning.railTall", params: { n, rail: railIndex + 1 }, target });
+      }
+    });
     if (board.clearance > 0 && !board.holes.length && !(board.rails || []).length) {
       warnings.push({ key: "warning.boardUnsupported", params: { n, clearance: roundMm(board.clearance, 2) }, target });
     }
