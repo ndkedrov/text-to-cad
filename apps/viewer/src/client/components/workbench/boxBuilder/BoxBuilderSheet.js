@@ -415,7 +415,7 @@ function LidTab({ builder }) {
       return;
     }
     try {
-      const drawing = drawingFromSvg(await file.text(), { name: file.name.replace(/\.svg$/iu, "") });
+      const drawing = await drawingFromSvg(await file.text(), { name: file.name.replace(/\.svg$/iu, "") });
       // It arrives sized to sit on the lid: two thirds of it at most.
       const fit = Math.min((dims.width * 2) / 3 / drawing.width, (dims.depth * 2) / 3 / drawing.height);
       edit((draft) => {

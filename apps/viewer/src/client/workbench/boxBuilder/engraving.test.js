@@ -118,6 +118,18 @@ test("filling it in another colour makes a part of its own, standing in the rece
   assert.equal(buildBoxPlan(cut).inlay, null, "a cut engraving has nothing to fill it");
 });
 
+test("a contour walked in thousands of steps is thinned without the page hanging", () => {
+  const spiral = Array.from({ length: 20000 }, (_, index) => {
+    const angle = (index / 20000) * Math.PI * 12;
+    return [angle * Math.cos(angle), angle * Math.sin(angle)];
+  });
+  const started = Date.now();
+  const kept = simplifyContour(spiral, 0.5);
+  const took = Date.now() - started;
+  assert.ok(kept.length <= MAX_CONTOUR_POINTS, `${kept.length} points`);
+  assert.ok(took < 1000, `took ${took} ms`);
+});
+
 test("a crowded drawing is thinned to what a plan can hold", () => {
   const circle = Array.from({ length: 400 }, (_, index) => {
     const angle = (index / 400) * Math.PI * 2;
