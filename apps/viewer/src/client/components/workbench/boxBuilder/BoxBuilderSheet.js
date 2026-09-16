@@ -1707,6 +1707,34 @@ export default function BoxBuilderSheet({
   const { boards: boardPresets } = useBoardPresets();
   const { spec, edit } = builder;
 
+  // An engraving from before the cut was worked out as the drawing came in: its
+  // lines become contours once, so the box stops rebuilding a chain of little
+  // slots on every load.
+  useEffect(() => {
+    const engraving = spec.lid.engraving;
+    if (!engraving?.strokes.length || engraving.contours.length) {
+      return undefined;
+    }
+    let cancelled = false;
+    grooveContoursAt(engraving.strokes, engraving.lineWidth).then(
+      (grooves) => {
+        if (cancelled || !grooves.length) {
+          return;
+        }
+        edit((draft) => {
+          const target = draft.lid.engraving;
+          if (target && !target.contours.length) {
+            target.contours = [...(target.fills || []), ...grooves];
+          }
+        });
+      },
+      () => {}
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [spec, edit]);
+
   // Boards in the box follow their templates when those change, unless edited
   // since (those offer an update in their own item). Whatever tab is open.
   useEffect(() => {

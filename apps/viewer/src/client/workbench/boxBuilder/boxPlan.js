@@ -448,7 +448,7 @@ export function buildBoxPlan(spec, { layout = "assembled" } = {}) {
 }
 
 // The polygon points a plan spends: cadgen refuses more than PLAN_POINT_LIMIT.
-export const PLAN_POINT_LIMIT = 6000;
+export const PLAN_POINT_LIMIT = 12000;
 
 export function countPlanPoints(node) {
   if (!node) {

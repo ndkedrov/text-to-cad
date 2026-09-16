@@ -10,6 +10,7 @@ import time
 import unittest
 from pathlib import Path
 
+from cadgen import box_plan
 from cadgen.box_plan import PlanError, normalize_box_plan, normalize_plan_node
 from cadgen.viewer.boxes import (
     MAX_SPEC_BYTES,
@@ -114,13 +115,16 @@ class PlanGrammar(unittest.TestCase):
         many = {"type": "union", "children": [{"type": "cyl", "r": 1, "h": 1}] * 1001}
         with self.assertRaises(PlanError):
             normalize_plan_node(many)
-        square = [[0, 0], [1, 0], [1, 1], [0, 1]]
-        # One polygon past what a polygon may hold, and then more points than a plan may.
+        # One polygon past what a polygon may hold, and then more points than a
+        # plan may; counted from the limits themselves, which move as engravings
+        # ask for more.
+        point = [0, 0]
         with self.assertRaises(PlanError):
-            normalize_plan_node({"type": "poly", "points": square * 101, "h": 1})
-        points = {"type": "union", "children": [{"type": "poly", "points": square * 100, "h": 1}] * 16}
+            normalize_plan_node({"type": "poly", "points": [point] * (box_plan._MAX_POLY_POINTS + 1), "h": 1})
+        full = {"type": "poly", "points": [point] * box_plan._MAX_POLY_POINTS, "h": 1}
+        over = box_plan._MAX_TOTAL_POINTS // box_plan._MAX_POLY_POINTS + 1
         with self.assertRaises(PlanError):
-            normalize_plan_node(points)
+            normalize_plan_node({"type": "union", "children": [full] * over})
 
     def test_a_refusal_does_not_echo_a_huge_value(self):
         with self.assertRaises(PlanError) as caught:
