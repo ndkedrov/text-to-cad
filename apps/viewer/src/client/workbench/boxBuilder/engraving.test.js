@@ -5,6 +5,7 @@ import { buildBoxPlan, engravingCutters } from "./boxPlan.js";
 import {
   MAX_CONTOUR_POINTS,
   MAX_ENGRAVING_CONTOURS,
+  MAX_ENGRAVING_POINTS,
   contourArea,
   engravingContours,
   engravingFromDrawing,
@@ -118,6 +119,37 @@ test("filling it in another colour makes a part of its own, standing in the rece
   assert.equal(buildBoxPlan(cut).inlay, null, "a cut engraving has nothing to fill it");
 });
 
+test("a line drawn with a pen is cut as a groove of rounded slots", () => {
+  const dims = boxDimensions(normalizeBoxSpec(defaultBoxSpec()));
+  const slotsOf = (engraving) => findNodes(engravingCutters(engraving, dims)[0], (node) => node.type === "rrect");
+
+  const line = normalizeEngraving({
+    name: "line",
+    width: 10,
+    height: 10,
+    sizeX: 10,
+    sizeY: 10,
+    depth: 0.6,
+    contours: [],
+    strokes: [{ width: 1, closed: false, points: [[0, 5], [10, 5]] }]
+  });
+  assert.equal(line.contours.length, 0, "a drawing can be all lines and no fills");
+  const [slot] = slotsOf(line);
+  // A 10 mm step cut with a 1 mm pen: a slot 11 long by 1 wide, rounded at both ends.
+  assert.deepEqual([slot.w, slot.d, slot.r], [11, 1, 0.5]);
+
+  const ring = normalizeEngraving({
+    width: 10,
+    height: 10,
+    sizeX: 10,
+    sizeY: 10,
+    depth: 0.6,
+    strokes: [{ width: 1, closed: true, points: [[0, 0], [10, 0], [10, 10], [0, 10]] }]
+  });
+  assert.equal(slotsOf(ring).length, 4, "a closed line takes the last step back to its start");
+  assert.equal(normalizeEngraving({ width: 10, height: 10, strokes: [{ width: 0, points: [[0, 0], [1, 1]] }] }), null);
+});
+
 test("a contour walked in thousands of steps is thinned without the page hanging", () => {
   const spiral = Array.from({ length: 20000 }, (_, index) => {
     const angle = (index / 20000) * Math.PI * 12;
@@ -140,5 +172,5 @@ test("a crowded drawing is thinned to what a plan can hold", () => {
   assert.ok(simplified.length >= 8, "but still round");
   const many = normalizeEngraving({ width: 100, height: 100, contours: Array.from({ length: 80 }, () => circle.slice(0, 60)) });
   assert.ok(many.contours.length <= MAX_ENGRAVING_CONTOURS);
-  assert.ok(engravingPointCount(many) <= 1200);
+  assert.ok(engravingPointCount(many) <= MAX_ENGRAVING_POINTS);
 });

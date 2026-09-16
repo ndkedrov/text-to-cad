@@ -65,7 +65,7 @@ import {
 } from "@/workbench/boxBuilder/boxBoards.js";
 import { buildBoxPlan } from "@/workbench/boxBuilder/boxPlan.js";
 import { floorSheetSvg, printFloorSheet } from "@/workbench/boxBuilder/floorSheet.js";
-import { ENGRAVING_MODES, engravingFromDrawing, engravingPointCount } from "@/workbench/boxBuilder/engraving.js";
+import { ENGRAVING_MODES, engravingFromDrawing, engravingPartCount, engravingPointCount } from "@/workbench/boxBuilder/engraving.js";
 import { drawingFromSvg } from "@/workbench/boxBuilder/engravingImport.js";
 import {
   BOARD_EDGES,
@@ -416,10 +416,11 @@ function LidTab({ builder }) {
     }
     try {
       const drawing = await drawingFromSvg(await file.text(), { name: file.name.replace(/\.svg$/iu, "") });
-      // It arrives sized to sit on the lid: two thirds of it at most.
+      // A drawing that gives its real size comes in at it; one that does not is
+      // sized to sit on the lid, two thirds of it at most.
       const fit = Math.min((dims.width * 2) / 3 / drawing.width, (dims.depth * 2) / 3 / drawing.height);
       edit((draft) => {
-        draft.lid.engraving = engravingFromDrawing(drawing, { millimetresPerUnit: fit });
+        draft.lid.engraving = engravingFromDrawing(drawing, { millimetresPerUnit: drawing.millimetresPerUnit || fit });
       });
       setEngravingError("");
     } catch (error) {
@@ -553,7 +554,7 @@ function LidTab({ builder }) {
               <FileSheetToggleRow label={t("field.keepRatio")} checked={keepRatio} onCheckedChange={setKeepRatio} />
               <NumberRow label={t("field.engravingDepth")} value={engraving.depth} min={0.1} max={100} step={0.1} onCommit={(depth) => patchEngraving({ depth })} />
               <FileSheetStatusText>
-                {t("engraving.summary", { contours: engraving.contours.length, points: engravingPointCount(engraving) })}
+                {t("engraving.summary", { contours: engravingPartCount(engraving), points: engravingPointCount(engraving) })}
               </FileSheetStatusText>
               {engraving.depth >= spec.lid.thickness ? <FileSheetStatusText>{t("engraving.through")}</FileSheetStatusText> : null}
               {engraving.mode === "inlay" ? <FileSheetStatusText>{t("engraving.inlayHint")}</FileSheetStatusText> : null}

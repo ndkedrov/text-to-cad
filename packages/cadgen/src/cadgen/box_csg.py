@@ -34,10 +34,29 @@ def _build(bd, node: dict):
         shape = bd.extrude(outline, amount=node["h"])
     else:
         children = [_build(bd, child) for child in node["children"]]
-        shape = children[0]
-        for other in children[1:]:
-            shape = shape + other if kind == "union" else shape - other
+        shape = _combine(children, kind)
     return _placed(bd, shape, node)
+
+
+def _combine(children: list, kind: str):
+    """Fuse or cut the children in one pass.
+
+    One boolean over all of them, rather than one per child: an engraved groove
+    is hundreds of little slots, and cutting them one after another has the
+    kernel rebuild the whole growing solid every time, which takes minutes.
+    """
+    shape = children[0]
+    others = children[1:]
+    if not others:
+        return shape
+    combine = getattr(shape, "fuse" if kind == "union" else "cut", None)
+    if combine is None:
+        for other in others:
+            shape = shape + other if kind == "union" else shape - other
+        return shape
+    fused = combine(*others)
+    # A fuse leaves the seams behind; cleaning keeps later booleans cheap.
+    return fused.clean() if hasattr(fused, "clean") else fused
 
 
 def _rounded_prism(bd, width: float, depth: float, height: float, radius: float):

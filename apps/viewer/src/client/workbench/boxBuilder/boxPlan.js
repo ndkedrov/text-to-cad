@@ -3,7 +3,7 @@
 // the very same tree with build123d (cadgen.box_csg) for the STEP/STL/3MF files.
 // Grammar: packages/cadgen/src/cadgen/box_plan.py.
 
-import { engravingIslands } from "./engraving.js";
+import { engravingIslands, engravingStrokes } from "./engraving.js";
 import {
   CLAMP_BAR,
   boardClampPostPoints,
@@ -317,8 +317,40 @@ function basePlan(spec, dims) {
   return union([shell, ...standoffs, ...boardSupports, ...lidScrewBossNodes(dims), ...clamps]);
 }
 
-// The engraving, cut into the top of the lid: every filled island less the
-// holes inside it. A cut as deep as the lid goes right through.
+// The drawing as solids `height` tall standing on z = 0: each filled island less
+// the holes in it, and each drawn line as a chain of rounded slots as wide as the
+// pen. Slots, rather than an outline of the line, because an outline that turns
+// sharply crosses itself and the kernel then refuses the part.
+function engravingShapes(engraving, height) {
+  const prism = (points) => ({
+    type: "poly",
+    points: points.map(([x, y]) => [tidy(x), tidy(y)]),
+    h: tidy(height)
+  });
+  const islands = engravingIslands(engraving)
+    .map((island) => difference(prism(island.outline), island.holes.map(prism)));
+  const grooves = engravingStrokes(engraving).flatMap((line) => {
+    const steps = line.closed ? line.points.length : line.points.length - 1;
+    const slots = [];
+    for (let index = 0; index < steps; index += 1) {
+      const [fromX, fromY] = line.points[index];
+      const [toX, toY] = line.points[(index + 1) % line.points.length];
+      const span = Math.hypot(toX - fromX, toY - fromY);
+      if (span < 1e-6) {
+        continue;
+      }
+      slots.push(roundedPrism(span + line.width, line.width, height, line.width / 2, {
+        rot: [0, 0, (Math.atan2(toY - fromY, toX - fromX) * 180) / Math.PI],
+        pos: [(fromX + toX) / 2, (fromY + toY) / 2, 0]
+      }));
+    }
+    return slots;
+  });
+  return [...islands, ...grooves];
+}
+
+// The engraving, cut into the top of the lid. A cut as deep as the lid goes
+// right through it.
 export function engravingCutters(engraving, dims) {
   if (!engraving) {
     return [];
@@ -326,15 +358,8 @@ export function engravingCutters(engraving, dims) {
   const through = engraving.depth >= dims.lidThickness - 1e-9;
   const height = through ? dims.lidThickness + 2 * CUT_MARGIN : engraving.depth + CUT_MARGIN;
   const bottom = through ? dims.wallTop - CUT_MARGIN : dims.lidTop - engraving.depth;
-  const prism = (points) => ({
-    type: "poly",
-    points: points.map(([x, y]) => [tidy(x), tidy(y)]),
-    h: tidy(height)
-  });
-  return engravingIslands(engraving).map((island) => group(
-    [difference(prism(island.outline), island.holes.map(prism))],
-    { pos: [0, 0, bottom] }
-  ));
+  const shapes = engravingShapes(engraving, height);
+  return shapes.length ? [group(shapes, { pos: [0, 0, bottom] })] : [];
 }
 
 // The piece that fills the engraving, when it is an inlay: the same islands,
@@ -346,13 +371,7 @@ function inlayPlan(spec, dims) {
     return null;
   }
   const height = Math.min(engraving.depth, dims.lidThickness);
-  const prism = (points) => ({
-    type: "poly",
-    points: points.map(([x, y]) => [tidy(x), tidy(y)]),
-    h: tidy(height)
-  });
-  const islands = engravingIslands(engraving).map((island) => difference(prism(island.outline), island.holes.map(prism)));
-  return group(islands, { pos: [0, 0, dims.lidTop - height] });
+  return group(engravingShapes(engraving, height), { pos: [0, 0, dims.lidTop - height] });
 }
 
 function lidPlan(spec, dims) {
@@ -423,6 +442,16 @@ export function buildBoxPlan(spec, { layout = "assembled" } = {}) {
     inlay = inlay ? group([inlay], turn) : inlay;
   }
   return { base, lid, inlay, dims };
+}
+
+// The polygon points a plan spends: cadgen refuses more than PLAN_POINT_LIMIT.
+export const PLAN_POINT_LIMIT = 2000;
+
+export function countPlanPoints(node) {
+  if (!node) {
+    return 0;
+  }
+  return (node.points?.length || 0) + (node.children || []).reduce((total, child) => total + countPlanPoints(child), 0);
 }
 
 export function countPlanNodes(node) {

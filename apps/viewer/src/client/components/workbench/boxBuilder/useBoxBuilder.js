@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PLAN_NODE_LIMIT, buildBoxPlan, countPlanNodes } from "@/workbench/boxBuilder/boxPlan.js";
+import { PLAN_NODE_LIMIT, PLAN_POINT_LIMIT, buildBoxPlan, countPlanNodes, countPlanPoints } from "@/workbench/boxBuilder/boxPlan.js";
 import {
   boxDimensions,
   boxSpecWarnings,
@@ -200,6 +200,10 @@ export function useBoxBuilder() {
       + countPlanNodes(plan.inlay) + (plan.inlay ? 1 : 0);
     if (nodes > PLAN_NODE_LIMIT) {
       list.push({ key: "warning.tooComplex", params: { count: nodes, limit: PLAN_NODE_LIMIT } });
+    }
+    const points = countPlanPoints(plan.base) + countPlanPoints(plan.lid) + countPlanPoints(plan.inlay);
+    if (points > PLAN_POINT_LIMIT) {
+      list.push({ key: "warning.tooManyPoints", params: { count: points, limit: PLAN_POINT_LIMIT } });
     }
     return list;
   }, [spec, plan]);

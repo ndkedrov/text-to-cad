@@ -7,9 +7,13 @@
 // 2000 of them, so contours are simplified when they come in.
 
 export const ENGRAVING_MODES = Object.freeze(["cut", "inlay"]);
-export const MAX_ENGRAVING_CONTOURS = 40;
+export const MAX_ENGRAVING_CONTOURS = 80;
 export const MAX_CONTOUR_POINTS = 64;
-export const MAX_ENGRAVING_POINTS = 1200;
+// The plan grammar allows 2000 polygon points in all; the rest is for the box.
+export const MAX_ENGRAVING_POINTS = 1600;
+// A groove is cut as one rounded slot per step along its line, and every slot is
+// a node of the plan, which allows 1000 in all.
+export const MAX_GROOVE_SEGMENTS = 400;
 // The smallest contour worth cutting, in the drawing's own units.
 const MIN_CONTOUR_SPAN = 1e-6;
 
@@ -131,7 +135,8 @@ export function engravingFromDrawing(drawing, { depth = 0.6, millimetresPerUnit 
     x: 0,
     y: 0,
     depth,
-    contours: drawing?.contours || []
+    contours: drawing?.contours || [],
+    strokes: drawing?.strokes || []
   });
 }
 
@@ -164,7 +169,27 @@ export function normalizeEngraving(raw) {
     budget -= kept.length;
     contours.push(kept);
   }
-  if (!contours.length) {
+  // Lines drawn with a pen rather than filled: each is cut as a groove as wide
+  // as the pen was. They are kept as lines, not as their outlines, because an
+  // outline that turns sharply crosses itself and the kernel refuses the part.
+  let segments = MAX_GROOVE_SEGMENTS;
+  const strokes = [];
+  for (const raw of Array.isArray(source.strokes) ? source.strokes : []) {
+    const line = raw && typeof raw === "object" ? raw : {};
+    const width = finiteOr(line.width, 0);
+    const points = (Array.isArray(line.points) ? line.points : [])
+      .filter((point) => Array.isArray(point) && Number.isFinite(Number(point[0])) && Number.isFinite(Number(point[1])))
+      .slice(0, MAX_CONTOUR_POINTS)
+      .map(([x, y]) => [round(Number(x)), round(Number(y))]);
+    const closed = Boolean(line.closed) && points.length > 2;
+    const needed = Math.max(points.length - (closed ? 0 : 1), 0);
+    if (width <= 0 || points.length < 2 || needed > segments) {
+      continue;
+    }
+    segments -= needed;
+    strokes.push({ width: round(width), closed, points });
+  }
+  if (!contours.length && !strokes.length) {
     return null;
   }
   return {
@@ -181,8 +206,26 @@ export function normalizeEngraving(raw) {
     sizeY: numberIn(source.sizeY, round(height), 0.5, 2000),
     // How deep it is cut from the top of the lid; deeper than the lid goes through.
     depth: numberIn(source.depth, 0.6, 0.1, 100),
-    contours
+    contours,
+    strokes
   };
+}
+
+// The lines to cut as grooves, in box coordinates, each with the width it is cut at.
+export function engravingStrokes(engraving) {
+  if (!engraving) {
+    return [];
+  }
+  const scaleX = engraving.sizeX / engraving.width;
+  const scaleY = engraving.sizeY / engraving.height;
+  return (engraving.strokes || []).map((line) => ({
+    width: round((line.width * (scaleX + scaleY)) / 2, 4),
+    closed: line.closed,
+    points: line.points.map(([x, y]) => [
+      round(engraving.x + (x - engraving.width / 2) * scaleX, 4),
+      round(engraving.y - (y - engraving.height / 2) * scaleY, 4)
+    ])
+  }));
 }
 
 // The contours in box coordinates: scaled to the size asked for, centred on
@@ -238,5 +281,11 @@ export function engravingIslands(engraving) {
 }
 
 export function engravingPointCount(engraving) {
-  return (engraving?.contours || []).reduce((total, points) => total + points.length, 0);
+  return [...(engraving?.contours || []), ...(engraving?.strokes || []).map((line) => line.points)]
+    .reduce((total, points) => total + points.length, 0);
+}
+
+// How many outlines and lines the drawing holds.
+export function engravingPartCount(engraving) {
+  return (engraving?.contours || []).length + (engraving?.strokes || []).length;
 }
