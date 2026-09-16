@@ -14,8 +14,9 @@ import {
   clampStemLength,
   faceFrame,
   isWallFace,
-  lidScrewCorner,
+  lidScrewAnchor,
   lidScrewPoints,
+  lidScrewStepCentre,
   roundMm,
   standoffPoints
 } from "./boxSpec.js";
@@ -241,30 +242,36 @@ function clampPieceNode(piece) {
 const SCREW_TAPER_STEP = 0.25;
 const SCREW_TAPER_MIN_RADIUS = 0.5;
 
-// A post in each inner corner, fused to the walls, its top flush with them and
-// `screwDepth` tall, with a pilot hole for the lid screw. Under it, cylinders that
-// shrink into the corner step by step make a 45-degree taper, so it prints
-// without supports.
+// A post under each lid screw, its top flush with the wall top and `screwDepth`
+// tall, with a pilot hole down it. A post standing against a wall is fused to it,
+// and cylinders that shrink into that wall (or corner) step by step taper its
+// underside to 45 degrees, so it prints without supports; one standing free of
+// the walls has nothing to hang from, so it carries on down to the floor.
 function lidScrewBossNodes(dims) {
-  if (!dims.lidScrews) {
-    return [];
-  }
   const radius = dims.screwDiameter / 2;
   const bossBottom = Math.max(dims.wallTop - dims.screwDepth, dims.floorTop);
-  const [cx, cy] = lidScrewCorner(dims, radius);
   const stepHeight = SCREW_TAPER_STEP * (1 + Math.SQRT2);
-  return [[1, 1], [-1, 1], [-1, -1], [1, -1]].map(([sx, sy]) => {
-    const pieces = [cylinder(radius, dims.wallTop - bossBottom, { pos: [sx * cx, sy * cy, bossBottom] })];
+  return lidScrewPoints(dims).map((point) => {
+    const anchor = lidScrewAnchor(dims, point);
+    const [x, y] = lidScrewStepCentre(dims, point, radius);
+    const pieces = [cylinder(radius, dims.wallTop - bossBottom, { pos: [x, y, bossBottom] })];
+    if (!anchor.x && !anchor.y) {
+      pieces.push(cylinder(radius, bossBottom - dims.floorTop + FUSE_OVERLAP, { pos: [x, y, dims.floorTop - FUSE_OVERLAP] }));
+    }
     let top = bossBottom;
     let stepRadius = radius;
-    while (stepRadius - SCREW_TAPER_STEP >= SCREW_TAPER_MIN_RADIUS - 1e-9 && top > dims.floorTop + 1e-6) {
+    while (
+      (anchor.x || anchor.y) &&
+      stepRadius - SCREW_TAPER_STEP >= SCREW_TAPER_MIN_RADIUS - 1e-9 &&
+      top > dims.floorTop + 1e-6
+    ) {
       stepRadius -= SCREW_TAPER_STEP;
       const bottom = Math.max(top - stepHeight, dims.floorTop - FUSE_OVERLAP);
-      const [tx, ty] = lidScrewCorner(dims, stepRadius);
-      pieces.push(cylinder(stepRadius, top - bottom + FUSE_OVERLAP, { pos: [sx * tx, sy * ty, bottom] }));
+      const [stepX, stepY] = lidScrewStepCentre(dims, point, stepRadius);
+      pieces.push(cylinder(stepRadius, top - bottom + FUSE_OVERLAP, { pos: [stepX, stepY, bottom] }));
       top = bottom;
     }
-    const pilot = cylinder(dims.screwPilot / 2, dims.wallTop - bossBottom + CUT_MARGIN, { pos: [sx * cx, sy * cy, bossBottom] });
+    const pilot = cylinder(dims.screwPilot / 2, dims.wallTop - bossBottom + CUT_MARGIN, { pos: [x, y, bossBottom] });
     return difference(union(pieces), [pilot]);
   });
 }
@@ -316,11 +323,14 @@ function lidPlan(spec, dims) {
     const bottom = dims.wallTop - dims.lipHeight;
     const ringHeight = dims.lipHeight + dims.lidThickness / 2;
     // The lip steps round each screw boss, with the lid's clearance.
-    const bossCutters = lidScrewPoints(dims).map(([x, y]) => cylinder(
-      dims.screwDiameter / 2 + dims.clearance,
-      ringHeight + 2 * CUT_MARGIN,
-      { pos: [x, y, bottom - CUT_MARGIN] }
-    ));
+    const bossCutters = lidScrewPoints(dims).map((point) => {
+      const [x, y] = lidScrewStepCentre(dims, point, dims.screwDiameter / 2);
+      return cylinder(
+        dims.screwDiameter / 2 + dims.clearance,
+        ringHeight + 2 * CUT_MARGIN,
+        { pos: [x, y, bottom - CUT_MARGIN] }
+      );
+    });
     lip = difference(
       roundedPrism(dims.lipWidth, dims.lipDepth, ringHeight, dims.lipRadius, { pos: [0, 0, bottom] }),
       [roundedPrism(
@@ -332,11 +342,14 @@ function lidPlan(spec, dims) {
       ), ...bossCutters]
     );
   }
-  const screwHoles = lidScrewPoints(dims).map(([x, y]) => cylinder(
-    dims.screwHole / 2,
-    dims.lidThickness + 2 * CUT_MARGIN,
-    { pos: [x, y, dims.wallTop - CUT_MARGIN] }
-  ));
+  const screwHoles = lidScrewPoints(dims).map((point) => {
+    const [x, y] = lidScrewStepCentre(dims, point, dims.screwDiameter / 2);
+    return cylinder(
+      dims.screwHole / 2,
+      dims.lidThickness + 2 * CUT_MARGIN,
+      { pos: [x, y, dims.wallTop - CUT_MARGIN] }
+    );
+  });
   const cutters = [
     ...spec.holes.filter((hole) => hole.face === "lid").map((hole) => holeCutter(hole, dims)),
     ...screwHoles
