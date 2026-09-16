@@ -127,6 +127,16 @@ function filledContours(wasm, shapes, tolerance) {
   return contours;
 }
 
+// The drawing's lines redrawn at another width: the contours to cut, ready for
+// the box. `width` is in the drawing's own units; 0 keeps each line as drawn.
+export async function grooveContoursAt(strokes, width) {
+  if (!strokes?.length) {
+    return [];
+  }
+  const wasm = await loadManifold();
+  return grooveContours(wasm, width > 0 ? strokes.map((line) => ({ ...line, width })) : strokes);
+}
+
 function isFilled(element, window) {
   const fill = window.getComputedStyle(element).fill;
   return Boolean(fill) && fill !== "none" && !/^rgba\([^)]*,\s*0\)$/u.test(fill);
@@ -239,7 +249,8 @@ export async function drawingFromSvg(text, { name = "", documentRef = globalThis
     const walls = walked
       .map((points) => simplifyContour(points, tolerance))
       .filter((points) => points.length >= 3 && Math.abs(contourArea(points)) > 1e-6);
-    const contours = (walls.length ? filledContours(wasm, walls, GROOVE_TOLERANCE) : [])
+    const fills = walls.length ? filledContours(wasm, walls, GROOVE_TOLERANCE) : [];
+    const contours = fills
       .concat(lines.length ? grooveContours(wasm, lines) : [])
       // The biggest marks first, so a crowded drawing keeps what matters most.
       .sort((left, right) => Math.abs(contourArea(right)) - Math.abs(contourArea(left)))
@@ -263,7 +274,14 @@ export async function drawingFromSvg(text, { name = "", documentRef = globalThis
       height: size.height,
       // Set when the file gives its real size, so the drawing can come in 1:1.
       millimetresPerUnit: millimetresPerUnit(svg, size),
-      contours: kept
+      contours: kept,
+      // What the contours were made from, so the groove can be redrawn at another
+      // width without the file: the shapes that were filled, and the lines drawn.
+      fills: fills.map((points) => points.map(([x, y]) => [x - size.minX, y - size.minY])),
+      strokes: lines.map((line) => ({
+        ...line,
+        points: line.points.map(([x, y]) => [x - size.minX, y - size.minY])
+      }))
     };
   } finally {
     stage.remove();

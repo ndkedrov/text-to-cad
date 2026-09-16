@@ -330,8 +330,9 @@ function engravingShapes(engraving, height) {
   const islands = engravingIslands(engraving)
     .map((island) => difference(prism(island.outline), island.holes.map(prism)));
   // Lines kept by a box saved before drawn lines became contours: a chain of
-  // rounded slots along each one, as wide as the pen that drew it.
-  const grooves = engravingStrokes(engraving).flatMap((line) => {
+  // rounded slots along each one, as wide as the pen that drew it. Where the
+  // contours are there, they already hold what the lines cut.
+  const grooves = (islands.length ? [] : engravingStrokes(engraving)).flatMap((line) => {
     const steps = line.closed ? line.points.length : line.points.length - 1;
     const slots = [];
     for (let index = 0; index < steps; index += 1) {
