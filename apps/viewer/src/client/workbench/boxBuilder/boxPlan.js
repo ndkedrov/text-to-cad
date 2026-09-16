@@ -3,7 +3,7 @@
 // the very same tree with build123d (cadgen.box_csg) for the STEP/STL/3MF files.
 // Grammar: packages/cadgen/src/cadgen/box_plan.py.
 
-import { engravingIslands, engravingStrokes, strokeOutline } from "./engraving.js";
+import { engravingIslands, engravingStrokes } from "./engraving.js";
 import {
   CLAMP_BAR,
   boardClampPostPoints,
@@ -329,13 +329,9 @@ function engravingShapes(engraving, height) {
   });
   const islands = engravingIslands(engraving)
     .map((island) => difference(prism(island.outline), island.holes.map(prism)));
+  // Lines kept by a box saved before drawn lines became contours: a chain of
+  // rounded slots along each one, as wide as the pen that drew it.
   const grooves = engravingStrokes(engraving).flatMap((line) => {
-    // The groove as one shape along the line, when an honest outline comes out of
-    // it; a line that bends tighter than its own pen is cut as slots instead.
-    const drawn = strokeOutline(line.points, line.width, line.closed);
-    if (drawn) {
-      return [difference(prism(drawn.outline), drawn.hole ? [prism(drawn.hole)] : [])];
-    }
     const steps = line.closed ? line.points.length : line.points.length - 1;
     const slots = [];
     for (let index = 0; index < steps; index += 1) {

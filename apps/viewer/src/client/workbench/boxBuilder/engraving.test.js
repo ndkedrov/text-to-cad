@@ -119,35 +119,19 @@ test("filling it in another colour makes a part of its own, standing in the rece
   assert.equal(buildBoxPlan(cut).inlay, null, "a cut engraving has nothing to fill it");
 });
 
-test("a line drawn with a pen is cut as the shape the pen covers", () => {
+test("a box saved with drawn lines still cuts them, as a chain of slots", () => {
   const dims = boxDimensions(normalizeBoxSpec(defaultBoxSpec()));
   const drawing = (strokes) => normalizeEngraving({ name: "line", width: 10, height: 10, sizeX: 10, sizeY: 10, depth: 0.6, contours: [], strokes });
-  const cutterOf = (engraving) => engravingCutters(engraving, dims)[0];
-  const span = (points, axis) => Math.max(...points.map((p) => p[axis])) - Math.min(...points.map((p) => p[axis]));
+  const slotsOf = (engraving) => findNodes(engravingCutters(engraving, dims)[0], (node) => node.type === "rrect");
 
-  // A straight line, 1 mm wide: one shape, 10 by 1.
+  // A 10 mm step drawn with a 1 mm pen: a slot 11 long by 1 wide, round at both ends.
   const straight = drawing([{ width: 1, closed: false, points: [[0, 5], [10, 5]] }]);
-  assert.equal(straight.contours.length, 0, "a drawing can be all lines and no fills");
-  const bars = findNodes(cutterOf(straight), (node) => node.type === "poly");
-  assert.equal(bars.length, 1);
-  assert.deepEqual([span(bars[0].points, 0), span(bars[0].points, 1)], [10, 1]);
+  assert.equal(straight.contours.length, 0, "such a drawing has lines and no fills");
+  const [slot] = slotsOf(straight);
+  assert.deepEqual([slot.w, slot.d, slot.r], [11, 1, 0.5]);
 
-  // A closed line: the shape it covers is a ring, so it has a hole in it.
   const ring = drawing([{ width: 1, closed: true, points: [[1, 1], [9, 1], [9, 9], [1, 9]] }]);
-  const ringParts = findNodes(cutterOf(ring), (node) => node.type === "poly");
-  assert.equal(ringParts.length, 2, "the outer edge and the hole inside it");
-  assert.ok(span(ringParts[0].points, 0) > span(ringParts[1].points, 0), "the hole is the smaller of the two");
-  assert.equal(findNodes(cutterOf(ring), (node) => node.type === "rrect").length, 0, "no slots are needed");
-
-  // A line that doubles back on itself still comes out as one shape: the loops
-  // its outline makes on the inside of each turn are cut away.
-  const zigzag = drawing([{ width: 3, closed: false, points: [[0, 0], [1, 3], [2, 0], [3, 3]] }]);
-  assert.equal(findNodes(cutterOf(zigzag), (node) => node.type === "poly").length, 1);
-  assert.equal(findNodes(cutterOf(zigzag), (node) => node.type === "rrect").length, 0);
-
-  // Too short to have an outline at all: cut as a slot instead.
-  const speck = drawing([{ width: 3, closed: false, points: [[0, 0], [0.001, 0]] }]);
-  assert.equal(findNodes(cutterOf(speck), (node) => node.type === "rrect").length, 1);
+  assert.equal(slotsOf(ring).length, 4, "a closed line takes the last step back to its start");
 
   assert.equal(normalizeEngraving({ width: 10, height: 10, strokes: [{ width: 0, points: [[0, 0], [1, 1]] }] }), null);
 });

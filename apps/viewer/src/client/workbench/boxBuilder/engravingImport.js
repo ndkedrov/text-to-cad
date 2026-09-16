@@ -10,6 +10,12 @@ import {
   contourArea,
   simplifyContour
 } from "./engraving.js";
+import { loadManifold } from "./manifoldRuntime.js";
+
+// Corners of a groove are rounded in this many steps, and the result is thinned
+// to this much, in the drawing's own units.
+const GROOVE_CORNER_STEPS = 8;
+const GROOVE_TOLERANCE = 0.02;
 
 // A drawing may be laid out in real sizes; these are the units a file may say so in.
 const MM_PER_UNIT = Object.freeze({ mm: 1, cm: 10, m: 1000, in: 25.4, pt: 25.4 / 72, pc: 25.4 / 6, px: 25.4 / 96 });
@@ -79,6 +85,45 @@ function sampleShape(shape, matrix, budget = MAX_SAMPLES) {
   if (current.length >= 3) {
     contours.push(current);
   }
+  return contours;
+}
+
+// What a pen of the line's width covers, as closed shapes: manifold's 2D side
+// offsets the line outwards and inwards and takes the difference, which sorts out
+// the loops a tight bend makes and the holes a closed line leaves by itself.
+function grooveContours(wasm, lines) {
+  const { CrossSection } = wasm;
+  const contours = [];
+  for (const line of lines) {
+    const ring = new CrossSection([line.points], "NonZero");
+    const outer = ring.offset(line.width / 2, "Round", 2, GROOVE_CORNER_STEPS);
+    const inner = line.closed ? ring.offset(-line.width / 2, "Round", 2, GROOVE_CORNER_STEPS) : null;
+    const groove = inner ? outer.subtract(inner) : outer;
+    const thinned = groove.simplify(GROOVE_TOLERANCE);
+    for (const polygon of thinned.toPolygons()) {
+      if (polygon.length >= 3) {
+        contours.push([...polygon].map(([x, y]) => [x, y]));
+      }
+    }
+    for (const shape of [ring, outer, inner, groove, thinned]) {
+      shape?.delete?.();
+    }
+  }
+  return contours;
+}
+
+// Filled shapes tidied by the same hands: overlaps merged, holes told apart from
+// shapes by which way each contour runs (SVG's even-odd rule decides what is a
+// hole, and a walked outline says nothing about it by itself).
+function filledContours(wasm, shapes, tolerance) {
+  const { CrossSection } = wasm;
+  const area = new CrossSection(shapes, "EvenOdd");
+  const thinned = area.simplify(tolerance);
+  const contours = thinned.toPolygons()
+    .filter((polygon) => polygon.length >= 3)
+    .map((polygon) => [...polygon].map(([x, y]) => [x, y]));
+  area.delete?.();
+  thinned.delete?.();
   return contours;
 }
 
@@ -175,11 +220,9 @@ export async function drawingFromSvg(text, { name = "", documentRef = globalThis
         walked.push(...contours);
         continue;
       }
-      // A line drawn with a pen is kept as a line: it is cut as a groove as wide
-      // as the pen was.
-      // A groove is drawn as one shape along its line, so it can be followed
-      // closely: a tenth of the pen's width keeps corners where they were.
-      const fine = Math.min(tolerance, groove / 10);
+      // The line is followed closely: whatever it is off by comes straight off the
+      // width of the groove drawn along it.
+      const fine = Math.min(tolerance, groove / 20);
       for (const line of contours) {
         const ends = Math.hypot(line[0][0] - line[line.length - 1][0], line[0][1] - line[line.length - 1][1]);
         const closed = ends <= groove;
@@ -192,9 +235,12 @@ export async function drawingFromSvg(text, { name = "", documentRef = globalThis
     if (!walked.length && !lines.length) {
       throw new EngravingError("nothing-filled");
     }
-    const contours = walked
+    const wasm = await loadManifold();
+    const walls = walked
       .map((points) => simplifyContour(points, tolerance))
-      .filter((points) => points.length >= 3 && Math.abs(contourArea(points)) > 1e-6)
+      .filter((points) => points.length >= 3 && Math.abs(contourArea(points)) > 1e-6);
+    const contours = (walls.length ? filledContours(wasm, walls, GROOVE_TOLERANCE) : [])
+      .concat(lines.length ? grooveContours(wasm, lines) : [])
       // The biggest marks first, so a crowded drawing keeps what matters most.
       .sort((left, right) => Math.abs(contourArea(right)) - Math.abs(contourArea(left)))
       .slice(0, MAX_ENGRAVING_CONTOURS);
@@ -208,22 +254,16 @@ export async function drawingFromSvg(text, { name = "", documentRef = globalThis
       budget -= fitted.length;
       kept.push(fitted.map(([x, y]) => [x - size.minX, y - size.minY]));
     }
-    if (!kept.length && !lines.length) {
+    if (!kept.length) {
       throw new EngravingError("too-complex");
     }
-    // The longest lines first, so a drawing over the budget keeps its main marks.
-    lines.sort((left, right) => right.points.length - left.points.length);
     return {
       name: String(name).slice(0, 60),
       width: size.width,
       height: size.height,
       // Set when the file gives its real size, so the drawing can come in 1:1.
       millimetresPerUnit: millimetresPerUnit(svg, size),
-      contours: kept,
-      strokes: lines.map((line) => ({
-        ...line,
-        points: line.points.map(([x, y]) => [x - size.minX, y - size.minY])
-      }))
+      contours: kept
     };
   } finally {
     stage.remove();
