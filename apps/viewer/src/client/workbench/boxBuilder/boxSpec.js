@@ -63,7 +63,7 @@ export const PORT_TYPES = Object.freeze({
   db9: Object.freeze({ shape: "rect", width: 19.5, height: 11.5, radius: 1, elevation: 0.5 }),
   // A keystone jack's suggested cut-out for a plastic panel 1.5-1.6 mm thick,
   // with no gap so the jack snaps in.
-  keystone: Object.freeze({ shape: "rect", width: 14.7, height: 16.4, radius: 0, elevation: 0, margin: 0 }),
+  keystone: Object.freeze({ shape: "rect", width: 14.7, height: 19.7, radius: 0, elevation: 0, margin: 0 }),
   // Room for an RJ45 plug (up to a shielded Cat6A one) to pass through a wall.
   rj45Pass: Object.freeze({ shape: "rect", width: 15, height: 15.3, radius: 1, elevation: 0 }),
   custom: Object.freeze({ shape: "rect", width: 10, height: 5, radius: 0, elevation: 0 })

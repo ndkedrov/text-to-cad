@@ -129,7 +129,7 @@ test("a connector hole is the connector's body plus a margin, and cuts as its sh
 });
 
 test("a keystone hole is its exact cut-out and needs a thin enough wall", () => {
-  assert.deepEqual(connectorHole("keystone"), { connector: "keystone", shape: "rect", width: 14.7, height: 16.4, radius: 0 });
+  assert.deepEqual(connectorHole("keystone"), { connector: "keystone", shape: "rect", width: 14.7, height: 19.7, radius: 0 });
   const spec = normalizeBoxSpec({ ...defaultBoxSpec(), holes: [{ face: "front", u: 0, v: 16, ...connectorHole("keystone") }] });
   const keystoneWarning = () => boxSpecWarnings(spec).find((warning) => warning.key === "warning.keystoneWall");
   assert.deepEqual(keystoneWarning()?.params, { n: 1, thickness: 2 });
