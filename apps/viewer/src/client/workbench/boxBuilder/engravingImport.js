@@ -14,12 +14,12 @@ import {
 // A drawing may be laid out in real sizes; these are the units a file may say so in.
 const MM_PER_UNIT = Object.freeze({ mm: 1, cm: 10, m: 1000, in: 25.4, pt: 25.4 / 72, pc: 25.4 / 6, px: 25.4 / 96 });
 // How many points a stroked line keeps before it is given its width.
-const STROKE_LINE_POINTS = 30;
+const STROKE_LINE_POINTS = 200;
 
 // How finely a shape is walked before it is simplified, and what counts as the
 // jump from the end of one subpath to the start of the next.
-const SAMPLE_STEP = 0.4;
-const MAX_SAMPLES = 800;
+const SAMPLE_STEP = 0.15;
+const MAX_SAMPLES = 3000;
 const JUMP = 6;
 // A drawing is read on the page's own thread, so the work is bounded on every
 // side: a crowded file would otherwise walk millions of points and the browser
@@ -142,7 +142,7 @@ export async function drawingFromSvg(text, { name = "", documentRef = globalThis
   try {
     const size = viewportSize(svg);
     const root = svg.getCTM ? svg.getCTM() : null;
-    const tolerance = Math.hypot(size.width, size.height) / 600;
+    const tolerance = Math.hypot(size.width, size.height) / 1500;
     const shapes = [...svg.querySelectorAll("path,rect,circle,ellipse,polygon,polyline,line")].slice(0, MAX_SHAPES);
     const walked = [];
     const lines = [];
@@ -177,9 +177,9 @@ export async function drawingFromSvg(text, { name = "", documentRef = globalThis
       }
       // A line drawn with a pen is kept as a line: it is cut as a groove as wide
       // as the pen was.
-      // A groove is followed no finer than a third of its own width: every step
-      // is a slot the kernel has to fuse, and hundreds of them take it minutes.
-      const fine = Math.max(tolerance, groove / 3);
+      // A groove is drawn as one shape along its line, so it can be followed
+      // closely: a tenth of the pen's width keeps corners where they were.
+      const fine = Math.min(tolerance, groove / 10);
       for (const line of contours) {
         const ends = Math.hypot(line[0][0] - line[line.length - 1][0], line[0][1] - line[line.length - 1][1]);
         const closed = ends <= groove;
