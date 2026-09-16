@@ -11,6 +11,7 @@ import {
   Magnet,
   Maximize2,
   Plus,
+  Printer,
   Redo2,
   RefreshCw,
   Save,
@@ -62,6 +63,7 @@ import {
   unmountBoard
 } from "@/workbench/boxBuilder/boxBoards.js";
 import { buildBoxPlan } from "@/workbench/boxBuilder/boxPlan.js";
+import { floorSheetSvg, printFloorSheet } from "@/workbench/boxBuilder/floorSheet.js";
 import {
   BOARD_EDGES,
   BOARD_ROTATIONS,
@@ -1244,7 +1246,7 @@ function quotaText(quota, t) {
 
 function FileTab({ builder, onOpenFile, hosted = false }) {
   const { language, t } = useBoxLanguage();
-  const { spec, name, setName, warnings, dirty, markSaved, replace, undo, redo, canUndo, canRedo } = builder;
+  const { spec, dims, name, setName, warnings, dirty, markSaved, replace, undo, redo, canUndo, canRedo } = builder;
   const [savedBoxes, setSavedBoxes] = useState([]);
   const [openTarget, setOpenTarget] = useState("");
   const [status, setStatus] = useState(null);
@@ -1252,6 +1254,7 @@ function FileTab({ builder, onOpenFile, hosted = false }) {
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
   const [quota, setQuota] = useState(null);
+  const [printBlocked, setPrintBlocked] = useState(false);
   const nameValid = isValidBoxName(name);
   const building = ["queued", "building"].includes(status?.build?.state);
 
@@ -1360,6 +1363,16 @@ function FileTab({ builder, onOpenFile, hosted = false }) {
     replace(freeBoxName(savedBoxes), defaultBoxSpec());
   };
 
+  // The floor, 1:1, in a window of its own: the browser's print dialog saves it as a PDF.
+  const printFloor = () => {
+    const svg = floorSheetSvg(spec, {
+      title: t("floor.sheetTitle", { name, width: formatNumber(dims.width), depth: formatNumber(dims.depth) }),
+      note: t("floor.sheetNote"),
+      ruler: t("floor.sheetRuler", { mm: 50 })
+    });
+    setPrintBlocked(!printFloorSheet(svg, name || "box"));
+  };
+
   const summary = buildSummary(status, t, language);
   const outputs = Array.isArray(status?.outputs) ? status.outputs : [];
   const folderPath = outputs[0]?.path ? outputs[0].path.replace(/[\\/][^\\/]+$/u, "") : "";
@@ -1400,6 +1413,10 @@ function FileTab({ builder, onOpenFile, hosted = false }) {
             {building ? t("action.building") : t("action.save")}
           </Button>
         </FileSheetButtonRow>
+        <FileSheetButtonRow>
+          <CompactButton icon={Printer} onClick={printFloor}>{t("action.printFloor")}</CompactButton>
+        </FileSheetButtonRow>
+        {printBlocked ? <FileSheetStatusText tone="error">{t("floor.blocked")}</FileSheetStatusText> : null}
         {summary ? summary.lines.map((line) => (
           <FileSheetStatusText key={line} tone={summary.tone}>{line}</FileSheetStatusText>
         )) : null}
