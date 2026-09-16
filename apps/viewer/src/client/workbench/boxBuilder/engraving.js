@@ -135,6 +135,7 @@ export function engravingFromDrawing(drawing, { depth = 0.6, millimetresPerUnit 
     y: 0,
     depth,
     contours: drawing?.contours || [],
+    fills: drawing?.fills || [],
     strokes: drawing?.strokes || []
   });
 }
@@ -168,8 +169,21 @@ export function normalizeEngraving(raw) {
     budget -= kept.length;
     contours.push(kept);
   }
-  // Boxes saved before drawn lines were turned into contours keep the lines
-  // themselves; those are cut as a chain of rounded slots.
+  // The shapes the drawing filled, kept as they came in so the contours can be
+  // put together again when the lines are redrawn at another width.
+  const fills = [];
+  for (const raw of Array.isArray(source.fills) ? source.fills : []) {
+    const points = (Array.isArray(raw) ? raw : [])
+      .filter((point) => Array.isArray(point) && Number.isFinite(Number(point[0])) && Number.isFinite(Number(point[1])))
+      .slice(0, MAX_CONTOUR_POINTS)
+      .map(([x, y]) => [round(Number(x)), round(Number(y))]);
+    if (points.length >= 3 && fills.length < MAX_ENGRAVING_CONTOURS) {
+      fills.push(points);
+    }
+  }
+  // The lines the drawing drew, and how wide to draw them: 0 keeps each as it
+  // came. A box saved before contours carried the cut has only these, and they
+  // are cut as a chain of rounded slots.
   const strokes = [];
   for (const raw of Array.isArray(source.strokes) ? source.strokes : []) {
     const line = raw && typeof raw === "object" ? raw : {};
@@ -202,9 +216,27 @@ export function normalizeEngraving(raw) {
     sizeY: numberIn(source.sizeY, round(height), 0.5, 2000),
     // How deep it is cut from the top of the lid; deeper than the lid goes through.
     depth: numberIn(source.depth, 0.6, 0.1, 100),
+    // How wide the drawn lines are cut, in the drawing's own units; 0 as drawn.
+    lineWidth: numberIn(source.lineWidth, 0, 0, 1000),
     contours,
+    fills,
     strokes
   };
+}
+
+// How wide the drawing's lines are cut, on the lid, in millimetres.
+export function engravingLineWidth(engraving) {
+  const lines = engraving?.strokes || [];
+  if (!lines.length) {
+    return 0;
+  }
+  const inUnits = engraving.lineWidth > 0 ? engraving.lineWidth : lines[0].width;
+  return round(inUnits * (engraving.sizeX / engraving.width), 3);
+}
+
+// That width back in the drawing's own units, where the lines are kept.
+export function engravingUnitsPerMm(engraving) {
+  return engraving ? engraving.width / engraving.sizeX : 1;
 }
 
 // The lines to cut as grooves, in box coordinates, each with the width it is cut at.

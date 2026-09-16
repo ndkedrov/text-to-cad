@@ -10,7 +10,9 @@ import {
   engravingContours,
   engravingFromDrawing,
   engravingIslands,
+  engravingLineWidth,
   engravingPointCount,
+  engravingUnitsPerMm,
   normalizeEngraving,
   simplifyContour
 } from "./engraving.js";
@@ -117,6 +119,27 @@ test("filling it in another colour makes a part of its own, standing in the rece
 
   const cut = normalizeBoxSpec({ ...spec, lid: { ...spec.lid, engraving: { ...spec.lid.engraving, mode: "cut" } } });
   assert.equal(buildBoxPlan(cut).inlay, null, "a cut engraving has nothing to fill it");
+});
+
+test("the drawing keeps what it was made from, so its lines can be redrawn wider", () => {
+  const engraving = normalizeEngraving({
+    name: "mark",
+    width: 10,
+    height: 10,
+    sizeX: 20,
+    sizeY: 20,
+    depth: 0.6,
+    contours: RING,
+    fills: [RING[0]],
+    strokes: [{ width: 0.5, closed: true, points: [[2, 2], [8, 2], [8, 8], [2, 8]] }]
+  });
+  assert.equal(engraving.fills.length, 1, "the shapes it filled");
+  assert.equal(engraving.strokes.length, 1, "and the lines it drew");
+  // The drawing is on the lid at twice its own size, so a 0.5 line is cut 1 mm wide.
+  assert.equal(engravingLineWidth(engraving), 1);
+  assert.equal(engravingUnitsPerMm(engraving), 0.5);
+  const wider = normalizeEngraving({ ...engraving, lineWidth: 1.5 });
+  assert.equal(engravingLineWidth(wider), 3, "asked for in the drawing's units, read back in millimetres");
 });
 
 test("a box saved with drawn lines still cuts them, as a chain of slots", () => {

@@ -65,8 +65,15 @@ import {
 } from "@/workbench/boxBuilder/boxBoards.js";
 import { buildBoxPlan } from "@/workbench/boxBuilder/boxPlan.js";
 import { floorSheetSvg, printFloorSheet } from "@/workbench/boxBuilder/floorSheet.js";
-import { ENGRAVING_MODES, engravingFromDrawing, engravingPartCount, engravingPointCount } from "@/workbench/boxBuilder/engraving.js";
-import { drawingFromSvg } from "@/workbench/boxBuilder/engravingImport.js";
+import {
+  ENGRAVING_MODES,
+  engravingFromDrawing,
+  engravingLineWidth,
+  engravingPartCount,
+  engravingPointCount,
+  engravingUnitsPerMm
+} from "@/workbench/boxBuilder/engraving.js";
+import { drawingFromSvg, grooveContoursAt } from "@/workbench/boxBuilder/engravingImport.js";
 import {
   BOARD_EDGES,
   BOARD_ROTATIONS,
@@ -408,6 +415,28 @@ function LidTab({ builder }) {
       ? { sizeX: values.sizeX, sizeY: roundMm(values.sizeX * ratio, 3) }
       : { sizeY: values.sizeY, sizeX: roundMm(values.sizeY / ratio, 3) });
   };
+  // The drawing's lines cut at another width: redrawn from the lines themselves,
+  // so the file is not needed again.
+  const redrawLines = async (millimetres) => {
+    if (!engraving?.strokes.length) {
+      return;
+    }
+    const width = millimetres * engravingUnitsPerMm(engraving);
+    try {
+      const grooves = await grooveContoursAt(engraving.strokes, width);
+      edit((draft) => {
+        const target = draft.lid.engraving;
+        if (target) {
+          target.lineWidth = width;
+          target.contours = [...(target.fills || []), ...grooves];
+        }
+      });
+      setEngravingError("");
+    } catch (error) {
+      setEngravingError(t(ENGRAVING_ERRORS[error?.message] || "engraving.error.unreadable"));
+    }
+  };
+
   const loadEngraving = async (event) => {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -553,6 +582,16 @@ function LidTab({ builder }) {
               </FileSheetFieldGrid>
               <FileSheetToggleRow label={t("field.keepRatio")} checked={keepRatio} onCheckedChange={setKeepRatio} />
               <NumberRow label={t("field.engravingDepth")} value={engraving.depth} min={0.1} max={100} step={0.1} onCommit={(depth) => patchEngraving({ depth })} />
+              {engraving.strokes.length ? (
+                <NumberRow
+                  label={t("field.engravingLineWidth")}
+                  value={engravingLineWidth(engraving)}
+                  min={0.1}
+                  max={50}
+                  step={0.05}
+                  onCommit={redrawLines}
+                />
+              ) : null}
               <FileSheetStatusText>
                 {t("engraving.summary", { contours: engravingPartCount(engraving), points: engravingPointCount(engraving) })}
               </FileSheetStatusText>
