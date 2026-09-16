@@ -488,6 +488,8 @@ function normalizeBoard(raw, used) {
   // A board with no mounting holes is clamped unless told otherwise.
   board.clamp = booleanOr(source.clamp, board.holes.length === 0);
   board.clampHeight = numberIn(source.clampHeight, defaultClampHeight(board), 1, 200);
+  // Where the posts stand along the board's long side; halfway by default.
+  board.clampOffset = numberIn(source.clampOffset, roundMm(Math.max(width, length) / 2, 3), 0, Math.max(width, length));
   // The fingerprint of the template the board was last made from (boardTemplateStamp).
   board.template = typeof source.template === "string" && /^[0-9a-f]{8}$/u.test(source.template) ? source.template : "";
   return board;
@@ -799,13 +801,15 @@ export function boardRailRect(board, rail) {
   return { x, y, sizeX: alongY ? rail.length : rail.thickness, sizeY: alongY ? rail.thickness : rail.length };
 }
 
-// Clamp posts in the board's own coordinates: beside its long sides, halfway along.
+// Clamp posts in the board's own coordinates: one beside each long side, both at
+// `clampOffset` along it so the T's bar lies square across the board.
 function boardClampPostsLocal(board) {
   const offset = CLAMP_POST_GAP + board.padDiameter / 2;
+  const along = board.clampOffset;
   if (boardLongAxis(board) === "x") {
-    return [[board.width / 2, -offset], [board.width / 2, board.length + offset]];
+    return [[along, -offset], [along, board.length + offset]];
   }
-  return [[-offset, board.length / 2], [board.width + offset, board.length / 2]];
+  return [[-offset, along], [board.width + offset, along]];
 }
 
 export function boardClampPostPoints(board) {
