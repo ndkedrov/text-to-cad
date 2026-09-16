@@ -3,6 +3,7 @@
 // the very same tree with build123d (cadgen.box_csg) for the STEP/STL/3MF files.
 // Grammar: packages/cadgen/src/cadgen/box_plan.py.
 
+import { engravingIslands } from "./engraving.js";
 import {
   CLAMP_BAR,
   boardClampPostPoints,
@@ -316,6 +317,44 @@ function basePlan(spec, dims) {
   return union([shell, ...standoffs, ...boardSupports, ...lidScrewBossNodes(dims), ...clamps]);
 }
 
+// The engraving, cut into the top of the lid: every filled island less the
+// holes inside it. A cut as deep as the lid goes right through.
+export function engravingCutters(engraving, dims) {
+  if (!engraving) {
+    return [];
+  }
+  const through = engraving.depth >= dims.lidThickness - 1e-9;
+  const height = through ? dims.lidThickness + 2 * CUT_MARGIN : engraving.depth + CUT_MARGIN;
+  const bottom = through ? dims.wallTop - CUT_MARGIN : dims.lidTop - engraving.depth;
+  const prism = (points) => ({
+    type: "poly",
+    points: points.map(([x, y]) => [tidy(x), tidy(y)]),
+    h: tidy(height)
+  });
+  return engravingIslands(engraving).map((island) => group(
+    [difference(prism(island.outline), island.holes.map(prism))],
+    { pos: [0, 0, bottom] }
+  ));
+}
+
+// The piece that fills the engraving, when it is an inlay: the same islands,
+// standing in the recess. It is a part of its own, so it can be printed in
+// another colour and lands in the slicer already in place.
+function inlayPlan(spec, dims) {
+  const engraving = spec.lid.engraving;
+  if (!dims.lidEnabled || engraving?.mode !== "inlay") {
+    return null;
+  }
+  const height = Math.min(engraving.depth, dims.lidThickness);
+  const prism = (points) => ({
+    type: "poly",
+    points: points.map(([x, y]) => [tidy(x), tidy(y)]),
+    h: tidy(height)
+  });
+  const islands = engravingIslands(engraving).map((island) => difference(prism(island.outline), island.holes.map(prism)));
+  return group(islands, { pos: [0, 0, dims.lidTop - height] });
+}
+
 function lidPlan(spec, dims) {
   if (!dims.lidEnabled) {
     return null;
@@ -345,6 +384,7 @@ function lidPlan(spec, dims) {
       ), ...bossCutters]
     );
   }
+  const engravingCuts = engravingCutters(spec.lid.engraving, dims);
   const screwHoles = lidScrewPoints(dims).map((point) => {
     const [x, y] = lidScrewStepCentre(dims, point, dims.screwDiameter / 2);
     return cylinder(
@@ -355,7 +395,8 @@ function lidPlan(spec, dims) {
   });
   const cutters = [
     ...spec.holes.filter((hole) => hole.face === "lid").map((hole) => holeCutter(hole, dims)),
-    ...screwHoles
+    ...screwHoles,
+    ...engravingCuts
   ];
   // A port cut-out that reaches up into the lip's band goes through the lip too,
   // or the closed lid would cover the connector from the inside.
@@ -374,10 +415,14 @@ export function buildBoxPlan(spec, { layout = "assembled" } = {}) {
   const dims = boxDimensions(spec);
   const base = basePlan(spec, dims);
   let lid = lidPlan(spec, dims);
-  if (lid && layout === "print") {
-    lid = group([lid], { rot: [180, 0, 0], pos: [0, 0, dims.lidTop] });
+  let inlay = inlayPlan(spec, dims);
+  if (layout === "print") {
+    // The inlay turns over with the lid, so the two still meet on the bed.
+    const turn = { rot: [180, 0, 0], pos: [0, 0, dims.lidTop] };
+    lid = lid ? group([lid], turn) : lid;
+    inlay = inlay ? group([inlay], turn) : inlay;
   }
-  return { base, lid, dims };
+  return { base, lid, inlay, dims };
 }
 
 export function countPlanNodes(node) {

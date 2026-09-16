@@ -17,6 +17,7 @@ import {
   Save,
   Trash2,
   Undo2,
+  Upload,
   X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,8 @@ import {
 } from "@/workbench/boxBuilder/boxBoards.js";
 import { buildBoxPlan } from "@/workbench/boxBuilder/boxPlan.js";
 import { floorSheetSvg, printFloorSheet } from "@/workbench/boxBuilder/floorSheet.js";
+import { ENGRAVING_MODES, engravingFromDrawing, engravingPointCount } from "@/workbench/boxBuilder/engraving.js";
+import { drawingFromSvg } from "@/workbench/boxBuilder/engravingImport.js";
 import {
   BOARD_EDGES,
   BOARD_ROTATIONS,
@@ -139,6 +142,14 @@ const SECTION_FOR_SELECTION = Object.freeze({
   hole: SECTION_IDS.HOLES,
   standoff: SECTION_IDS.STANDOFFS,
   board: SECTION_IDS.BOARDS
+});
+
+// What went wrong while reading a drawing (engravingImport.js), in words.
+const ENGRAVING_ERRORS = Object.freeze({
+  "not-svg": "engraving.error.notSvg",
+  "no-size": "engraving.error.noSize",
+  "nothing-filled": "engraving.error.nothingFilled",
+  "too-complex": "engraving.error.tooComplex"
 });
 
 const FORMAT_ORDER = ["step", "stl", "3mf"];
@@ -376,6 +387,46 @@ function LidTab({ builder }) {
     mutate(placed);
     draft.lid.screwPoints = placed;
   });
+
+  const engraving = spec.lid.engraving;
+  const fileRef = useRef(null);
+  const [keepRatio, setKeepRatio] = useState(true);
+  const [engravingError, setEngravingError] = useState("");
+  const patchEngraving = (values) => edit((draft) => {
+    if (draft.lid.engraving) {
+      Object.assign(draft.lid.engraving, values);
+    }
+  });
+  // With the proportions kept, the other side follows whichever one was typed.
+  const resizeEngraving = (values) => {
+    if (!engraving || !keepRatio) {
+      patchEngraving(values);
+      return;
+    }
+    const ratio = engraving.sizeY / engraving.sizeX;
+    patchEngraving(values.sizeX != null
+      ? { sizeX: values.sizeX, sizeY: roundMm(values.sizeX * ratio, 3) }
+      : { sizeY: values.sizeY, sizeX: roundMm(values.sizeY / ratio, 3) });
+  };
+  const loadEngraving = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      return;
+    }
+    try {
+      const drawing = drawingFromSvg(await file.text(), { name: file.name.replace(/\.svg$/iu, "") });
+      // It arrives sized to sit on the lid: two thirds of it at most.
+      const fit = Math.min((dims.width * 2) / 3 / drawing.width, (dims.depth * 2) / 3 / drawing.height);
+      edit((draft) => {
+        draft.lid.engraving = engravingFromDrawing(drawing, { millimetresPerUnit: fit });
+      });
+      setEngravingError("");
+    } catch (error) {
+      setEngravingError(t(ENGRAVING_ERRORS[error?.message] || "engraving.error.unreadable"));
+    }
+  };
+
   if (!spec.walls.enabled) {
     return (
       <div className="pt-2">
@@ -478,6 +529,63 @@ function LidTab({ builder }) {
               </FileSheetButtonRow>
             </>
           ) : null}
+        </FileSheetSubsection>
+      ) : null}
+      {spec.lid.enabled ? (
+        <FileSheetSubsection title={t("section.engraving")}>
+          {engraving ? (
+            <>
+              <FileSheetControlRow label={t("field.engravingFile")} value={engraving.name || t("engraving.unnamed")} />
+              <FileSheetSelectRow
+                label={t("field.engravingMode")}
+                value={engraving.mode}
+                onValueChange={(mode) => patchEngraving({ mode })}
+                options={ENGRAVING_MODES.map((mode) => ({ value: mode, label: t(`engraving.mode.${mode}`) }))}
+              />
+              <FileSheetFieldGrid columns={2}>
+                <NumberField label={t("field.centerX")} value={engraving.x} min={-2000} max={2000} step={0.5} onCommit={(x) => patchEngraving({ x })} />
+                <NumberField label={t("field.centerY")} value={engraving.y} min={-2000} max={2000} step={0.5} onCommit={(y) => patchEngraving({ y })} />
+              </FileSheetFieldGrid>
+              <FileSheetFieldGrid columns={2}>
+                <NumberField label={t("size.width")} value={engraving.sizeX} min={0.5} max={2000} step={0.5} onCommit={(sizeX) => resizeEngraving({ sizeX })} />
+                <NumberField label={t("size.height")} value={engraving.sizeY} min={0.5} max={2000} step={0.5} onCommit={(sizeY) => resizeEngraving({ sizeY })} />
+              </FileSheetFieldGrid>
+              <FileSheetToggleRow label={t("field.keepRatio")} checked={keepRatio} onCheckedChange={setKeepRatio} />
+              <NumberRow label={t("field.engravingDepth")} value={engraving.depth} min={0.1} max={100} step={0.1} onCommit={(depth) => patchEngraving({ depth })} />
+              <FileSheetStatusText>
+                {t("engraving.summary", { contours: engraving.contours.length, points: engravingPointCount(engraving) })}
+              </FileSheetStatusText>
+              {engraving.depth >= spec.lid.thickness ? <FileSheetStatusText>{t("engraving.through")}</FileSheetStatusText> : null}
+              {engraving.mode === "inlay" ? <FileSheetStatusText>{t("engraving.inlayHint")}</FileSheetStatusText> : null}
+              <FileSheetButtonRow columns={2}>
+                <CompactButton icon={Upload} onClick={() => fileRef.current?.click()}>{t("action.replaceEngraving")}</CompactButton>
+                <CompactButton
+                  icon={X}
+                  onClick={() => edit((draft) => {
+                    draft.lid.engraving = null;
+                  })}
+                >
+                  {t("action.removeEngraving")}
+                </CompactButton>
+              </FileSheetButtonRow>
+            </>
+          ) : (
+            <>
+              <FileSheetStatusText>{t("engraving.hint")}</FileSheetStatusText>
+              <FileSheetButtonRow>
+                <CompactButton icon={Upload} onClick={() => fileRef.current?.click()}>{t("action.addEngraving")}</CompactButton>
+              </FileSheetButtonRow>
+            </>
+          )}
+          {engravingError ? <FileSheetStatusText tone="error">{engravingError}</FileSheetStatusText> : null}
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".svg,image/svg+xml"
+            className="hidden"
+            aria-label={t("action.addEngraving")}
+            onChange={loadEngraving}
+          />
         </FileSheetSubsection>
       ) : null}
     </div>
@@ -1444,7 +1552,7 @@ function FileTab({ builder, onOpenFile, hosted = false }) {
           <FileSheetStatusText key={line} tone={summary.tone}>{line}</FileSheetStatusText>
         )) : null}
         {error ? <FileSheetStatusText tone="error">{describeBoxError(error, t)}</FileSheetStatusText> : null}
-        {["base", "lid"].map((part) => {
+        {["base", "lid", "inlay"].map((part) => {
           const files = outputs
             .filter((output) => output.part === part)
             .sort((left, right) => FORMAT_ORDER.indexOf(left.format) - FORMAT_ORDER.indexOf(right.format));

@@ -35,7 +35,7 @@ __all__ = [
     "normalize_box_plan",
 ]
 
-BOX_PART_NAMES = ("base", "lid")
+BOX_PART_NAMES = ("base", "lid", "inlay")
 
 _PRIMITIVES = frozenset({"rrect", "cyl", "poly"})
 _OPERATIONS = frozenset({"union", "difference"})
@@ -137,7 +137,7 @@ def normalize_plan_node(node: Any, where: str = "plan", *, _budget: _Budget | No
 
 
 def normalize_box_plan(plan: Any) -> dict:
-    """``{"base": node, "lid": node | None}`` checked; ``base`` is required."""
+    """``{"base": node, "lid": node | None, "inlay": node | None}`` checked; ``base`` is required."""
     if not isinstance(plan, dict):
         raise PlanError("plan: expected an object with base and lid")
     unknown = sorted(str(key)[:20] for key in set(plan) - set(BOX_PART_NAMES))
