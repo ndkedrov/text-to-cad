@@ -10,9 +10,9 @@
 
 export const ENGRAVING_MODES = Object.freeze(["cut", "inlay"]);
 export const MAX_ENGRAVING_CONTOURS = 80;
-export const MAX_CONTOUR_POINTS = 400;
-// The plan grammar allows 6000 polygon points in all; the rest is for the box.
-export const MAX_ENGRAVING_POINTS = 4000;
+export const MAX_CONTOUR_POINTS = 800;
+// The plan grammar allows 12000 polygon points in all; the rest is for the box.
+export const MAX_ENGRAVING_POINTS = 9000;
 // The smallest contour worth cutting, in the drawing's own units.
 const MIN_CONTOUR_SPAN = 1e-6;
 

@@ -13,9 +13,10 @@ import {
 import { loadManifold } from "./manifoldRuntime.js";
 
 // Corners of a groove are rounded in this many steps, and the result is thinned
-// to this much, in the drawing's own units.
-const GROOVE_CORNER_STEPS = 8;
-const GROOVE_TOLERANCE = 0.02;
+// to this much, in the drawing's own units. Both are fine enough that a small
+// circle keeps its roundness instead of coming out as a decagon.
+const GROOVE_CORNER_STEPS = 16;
+const GROOVE_TOLERANCE = 0.005;
 
 // A drawing may be laid out in real sizes; these are the units a file may say so in.
 const MM_PER_UNIT = Object.freeze({ mm: 1, cm: 10, m: 1000, in: 25.4, pt: 25.4 / 72, pc: 25.4 / 6, px: 25.4 / 96 });
@@ -24,8 +25,8 @@ const STROKE_LINE_POINTS = 200;
 
 // How finely a shape is walked before it is simplified, and what counts as the
 // jump from the end of one subpath to the start of the next.
-const SAMPLE_STEP = 0.15;
-const MAX_SAMPLES = 3000;
+const SAMPLE_STEP = 0.1;
+const MAX_SAMPLES = 4000;
 const JUMP = 6;
 // A drawing is read on the page's own thread, so the work is bounded on every
 // side: a crowded file would otherwise walk millions of points and the browser
@@ -232,7 +233,7 @@ export async function drawingFromSvg(text, { name = "", documentRef = globalThis
       }
       // The line is followed closely: whatever it is off by comes straight off the
       // width of the groove drawn along it.
-      const fine = Math.min(tolerance, groove / 20);
+      const fine = Math.min(tolerance, groove / 40);
       for (const line of contours) {
         const ends = Math.hypot(line[0][0] - line[line.length - 1][0], line[0][1] - line[line.length - 1][1]);
         const closed = ends <= groove;
