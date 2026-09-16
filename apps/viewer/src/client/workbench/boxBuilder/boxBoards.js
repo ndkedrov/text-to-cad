@@ -93,6 +93,9 @@ export function newBoard(spec, preset = null) {
   board.clampHeight = source.clampHeight != null && Number.isFinite(Number(source.clampHeight))
     ? Number(source.clampHeight)
     : defaultClampHeight(board);
+  board.clampOffset = source.clampOffset != null && Number.isFinite(Number(source.clampOffset))
+    ? Number(source.clampOffset)
+    : roundMm(Math.max(board.width, board.length) / 2, 3);
   board.template = source === CUSTOM_BOARD ? "" : boardTemplateStamp(normalizedBoard(board));
   return board;
 }
@@ -105,7 +108,8 @@ function normalizedBoard(board) {
 
 // What a board takes from its template; where it sits in the box is its own.
 const TEMPLATE_FIELDS = Object.freeze([
-  "name", "width", "length", "thickness", "clearance", "componentHeight", "padDiameter", "boreDiameter", "clamp", "clampHeight"
+  "name", "width", "length", "thickness", "clearance", "componentHeight", "padDiameter", "boreDiameter",
+  "clamp", "clampHeight", "clampOffset"
 ]);
 const PORT_FIELDS = Object.freeze(["type", "edge", "offset", "elevation", "shape", "width", "height", "radius", "overhang", "margin"]);
 
@@ -314,12 +318,15 @@ export function resizeBoard(draft, id, { width, length }) {
       ? keep(entry.offset, board.width, nextWidth)
       : keep(entry.offset, board.length, nextLength);
   }
-  // Ribs keep their middle's distance to the nearer end of the long side.
+  // Ribs and the clamp posts keep their distance to the nearer end of the long side.
   const alongX = boardLongAxis(board) === "x";
+  const longFrom = alongX ? board.width : board.length;
+  const longTo = alongX ? nextWidth : nextLength;
   for (const rail of board.rails || []) {
-    const centre = keep(rail.offset + rail.thickness / 2, alongX ? board.width : board.length, alongX ? nextWidth : nextLength);
+    const centre = keep(rail.offset + rail.thickness / 2, longFrom, longTo);
     rail.offset = roundMm(Math.max(centre - rail.thickness / 2, 0), 3);
   }
+  board.clampOffset = keep(board.clampOffset, longFrom, longTo);
   board.width = nextWidth;
   board.length = nextLength;
   if (board.mounted) {

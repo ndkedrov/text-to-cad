@@ -171,6 +171,8 @@ def normalize_board_presets(boards: Any, port_types, categories) -> list[dict]:
             entry["clamp"] = source["clamp"]
         if "clampHeight" in source:
             entry["clampHeight"] = _number(source, "clampHeight", where, 1, 200)
+        if "clampOffset" in source:
+            entry["clampOffset"] = _number(source, "clampOffset", where, 0, max(width, length))
         clean.append(entry)
     return clean
 

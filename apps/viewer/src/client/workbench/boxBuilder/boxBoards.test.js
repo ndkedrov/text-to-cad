@@ -113,6 +113,14 @@ test("the dual USB-C ESP32-S3 rests on two ribs and a T piece next to the box cl
   assert.deepEqual(ribs.map((rib) => [rib.pos, rib.h]), [[[0, -37, 1.99], 2.01], [[0, 20, 1.99], 2.01]]);
   const posts = findNodes(base, (node) => node.type === "cyl" && node.r === 2.5 && node.h === 14.01);
   assert.deepEqual(posts.map((post) => post.pos), [[-15.7, -12.5, 1.99], [15.7, -12.5, 1.99]]);
+  // The posts slide along the board: 20 mm from the USB end instead of halfway.
+  const moved = mounted("esp32S3DevkitC", (draft) => {
+    draft.base.width = 120;
+    draft.base.depth = 100;
+  });
+  moved.boards[0].clampOffset = 20;
+  const movedPosts = findNodes(buildBoxPlan(moved).base, (node) => node.type === "cyl" && node.r === 2.5 && node.h === 14.01);
+  assert.deepEqual(movedPosts.map((post) => post.pos), [[-15.7, -27, 1.99], [15.7, -27, 1.99]]);
   const tee = findNodes(base, (node) => node.type === "poly" && node.h === CLAMP_DEPTH);
   assert.equal(tee.length, 1);
   // Bar 3 mm plus a stem from the 14 mm post tops down to the board top at 3.6 mm.

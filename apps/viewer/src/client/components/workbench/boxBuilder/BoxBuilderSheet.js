@@ -1036,6 +1036,14 @@ function BoardItem({ builder, board, index, presets }) {
         {board.clamp ? (
           <>
             <NumberRow label={t("field.clampHeight")} value={board.clampHeight} min={1} max={200} step={0.5} onCommit={(clampHeight) => patch({ clampHeight })} />
+            <NumberRow
+              label={t("field.clampOffset")}
+              value={board.clampOffset}
+              min={0}
+              max={Math.max(board.width, board.length)}
+              step={0.5}
+              onCommit={(clampOffset) => patch({ clampOffset })}
+            />
             <FileSheetStatusText>{t("board.clampStem", { stem: formatNumber(clampStemLength(board), 1) })}</FileSheetStatusText>
           </>
         ) : null}
