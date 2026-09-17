@@ -58,6 +58,8 @@ for the full flow, the resume path, the rehearsal, and local/manual fallbacks.
 - `models/`: sample and durable CAD/robot-description fixtures.
 - `apps/viewer/`: the CAD Viewer's React client (its backend is `cadgen.viewer`).
 - `packages/cadgen-js`: shared JS CAD/render/runtime code, UI-framework agnostic.
+- `packages/box-builder`: the printable-box builder panel (spec, CSG plan,
+  boards, engraving, React panel) hosted by the viewer through an adapter.
 - `packages/cadgen`: the published distribution — STEP/GLB/topology generation,
   the skill CLI parsers, the CAD Viewer backend + client, and the Node/browser
   runtimes it executes.

@@ -5,6 +5,7 @@
 @source "../hooks";
 @source "../ui";
 @source "../workbench";
+@source "../../../../../packages/box-builder/src";
 @source "../main.jsx";
 @source "../../../index.html";
 

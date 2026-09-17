@@ -6,6 +6,8 @@ import json
 import tempfile
 import unittest
 
+from tests.python.support.paths import repo_path
+
 from cadgen.viewer.board_presets import BoardPresets, PresetError, normalize_board_presets, shipped_presets
 
 
@@ -16,6 +18,14 @@ class ShippedPresets(unittest.TestCase):
         self.assertGreaterEqual(len(boards), 10)
         self.assertEqual(len({board["id"] for board in boards}), len(boards))
         self.assertEqual(boards, shipped["boards"], "normalizing changes nothing in the shipped set")
+
+    def test_the_box_builder_package_ships_the_same_list(self):
+        # The panel's package carries the list for hosts without this server; the
+        # wheel ships alone, so it keeps its own copy, and the two must not drift.
+        package_copy = repo_path("packages/box-builder/src/presets/boards.json")
+        server_copy = repo_path("packages/cadgen/src/cadgen/viewer/board_presets.json")
+        with open(package_copy, encoding="utf-8") as package_file, open(server_copy, encoding="utf-8") as server_file:
+            self.assertEqual(json.load(package_file), json.load(server_file), "edit both copies of the board list")
 
 
 class EditedPresets(unittest.TestCase):

@@ -23,6 +23,10 @@ const DEFAULT_DEV_PORT = 5173;
 const viewerAppRoot = path.dirname(fileURLToPath(import.meta.url));
 const viewerClientRoot = path.join(viewerAppRoot, "src", "client");
 const cadJsPackageRoot = resolveCadJsPackageRoot();
+// The box builder panel is this repository's `packages/box-builder`, built from
+// source like cadgen-js. Its dependencies come from this app's node_modules (the
+// aliases below), so the panel shares one React, three and manifold with the app.
+const boxBuilderPackageRoot = path.resolve(viewerAppRoot, "..", "..", "packages", "box-builder", "src");
 const viewerNodeModulesRoot = path.join(viewerAppRoot, "node_modules");
 const defaultDirectoryRoot = path.resolve(viewerAppRoot, "..");
 const directoryRoot = resolveDirectoryRoot();
@@ -213,6 +217,13 @@ export default defineConfig(async ({ command }) => ({
     alias: {
       "@": viewerClientRoot,
       "cadgen-js": cadJsPackageRoot,
+      "box-builder": boxBuilderPackageRoot,
+      "class-variance-authority": path.join(viewerNodeModulesRoot, "class-variance-authority"),
+      "lucide-react": path.join(viewerNodeModulesRoot, "lucide-react"),
+      "manifold-3d": path.join(viewerNodeModulesRoot, "manifold-3d"),
+      "radix-ui": path.join(viewerNodeModulesRoot, "radix-ui"),
+      "react": path.join(viewerNodeModulesRoot, "react"),
+      "react-dom": path.join(viewerNodeModulesRoot, "react-dom"),
       "clsx": path.join(viewerNodeModulesRoot, "clsx"),
       "gifenc": path.join(viewerNodeModulesRoot, "gifenc", "dist", "gifenc.esm.js"),
       "tailwind-merge": path.join(viewerNodeModulesRoot, "tailwind-merge"),
@@ -293,7 +304,7 @@ export default defineConfig(async ({ command }) => ({
       // cadgen-js lives outside the app root, so it must be allowed explicitly;
       // real paths too, in case a checkout reaches it through a link. See
       // scripts/serverFsAllow.mjs.
-      allow: resolveServerFsAllow([viewerAppRoot, cadJsPackageRoot], {
+      allow: resolveServerFsAllow([viewerAppRoot, cadJsPackageRoot, boxBuilderPackageRoot], {
         realpath: fs.realpathSync,
       }),
     },

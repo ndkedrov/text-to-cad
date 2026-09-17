@@ -18,7 +18,7 @@ test("both languages carry exactly the same keys", () => {
 
 test("every board type the server ships is named in both languages", () => {
   const shipped = JSON.parse(readFileSync(
-    new URL("../../../../../../packages/cadgen/src/cadgen/viewer/board_presets.json", import.meta.url),
+    new URL("../presets/boards.json", import.meta.url),
     "utf8"
   ));
   for (const id of shipped.categories) {
@@ -59,7 +59,7 @@ test("every warning the spec produces has a sentence in both languages", () => {
   spec.lid.enabled = false;
   spec.holes.push({ ...newHole(spec, "lid") });
   const rpiZero = JSON.parse(readFileSync(
-    new URL("../../../../../../packages/cadgen/src/cadgen/viewer/board_presets.json", import.meta.url),
+    new URL("../presets/boards.json", import.meta.url),
     "utf8"
   )).boards.find((board) => board.id === "rpiZero");
   spec.boards.push({ ...newBoard(spec, rpiZero), mounted: true, componentHeight: 100, x: 60 });

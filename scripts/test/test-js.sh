@@ -9,5 +9,8 @@ cd "$REPO_ROOT"
 section "cadgen-js tests"
 npm --prefix packages/cadgen-js test
 
+section "Box builder tests"
+npm --prefix packages/box-builder test
+
 section "CAD Viewer tests"
 npm --prefix apps/viewer run test

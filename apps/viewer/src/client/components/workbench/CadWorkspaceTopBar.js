@@ -63,7 +63,7 @@ import {
   ellipsisBreadcrumbMenuDirectory
 } from "@/workbench/breadcrumbs";
 import viewerPackage from "../../../../package.json";
-import { useBoxLanguage } from "./boxBuilder/useBoxLanguage";
+import { useBoxLanguage } from "box-builder/ui/useBoxLanguage.js";
 
 function fileSheetLabel(fileSheetKind) {
   if (fileSheetKind === "dxf") {

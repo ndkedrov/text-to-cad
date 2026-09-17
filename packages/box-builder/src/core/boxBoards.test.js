@@ -29,9 +29,9 @@ import {
   normalizeBoxSpec
 } from "./boxSpec.js";
 
-// The board templates the server ships (GET /__cad/boxes/presets).
+// The board templates the package ships (the viewer server serves the same list).
 const SHIPPED = JSON.parse(readFileSync(
-  new URL("../../../../../../packages/cadgen/src/cadgen/viewer/board_presets.json", import.meta.url),
+  new URL("../presets/boards.json", import.meta.url),
   "utf8"
 ));
 

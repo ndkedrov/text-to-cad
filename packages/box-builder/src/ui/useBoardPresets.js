@@ -1,19 +1,21 @@
 import { useEffect, useState } from "react";
-import { fetchBoardPresets } from "@/workbench/boxBuilder/boxApi.js";
+import { useBoxAdapterOr } from "./adapter.js";
 
-// The server's circuit-board templates: { boards, categories }. Fetched whenever
+// The host's circuit-board templates: { boards, categories }. Fetched whenever
 // the board list is shown and again whenever this tab comes back into view, so
 // presets an admin publishes in another tab are offered without a reload. Until
-// an answer arrives (or when the server has no such route) the last list seen on
-// this page is used, which starts empty: only "Custom".
+// an answer arrives (or when the host has none) the last list seen on this page
+// is used, which starts empty: only "Custom". `adapter` is for a caller outside
+// the adapter's provider.
 let lastPresets = { boards: [], categories: [] };
 
-export function useBoardPresets() {
+export function useBoardPresets(adapter) {
+  const source = useBoxAdapterOr(adapter);
   const [presets, setPresets] = useState(lastPresets);
   useEffect(() => {
     let cancelled = false;
     const refresh = () => {
-      fetchBoardPresets().then(
+      source.boardPresets().then(
         (payload) => {
           if (!cancelled && Array.isArray(payload?.boards)) {
             lastPresets = {
@@ -39,6 +41,6 @@ export function useBoardPresets() {
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", refreshWhenShown);
     };
-  }, []);
+  }, [source]);
   return presets;
 }
