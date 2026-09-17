@@ -1,20 +1,54 @@
-// Box builder: evaluate a CSG plan with manifold (WASM) for the live preview.
-// Same grammar as cadgen.box_csg; curves become polygons here, which is the only
-// difference between what the preview shows and the exported STEP.
+// Box builder: evaluate a CSG plan with manifold (WASM), for the live preview or
+// for print files a host writes itself. Same grammar as cadgen.box_csg; curves
+// become polygons here, which is the only difference between what the preview
+// shows and the exported STEP.
 
+// Segments in a full circle of this radius, as the preview draws it. Always a
+// multiple of 4, so a rounded corner gets a whole quarter.
 export function circleSegments(radius) {
   return Math.min(128, Math.max(24, Math.round(radius * 6 / 4) * 4));
 }
 
+// How far a facet of an exported circle may stray from the true curve, in mm.
+export const EXPORT_CHORD_TOLERANCE_MM = 0.02;
+
+// The same for print files (STL, 3MF), where a facet shows on the part: never
+// coarser than the preview the user saw, and fine enough that no chord sits
+// further than EXPORT_CHORD_TOLERANCE_MM inside the circle, up to 256. Measured
+// against the server's files: every volume within 0.15 %, every bounding box
+// exact. Always a multiple of 4.
+export function exportCircleSegments(radius) {
+  const preview = circleSegments(radius);
+  if (radius <= EXPORT_CHORD_TOLERANCE_MM) {
+    return preview;
+  }
+  const chord = Math.PI / Math.acos(1 - EXPORT_CHORD_TOLERANCE_MM / radius);
+  return Math.min(256, Math.max(preview, Math.ceil(chord / 4) * 4));
+}
+
+export const PLAN_QUALITIES = Object.freeze(["preview", "export"]);
+
+// Segments for a circle at a quality: "preview" (the default) or "export".
+export function circleSegmentsFor(radius, quality = "preview") {
+  if (quality === "preview") {
+    return circleSegments(radius);
+  }
+  if (quality === "export") {
+    return exportCircleSegments(radius);
+  }
+  throw new Error(`unknown plan quality: ${quality}`);
+}
+
 // Counter-clockwise outline of a rectangle centred on the origin with rounded corners.
-export function roundedRectContour(width, depth, radius) {
+export function roundedRectContour(width, depth, radius, quality = "preview") {
   const halfWidth = width / 2;
   const halfDepth = depth / 2;
   const cornerRadius = Math.min(Math.max(radius, 0), halfWidth, halfDepth);
+  const segments = circleSegmentsFor(cornerRadius, quality);
   if (cornerRadius <= 1e-6) {
     return [[-halfWidth, -halfDepth], [halfWidth, -halfDepth], [halfWidth, halfDepth], [-halfWidth, halfDepth]];
   }
-  const steps = Math.max(2, circleSegments(cornerRadius) / 4);
+  const steps = Math.max(2, segments / 4);
   const corners = [
     [halfWidth - cornerRadius, halfDepth - cornerRadius, 0],
     [-halfWidth + cornerRadius, halfDepth - cornerRadius, 90],
@@ -42,8 +76,12 @@ export function roundedRectContour(width, depth, radius) {
 
 // Returns a Manifold the caller owns (call .delete() when done). Every
 // intermediate object is freed here: WASM memory is not garbage-collected.
-export function manifoldFromPlan(wasm, plan) {
+// `quality` sets how finely circles and rounded corners are cut into polygons:
+// "preview" (the default) or "export".
+export function manifoldFromPlan(wasm, plan, { quality = "preview" } = {}) {
   const { Manifold, CrossSection } = wasm;
+  // An unknown quality fails here, before any wasm object is made.
+  circleSegmentsFor(1, quality);
   const owned = [];
   const own = (object) => {
     owned.push(object);
@@ -59,10 +97,10 @@ export function manifoldFromPlan(wasm, plan) {
     let solid;
     switch (node.type) {
       case "rrect":
-        solid = extrudeContour(roundedRectContour(node.w, node.d, node.r), node.h);
+        solid = extrudeContour(roundedRectContour(node.w, node.d, node.r, quality), node.h);
         break;
       case "cyl":
-        solid = own(Manifold.cylinder(node.h, node.r, node.r, circleSegments(node.r)));
+        solid = own(Manifold.cylinder(node.h, node.r, node.r, circleSegmentsFor(node.r, quality)));
         break;
       case "poly":
         solid = extrudeContour(node.points, node.h);

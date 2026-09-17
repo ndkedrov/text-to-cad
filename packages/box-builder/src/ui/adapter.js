@@ -5,16 +5,38 @@ import { createContext, createElement, useContext } from "react";
 // the host's. A host hands the panel an adapter with these members:
 //
 //   listBoxes()                   -> { boxes: [{ name, updatedAt }], quota? }
-//   loadBox(name)                 -> { name, spec, build, outputs, quota? }
+//   loadBox(name)                 -> { name, spec, build, outputs, quota?, changed? }
+//                                    changed: true opens the box as unsaved (the host
+//                                    had to adjust the document while reading it)
 //   boxStatus(name)               -> { name, build, outputs, quota? }
 //   saveBox(name, { spec, plan }) -> the same as boxStatus, once the build is queued
 //   fileUrl(name, part, format)   -> a link that downloads one built file
+//                                    (not needed with exportFile)
 //   boardPresets()                -> { boards, categories }
-//   onOutputsChanged()            -> optional: a build finished, its files are new
+//
+// and, optionally, these. Without one the panel does what a web page does, which
+// is what the CAD Viewer relies on; a host where that does not work (an app's
+// WebView: no download links, confirm dialogs or print windows) brings its own:
+//
+//   onOutputsChanged()              -> a build finished, its files are new
+//   exportFile(name, part, format)  -> Promise<boolean>: saves or shares one built
+//                                      file instead of a download link; false is
+//                                      the user cancelling
+//   confirm(message)                -> Promise<boolean>: instead of window.confirm,
+//                                      before unsaved changes are dropped
+//   printFloorSheet(svg, title)     -> Promise<boolean>: prints the floor sheet (an
+//                                      SVG in millimetres) instead of a print
+//                                      window; false shows it as blocked
+//   capabilities                    -> { folderPath, openStep, quota }, booleans:
+//                                      show the boxes/ folder (and the copy-path
+//                                      button), the open-STEP button, the quota.
+//                                      Over the panel's `hosted` prop; a field
+//                                      left out keeps what `hosted` gives
 //
 // `build` is { state: "queued" | "building" | "done" | "error", parts } or null;
 // `outputs` lists { part, format, file, size, modifiedAt, path? }. A rejected call
 // throws an Error that may carry `status` and `code` (see describeBoxError).
+// How the optional members fall back: core/adapterMembers.js.
 
 const BoxAdapterContext = createContext(null);
 

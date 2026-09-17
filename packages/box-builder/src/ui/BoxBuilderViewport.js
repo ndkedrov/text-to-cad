@@ -109,7 +109,7 @@ function lidLift(dims) {
 }
 
 function geometryFromPlan(wasm, node) {
-  const solid = manifoldFromPlan(wasm, node);
+  const solid = manifoldFromPlan(wasm, node, { quality: "preview" });
   try {
     const mesh = solid.getMesh();
     const { numProp, vertProperties, triVerts } = mesh;

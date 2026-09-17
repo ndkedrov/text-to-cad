@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { mountBoard, newBoard } from "./boxBoards.js";
-import { floorSheetSvg } from "./floorSheet.js";
+import { FLOOR_SHEET_WINDOW_FEATURES, floorSheetSvg, printFloorSheet } from "./floorSheet.js";
 import { defaultBoxSpec, newHole, newStandoffGroup, normalizeBoxSpec } from "./boxSpec.js";
 
 const DEMO_BOARD = {
@@ -44,10 +44,10 @@ const countOf = (svg, pattern) => svg.match(new RegExp(pattern, "gu"))?.length |
 
 test("the floor sheet is a page in millimetres, one to one", () => {
   const svg = svgOf(demoSpec());
-  // 100 x 70 box, 12 mm margins, 16 mm for the title strip.
+  // 100 x 70 box, 12 mm margins (4 mm above the grid), 16 mm for the title strip.
   assert.equal(attribute(svg, "width"), "124mm");
-  assert.equal(attribute(svg, "height"), "110mm");
-  assert.equal(attribute(svg, "viewBox"), "0 0 124 110");
+  assert.equal(attribute(svg, "height"), "102mm");
+  assert.equal(attribute(svg, "viewBox"), "0 0 124 102");
   assert.ok(svg.includes("box floor"), "the title is on the sheet");
   assert.ok(svg.includes("50 mm"), "so is the ruler it is checked against");
 });
@@ -89,4 +89,60 @@ test("lid screw bosses are drawn as hanging above the floor, and only when there
   const withScrews = svgOf(demoSpec({ screws: true }));
   assert.equal(countOf(withScrews, 'class="above"'), 4, "one per corner");
   assert.ok(withScrews.includes('<circle class="cut" cx="44.8" cy="-29.8" r="1.25"/>'), "with its pilot hole");
+});
+
+test("a long note wraps under the title and the ruler instead of running off the page", () => {
+  const note = "Print at 100%, with no fitting to the page. ".repeat(6).trim();
+  const svg = floorSheetSvg(demoSpec(), { title: "box floor", note, ruler: "50 mm" });
+  const width = Number(attribute(svg, "width").replace("mm", ""));
+  const noteLines = [...svg.matchAll(/<text class="note" x="12" y="([\d.]+)" text-anchor="start">([^<]*)<\/text>/gu)];
+  assert.ok(noteLines.length > 1, "the note takes more than one line");
+  assert.equal(noteLines.map((line) => line[2]).join(" "), note, "and loses no words");
+  // 2.6 mm text at 0.6 of its size per character fits between the margins.
+  for (const [, , line] of noteLines) {
+    assert.ok(line.length * 2.6 * 0.6 <= width - 24, line);
+  }
+  // Every note line sits below the ruler (y 7) and above the grid.
+  const gridTop = Number(svg.match(/<g transform="translate\([\d.]+ ([\d.]+)\)">/u)[1]);
+  for (const [, y] of noteLines) {
+    assert.ok(Number(y) > 7 && Number(y) < gridTop - 4, y);
+  }
+});
+
+test("a box narrower than the ruler still gets a page the ruler fits on, with the box centred", () => {
+  const draft = normalizeBoxSpec(defaultBoxSpec());
+  draft.base.width = 30;
+  const spec = normalizeBoxSpec(draft);
+  const svg = floorSheetSvg(spec, { title: "box floor", note: "print at 100%", ruler: "50 mm" });
+  // The 50 mm ruler and 12 mm margins.
+  assert.equal(attribute(svg, "width"), "74mm");
+  assert.match(svg, /<g transform="translate\(22 [\d.]+\)">/u, "the grid starts 10 mm in, centring the 30 mm box");
+  // The title does not fit beside the ruler, so the ruler moves under the note.
+  const rulerY = Number(svg.match(/class="ruler" d="M12 ([\d.]+)h50/u)[1]);
+  const lastText = Math.max(...[...svg.matchAll(/<text class="(?:title|note)" x="12" y="([\d.]+)"/gu)].map((match) => Number(match[1])));
+  assert.ok(rulerY - 2.5 - 2.6 > lastText, "the ruler label clears the text above it");
+});
+
+test("the print window is opened so that window.open hands it back", () => {
+  // With "noopener" window.open returns null even when the window opens (HTML,
+  // window open steps), and the sheet would always be reported as blocked.
+  assert.doesNotMatch(FLOOR_SHEET_WINDOW_FEATURES, /noopener|noreferrer/u);
+  const opened = [];
+  let written = "";
+  let printed = 0;
+  const sheet = {
+    opener: "the page",
+    document: { write: (html) => { written += html; }, close: () => {} },
+    focus: () => {},
+    setTimeout: (callback) => callback(),
+    print: () => { printed += 1; }
+  };
+  const host = { open: (...args) => { opened.push(args); return sheet; } };
+  assert.equal(printFloorSheet("<svg/>", "box <1>", host), true);
+  assert.deepEqual(opened, [["", "_blank", FLOOR_SHEET_WINDOW_FEATURES]]);
+  assert.equal(sheet.opener, null, "the window is cut loose from the page");
+  assert.ok(written.includes("<title>box &lt;1&gt;</title>"));
+  assert.ok(written.includes("<body><svg/></body>"));
+  assert.equal(printed, 1);
+  assert.equal(printFloorSheet("<svg/>", "box", { open: () => null }), false, "a blocked window is reported");
 });

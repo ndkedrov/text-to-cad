@@ -57,7 +57,13 @@ import {
   unmountBoard
 } from "../core/boxBoards.js";
 import { buildBoxPlan } from "../core/boxPlan.js";
-import { floorSheetSvg, printFloorSheet } from "../core/floorSheet.js";
+import { floorSheetSvg } from "../core/floorSheet.js";
+import {
+  adapterCapabilities,
+  confirmWithAdapter,
+  fileAction,
+  printFloorWithAdapter
+} from "../core/adapterMembers.js";
 import {
   ENGRAVING_MODES,
   PRINTABLE_GAP_WIDTH,
@@ -1441,9 +1447,10 @@ function FileTab({ builder, onOpenFile, hosted = false }) {
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
   const [quota, setQuota] = useState(null);
-  const [printBlocked, setPrintBlocked] = useState(false);
+  const [printProblem, setPrintProblem] = useState(null);
   const nameValid = isValidBoxName(name);
   const building = ["queued", "building"].includes(status?.build?.state);
+  const capabilities = adapterCapabilities(adapter, { hosted });
 
   const refreshList = useCallback(async () => {
     try {
@@ -1530,34 +1537,48 @@ function FileTab({ builder, onOpenFile, hosted = false }) {
     if (!target) {
       return;
     }
-    if (dirty && !window.confirm(t("confirm.open", { name: target }))) {
+    if (dirty && !(await confirmWithAdapter(adapter, t("confirm.open", { name: target })))) {
       return;
     }
     setError(null);
     try {
       const payload = await adapter.loadBox(target);
-      replace(payload.name, payload.spec, { saved: true });
+      // A host that had to change the document while reading it opens it as unsaved.
+      replace(payload.name, payload.spec, { saved: payload.changed !== true });
       setStatus(payload);
     } catch (loadError) {
       setError(loadError);
     }
   };
 
-  const startNew = () => {
-    if (dirty && !window.confirm(t("confirm.new"))) {
+  const startNew = async () => {
+    if (dirty && !(await confirmWithAdapter(adapter, t("confirm.new")))) {
       return;
     }
     replace(freeBoxName(savedBoxes), defaultBoxSpec());
   };
 
-  // The floor, 1:1, in a window of its own: the browser's print dialog saves it as a PDF.
-  const printFloor = () => {
+  // The floor, 1:1, in a window of its own: the browser's print dialog saves it as a
+  // PDF. A host with its own printing does it instead.
+  const printFloor = async () => {
     const svg = floorSheetSvg(spec, {
       title: t("floor.sheetTitle", { name, width: formatNumber(dims.width), depth: formatNumber(dims.depth) }),
       note: t("floor.sheetNote"),
       ruler: t("floor.sheetRuler", { mm: 50 })
     });
-    setPrintBlocked(!printFloorSheet(svg, name || "box"));
+    const printed = await printFloorWithAdapter(adapter, svg, name || "box");
+    // A browser that refused the window is told how to allow it; a host that could not print is not a browser.
+    setPrintProblem(printed ? null : typeof adapter?.printFloorSheet === "function" ? "floor.failed" : "floor.blocked");
+  };
+
+  // A file through the host's exportFile: false is the user cancelling, not a failure.
+  const exportFile = async (run) => {
+    setError(null);
+    try {
+      await run();
+    } catch (exportError) {
+      setError(exportError);
+    }
   };
 
   const summary = buildSummary(status, t, language);
@@ -1580,9 +1601,9 @@ function FileTab({ builder, onOpenFile, hosted = false }) {
         {!nameValid ? (
           <FileSheetStatusText tone="error">{t("name.invalid")}</FileSheetStatusText>
         ) : null}
-        {hosted ? null : <FileSheetControlRow label={t("field.folder")} value={`boxes/${name}`} />}
+        {capabilities.folderPath ? <FileSheetControlRow label={t("field.folder")} value={`boxes/${name}`} /> : null}
         <FileSheetControlRow label={t("field.state")} value={dirty ? t("state.unsaved") : t("state.saved")} />
-        {quota ? <FileSheetControlRow label={t("field.today")} value={quotaText(quota, t)} /> : null}
+        {quota && capabilities.quota ? <FileSheetControlRow label={t("field.today")} value={quotaText(quota, t)} /> : null}
       </FileSheetSubsection>
 
       <FileSheetSubsection title={t("section.build")}>
@@ -1603,7 +1624,7 @@ function FileTab({ builder, onOpenFile, hosted = false }) {
         <FileSheetButtonRow>
           <CompactButton icon={Printer} onClick={printFloor}>{t("action.printFloor")}</CompactButton>
         </FileSheetButtonRow>
-        {printBlocked ? <FileSheetStatusText tone="error">{t("floor.blocked")}</FileSheetStatusText> : null}
+        {printProblem ? <FileSheetStatusText tone="error">{t(printProblem)}</FileSheetStatusText> : null}
         {summary ? summary.lines.map((line) => (
           <FileSheetStatusText key={line} tone={summary.tone}>{line}</FileSheetStatusText>
         )) : null}
@@ -1618,25 +1639,43 @@ function FileTab({ builder, onOpenFile, hosted = false }) {
           return (
             <FileSheetInlineControlRow key={part} label={t(`part.${part}`)}>
               <span className="flex items-center gap-1">
-                {files.map((output) => (
-                  <Button
-                    key={output.file}
-                    asChild
-                    size="sm"
-                    variant="outline"
-                    className={cn(FILE_SHEET_COMPACT_BUTTON_CLASSES, "px-1.5")}
-                  >
-                    <a
-                      href={adapter.fileUrl(status?.name || name, part, output.format)}
-                      download
-                      title={t("action.download", { format: output.format.toUpperCase() })}
+                {files.map((output) => {
+                  const action = fileAction(adapter, status?.name || name, part, output.format);
+                  const label = output.format.toUpperCase();
+                  const title = t("action.download", { format: label });
+                  const icon = <Download className="size-3.5" strokeWidth={2} aria-hidden="true" />;
+                  if (action.kind === "export") {
+                    return (
+                      <Button
+                        key={output.file}
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className={cn(FILE_SHEET_COMPACT_BUTTON_CLASSES, "px-1.5")}
+                        title={title}
+                        onClick={() => exportFile(action.run)}
+                      >
+                        {icon}
+                        {label}
+                      </Button>
+                    );
+                  }
+                  return (
+                    <Button
+                      key={output.file}
+                      asChild
+                      size="sm"
+                      variant="outline"
+                      className={cn(FILE_SHEET_COMPACT_BUTTON_CLASSES, "px-1.5")}
                     >
-                      <Download className="size-3.5" strokeWidth={2} aria-hidden="true" />
-                      {output.format.toUpperCase()}
-                    </a>
-                  </Button>
-                ))}
-                {!hosted && files.some((output) => output.format === "step") ? (
+                      <a href={action.href} download={output.file.split(/[\\/]/u).pop()} title={title}>
+                        {icon}
+                        {label}
+                      </a>
+                    </Button>
+                  );
+                })}
+                {capabilities.openStep && files.some((output) => output.format === "step") ? (
                   <CompactButton
                     icon={Eye}
                     className="px-1.5"
@@ -1649,7 +1688,7 @@ function FileTab({ builder, onOpenFile, hosted = false }) {
             </FileSheetInlineControlRow>
           );
         })}
-        {folderPath ? (
+        {folderPath && capabilities.copyFolderPath ? (
           <FileSheetButtonRow>
             <CompactButton
               icon={Copy}
