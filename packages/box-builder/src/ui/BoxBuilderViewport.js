@@ -2,18 +2,18 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { loadManifold } from "@/workbench/boxBuilder/manifoldRuntime.js";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/ui/utils";
-import { formatWarning } from "@/workbench/boxBuilder/i18n.js";
+import { loadManifold } from "../browser/manifoldRuntime.js";
+import { Button } from "./kit/ui/button.jsx";
+import { cn } from "./kit/utils.js";
+import { formatWarning } from "../core/i18n.js";
 import {
   duplicateSelected,
   findSelected,
   nudgeSelected,
   removeSelected
-} from "@/workbench/boxBuilder/boxEdits.js";
-import { manifoldFromPlan, roundedRectContour } from "@/workbench/boxBuilder/manifoldPlan.js";
-import { clampPieces } from "@/workbench/boxBuilder/boxPlan.js";
+} from "../core/boxEdits.js";
+import { manifoldFromPlan, roundedRectContour } from "../core/manifoldPlan.js";
+import { clampPieces } from "../core/boxPlan.js";
 import {
   boardLevels,
   clampBoardPosition,
@@ -26,8 +26,8 @@ import {
   isWallFace,
   roundMm,
   standoffPoints
-} from "@/workbench/boxBuilder/boxSpec.js";
-import { useBoxLanguage } from "./useBoxLanguage";
+} from "../core/boxSpec.js";
+import { useBoxLanguage } from "./useBoxLanguage.js";
 
 const BASE_COLOR = 0xc3cad1;
 const LID_COLOR = 0x93b4cc;

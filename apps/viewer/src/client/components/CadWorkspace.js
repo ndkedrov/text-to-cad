@@ -52,9 +52,10 @@ import {
 } from "@/workbench/artifactProgress.js";
 import FloatingToolBar from "./workbench/FloatingToolBar";
 import CadWorkspaceTopBar from "./workbench/CadWorkspaceTopBar";
-import BoxBuilderSheet from "./workbench/boxBuilder/BoxBuilderSheet";
-import BoxBuilderViewport from "./workbench/boxBuilder/BoxBuilderViewport";
-import { useBoxBuilder } from "./workbench/boxBuilder/useBoxBuilder";
+import BoxBuilderSheet from "box-builder/ui/BoxBuilderSheet.js";
+import BoxBuilderViewport from "box-builder/ui/BoxBuilderViewport.js";
+import { useBoxBuilder } from "box-builder/ui/useBoxBuilder.js";
+import { serverBoxAdapter } from "@/workbench/serverBoxAdapter.js";
 import CadWorkspaceHome from "./workbench/CadWorkspaceHome";
 import { useCadAssets } from "./workbench/hooks/useCadAssets";
 import {
@@ -7538,6 +7539,7 @@ export default function CadWorkspace({
                 }}
                 onStartResize={handleStartFileSheetResize}
                 builder={boxBuilder}
+                adapter={serverBoxAdapter}
                 onOpenFile={handleOpenBoxFile}
                 hosted={boxBuilderHosted}
               />

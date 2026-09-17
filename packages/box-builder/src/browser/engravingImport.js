@@ -9,8 +9,8 @@ import {
   MAX_ENGRAVING_POINTS,
   contourArea,
   simplifyContour
-} from "./engraving.js";
-import { closeNarrowGaps } from "./engravingGaps.js";
+} from "../core/engraving.js";
+import { closeNarrowGaps } from "../core/engravingGaps.js";
 import { loadManifold } from "./manifoldRuntime.js";
 
 // Corners of a groove are rounded in this many steps, and the result is thinned

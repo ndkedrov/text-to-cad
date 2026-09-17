@@ -4,7 +4,7 @@ import {
   setBoxLanguage,
   subscribeBoxLanguage,
   translate
-} from "@/workbench/boxBuilder/i18n.js";
+} from "../core/i18n.js";
 
 // The box builder's language and its translator; every caller re-renders on a switch.
 export function useBoxLanguage() {

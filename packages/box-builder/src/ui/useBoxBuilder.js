@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PLAN_NODE_LIMIT, PLAN_POINT_LIMIT, buildBoxPlan, countPlanNodes, countPlanPoints } from "@/workbench/boxBuilder/boxPlan.js";
+import { PLAN_NODE_LIMIT, PLAN_POINT_LIMIT, buildBoxPlan, countPlanNodes, countPlanPoints } from "../core/boxPlan.js";
 import {
   boxDimensions,
   boxSpecWarnings,
   defaultBoxSpec,
   normalizeBoxSpec
-} from "@/workbench/boxBuilder/boxSpec.js";
+} from "../core/boxSpec.js";
 
 // The unsaved box survives a reload: it is a draft on this machine, not a file.
 const DRAFT_STORAGE_KEY = "cad-viewer:box-builder:draft:v1";

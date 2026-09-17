@@ -20,19 +20,12 @@ import {
   Upload,
   X
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { copyTextToClipboard } from "@/ui/clipboard";
-import { cn } from "@/ui/utils";
-import {
-  boxFileUrl,
-  describeBoxError,
-  fetchBoxStatus,
-  isValidBoxName,
-  listBoxes,
-  loadBox,
-  saveBox
-} from "@/workbench/boxBuilder/boxApi.js";
+import { Button } from "./kit/ui/button.jsx";
+import { Input } from "./kit/ui/input.jsx";
+import { copyTextToClipboard } from "./kit/clipboard.js";
+import { cn } from "./kit/utils.js";
+import { describeBoxError, isValidBoxName } from "../core/boxNames.js";
+import { BoxAdapterProvider, useBoxAdapter } from "./adapter.js";
 import {
   ARRAY_DIRECTIONS,
   ARRAY_MODES,
@@ -41,7 +34,7 @@ import {
   duplicateSelected,
   planArray,
   removeSelected
-} from "@/workbench/boxBuilder/boxEdits.js";
+} from "../core/boxEdits.js";
 import {
   PORT_TYPE_IDS,
   boardMinimumSize,
@@ -62,9 +55,9 @@ import {
   setPortType,
   snapBoardToWalls,
   unmountBoard
-} from "@/workbench/boxBuilder/boxBoards.js";
-import { buildBoxPlan } from "@/workbench/boxBuilder/boxPlan.js";
-import { floorSheetSvg, printFloorSheet } from "@/workbench/boxBuilder/floorSheet.js";
+} from "../core/boxBoards.js";
+import { buildBoxPlan } from "../core/boxPlan.js";
+import { floorSheetSvg, printFloorSheet } from "../core/floorSheet.js";
 import {
   ENGRAVING_MODES,
   PRINTABLE_GAP_WIDTH,
@@ -75,8 +68,8 @@ import {
   engravingPartCount,
   engravingPointCount,
   engravingUnitsPerMm
-} from "@/workbench/boxBuilder/engraving.js";
-import { drawingFromSvg, redrawnContours } from "@/workbench/boxBuilder/engravingImport.js";
+} from "../core/engraving.js";
+import { drawingFromSvg, redrawnContours } from "../browser/engravingImport.js";
 import {
   BOARD_EDGES,
   BOARD_ROTATIONS,
@@ -113,9 +106,8 @@ import {
   newStandoffGroup,
   nextId,
   roundMm
-} from "@/workbench/boxBuilder/boxSpec.js";
-import { formatWarning } from "@/workbench/boxBuilder/i18n.js";
-import { refreshCadCatalog } from "@/workbench/cadManifestStore.js";
+} from "../core/boxSpec.js";
+import { formatWarning } from "../core/i18n.js";
 import FileSheet, {
   FILE_SHEET_COMPACT_BUTTON_CLASSES,
   FILE_SHEET_COMPACT_ICON_BUTTON_CLASSES,
@@ -134,10 +126,10 @@ import FileSheet, {
   FileSheetToggleRow,
   FileSheetValueInput,
   parseFileSheetNumberInput
-} from "../FileSheet";
-import FileSheetTabbedSurface from "../FileSheetTabbedSurface";
-import { useBoardPresets } from "./useBoardPresets";
-import { useBoxLanguage } from "./useBoxLanguage";
+} from "./kit/FileSheet.js";
+import FileSheetTabbedSurface from "./kit/FileSheetTabbedSurface.js";
+import { useBoardPresets } from "./useBoardPresets.js";
+import { useBoxLanguage } from "./useBoxLanguage.js";
 
 const SECTION_IDS = Object.freeze({
   BODY: "box-body",
@@ -1440,6 +1432,7 @@ function quotaText(quota, t) {
 
 function FileTab({ builder, onOpenFile, hosted = false }) {
   const { language, t } = useBoxLanguage();
+  const adapter = useBoxAdapter();
   const { spec, dims, name, setName, warnings, dirty, markSaved, replace, undo, redo, canUndo, canRedo } = builder;
   const [savedBoxes, setSavedBoxes] = useState([]);
   const [openTarget, setOpenTarget] = useState("");
@@ -1454,7 +1447,7 @@ function FileTab({ builder, onOpenFile, hosted = false }) {
 
   const refreshList = useCallback(async () => {
     try {
-      const payload = await listBoxes();
+      const payload = await adapter.listBoxes();
       setSavedBoxes(Array.isArray(payload?.boxes) ? payload.boxes : []);
       if (payload?.quota) {
         setQuota(payload.quota);
@@ -1462,7 +1455,7 @@ function FileTab({ builder, onOpenFile, hosted = false }) {
     } catch (listError) {
       setError(listError);
     }
-  }, []);
+  }, [adapter]);
 
   useEffect(() => {
     refreshList();
@@ -1474,7 +1467,7 @@ function FileTab({ builder, onOpenFile, hosted = false }) {
       return undefined;
     }
     let cancelled = false;
-    fetchBoxStatus(name).then(
+    adapter.boxStatus(name).then(
       (payload) => {
         if (!cancelled) {
           setStatus(payload);
@@ -1488,7 +1481,7 @@ function FileTab({ builder, onOpenFile, hosted = false }) {
     return () => {
       cancelled = true;
     };
-  }, [name, nameValid]);
+  }, [adapter, name, nameValid]);
 
   useEffect(() => {
     if (!building) {
@@ -1496,20 +1489,20 @@ function FileTab({ builder, onOpenFile, hosted = false }) {
     }
     const timer = window.setInterval(async () => {
       try {
-        const payload = await fetchBoxStatus(name);
+        const payload = await adapter.boxStatus(name);
         setStatus(payload);
         if (payload?.quota) {
           setQuota(payload.quota);
         }
         if (!["queued", "building"].includes(payload?.build?.state)) {
-          refreshCadCatalog();
+          adapter.onOutputsChanged?.();
         }
       } catch (pollError) {
         setError(pollError);
       }
     }, STATUS_POLL_MS);
     return () => window.clearInterval(timer);
-  }, [building, name]);
+  }, [adapter, building, name]);
 
   const save = async () => {
     if (!nameValid) {
@@ -1519,7 +1512,7 @@ function FileTab({ builder, onOpenFile, hosted = false }) {
     setError(null);
     try {
       const plan = buildBoxPlan(spec, { layout: "print" });
-      const payload = await saveBox(name, { spec, plan: { base: plan.base, lid: plan.lid, inlay: plan.inlay } });
+      const payload = await adapter.saveBox(name, { spec, plan: { base: plan.base, lid: plan.lid, inlay: plan.inlay } });
       setStatus(payload);
       if (payload?.quota) {
         setQuota(payload.quota);
@@ -1542,7 +1535,7 @@ function FileTab({ builder, onOpenFile, hosted = false }) {
     }
     setError(null);
     try {
-      const payload = await loadBox(target);
+      const payload = await adapter.loadBox(target);
       replace(payload.name, payload.spec, { saved: true });
       setStatus(payload);
     } catch (loadError) {
@@ -1634,7 +1627,7 @@ function FileTab({ builder, onOpenFile, hosted = false }) {
                     className={cn(FILE_SHEET_COMPACT_BUTTON_CLASSES, "px-1.5")}
                   >
                     <a
-                      href={boxFileUrl(status?.name || name, part, output.format)}
+                      href={adapter.fileUrl(status?.name || name, part, output.format)}
                       download
                       title={t("action.download", { format: output.format.toUpperCase() })}
                     >
@@ -1721,13 +1714,14 @@ export default function BoxBuilderSheet({
   onStartResize,
   builder,
   onOpenFile,
-  hosted = false
+  hosted = false,
+  adapter
 }) {
   const { t } = useBoxLanguage();
   const [openSectionIds, setOpenSectionIds] = useState([SECTION_IDS.BODY]);
   const selectionKind = builder.selection?.kind || "";
   const selectionId = builder.selection?.id || "";
-  const { boards: boardPresets } = useBoardPresets();
+  const { boards: boardPresets } = useBoardPresets(adapter);
   const { spec, edit } = builder;
 
   // An engraving from before the cut was worked out as the drawing came in: its
@@ -1786,21 +1780,23 @@ export default function BoxBuilderSheet({
   ];
 
   return (
-    <FileSheet
-      open={open}
-      title={t("sheet.title")}
-      isDesktop={isDesktop}
-      width={width}
-      onOpenChange={onOpenChange}
-      onStartResize={onStartResize}
-      scrollBody={false}
-    >
-      <FileSheetTabbedSurface
-        kind="box"
-        sections={sections}
-        openSectionIds={openSectionIds}
-        onOpenSectionIdsChange={setOpenSectionIds}
-      />
-    </FileSheet>
+    <BoxAdapterProvider adapter={adapter}>
+      <FileSheet
+        open={open}
+        title={t("sheet.title")}
+        isDesktop={isDesktop}
+        width={width}
+        onOpenChange={onOpenChange}
+        onStartResize={onStartResize}
+        scrollBody={false}
+      >
+        <FileSheetTabbedSurface
+          kind="box"
+          sections={sections}
+          openSectionIds={openSectionIds}
+          onOpenSectionIdsChange={setOpenSectionIds}
+        />
+      </FileSheet>
+    </BoxAdapterProvider>
   );
 }
