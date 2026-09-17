@@ -67,13 +67,16 @@ import { buildBoxPlan } from "@/workbench/boxBuilder/boxPlan.js";
 import { floorSheetSvg, printFloorSheet } from "@/workbench/boxBuilder/floorSheet.js";
 import {
   ENGRAVING_MODES,
+  PRINTABLE_GAP_WIDTH,
+  PRINTABLE_LINE_WIDTH,
   engravingFromDrawing,
+  engravingGapWidth,
   engravingLineWidth,
   engravingPartCount,
   engravingPointCount,
   engravingUnitsPerMm
 } from "@/workbench/boxBuilder/engraving.js";
-import { drawingFromSvg, grooveContoursAt } from "@/workbench/boxBuilder/engravingImport.js";
+import { drawingFromSvg, redrawnContours } from "@/workbench/boxBuilder/engravingImport.js";
 import {
   BOARD_EDGES,
   BOARD_ROTATIONS,
@@ -415,20 +418,24 @@ function LidTab({ builder }) {
       ? { sizeX: values.sizeX, sizeY: roundMm(values.sizeX * ratio, 3) }
       : { sizeY: values.sizeY, sizeX: roundMm(values.sizeY / ratio, 3) });
   };
-  // The drawing's lines cut at another width: redrawn from the lines themselves,
-  // so the file is not needed again.
-  const redrawLines = async (millimetres) => {
-    if (!engraving?.strokes.length) {
+  // The drawing's lines cut at another width, or its narrow gaps closed: redrawn
+  // from the shapes and lines themselves, so the file is not needed again. Both
+  // arrive in millimetres and are kept in the drawing's units.
+  const redrawEngraving = async ({ lineMm = engravingLineWidth(engraving), gapMm = engravingGapWidth(engraving) } = {}) => {
+    if (!engraving?.strokes.length && !engraving?.fills.length) {
       return;
     }
-    const width = millimetres * engravingUnitsPerMm(engraving);
+    const units = engravingUnitsPerMm(engraving);
+    const lineWidth = engraving.strokes.length ? lineMm * units : 0;
+    const gapWidth = gapMm * units;
     try {
-      const grooves = await grooveContoursAt(engraving.strokes, width);
+      const contours = await redrawnContours(engraving, { lineWidth, gapWidth });
       edit((draft) => {
         const target = draft.lid.engraving;
         if (target) {
-          target.lineWidth = width;
-          target.contours = [...(target.fills || []), ...grooves];
+          target.lineWidth = lineWidth;
+          target.gapWidth = gapWidth;
+          target.contours = contours;
         }
       });
       setEngravingError("");
@@ -589,7 +596,17 @@ function LidTab({ builder }) {
                   min={0.1}
                   max={50}
                   step={0.05}
-                  onCommit={redrawLines}
+                  onCommit={(lineMm) => redrawEngraving({ lineMm })}
+                />
+              ) : null}
+              {engraving.strokes.length || engraving.fills.length ? (
+                <NumberRow
+                  label={t("field.engravingGap")}
+                  value={engravingGapWidth(engraving)}
+                  min={0}
+                  max={10}
+                  step={0.05}
+                  onCommit={(gapMm) => redrawEngraving({ gapMm })}
                 />
               ) : null}
               <FileSheetStatusText>
@@ -597,6 +614,12 @@ function LidTab({ builder }) {
               </FileSheetStatusText>
               {engraving.depth >= spec.lid.thickness ? <FileSheetStatusText>{t("engraving.through")}</FileSheetStatusText> : null}
               {engraving.mode === "inlay" ? <FileSheetStatusText>{t("engraving.inlayHint")}</FileSheetStatusText> : null}
+              {engraving.mode === "inlay" && (
+                (engraving.strokes.length && engravingLineWidth(engraving) < PRINTABLE_LINE_WIDTH)
+                || engravingGapWidth(engraving) < PRINTABLE_GAP_WIDTH
+              ) ? (
+                <FileSheetStatusText>{t("engraving.printHint")}</FileSheetStatusText>
+              ) : null}
               <FileSheetButtonRow columns={2}>
                 <CompactButton icon={Upload} onClick={() => fileRef.current?.click()}>{t("action.replaceEngraving")}</CompactButton>
                 <CompactButton
@@ -1716,15 +1739,15 @@ export default function BoxBuilderSheet({
       return undefined;
     }
     let cancelled = false;
-    grooveContoursAt(engraving.strokes, engraving.lineWidth).then(
-      (grooves) => {
-        if (cancelled || !grooves.length) {
+    redrawnContours(engraving, engraving).then(
+      (contours) => {
+        if (cancelled || !contours.length) {
           return;
         }
         edit((draft) => {
           const target = draft.lid.engraving;
           if (target && !target.contours.length) {
-            target.contours = [...(target.fills || []), ...grooves];
+            target.contours = contours;
           }
         });
       },

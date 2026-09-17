@@ -218,6 +218,9 @@ export function normalizeEngraving(raw) {
     depth: numberIn(source.depth, 0.6, 0.1, 100),
     // How wide the drawn lines are cut, in the drawing's own units; 0 as drawn.
     lineWidth: numberIn(source.lineWidth, 0, 0, 1000),
+    // Gaps between the marks narrower than this are closed, in the drawing's own
+    // units; 0 leaves them as drawn.
+    gapWidth: numberIn(source.gapWidth, 0, 0, 1000),
     contours,
     fills,
     strokes
@@ -233,6 +236,16 @@ export function engravingLineWidth(engraving) {
   const inUnits = engraving.lineWidth > 0 ? engraving.lineWidth : lines[0].width;
   return round(inUnits * (engraving.sizeX / engraving.width), 3);
 }
+
+// How narrow a gap between the marks may be before it is closed, in millimetres.
+export function engravingGapWidth(engraving) {
+  return engraving ? round(engraving.gapWidth * (engraving.sizeX / engraving.width), 3) : 0;
+}
+
+// Widths a 0.4 mm nozzle prints as unbroken lines: an inlay's lines, and the lid
+// left between them.
+export const PRINTABLE_LINE_WIDTH = 0.8;
+export const PRINTABLE_GAP_WIDTH = 0.6;
 
 // That width back in the drawing's own units, where the lines are kept.
 export function engravingUnitsPerMm(engraving) {

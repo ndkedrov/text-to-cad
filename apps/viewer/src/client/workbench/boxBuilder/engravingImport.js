@@ -10,6 +10,7 @@ import {
   contourArea,
   simplifyContour
 } from "./engraving.js";
+import { closeNarrowGaps } from "./engravingGaps.js";
 import { loadManifold } from "./manifoldRuntime.js";
 
 // Corners of a groove are rounded in this many steps, and the result is thinned
@@ -128,14 +129,18 @@ function filledContours(wasm, shapes, tolerance) {
   return contours;
 }
 
-// The drawing's lines redrawn at another width: the contours to cut, ready for
-// the box. `width` is in the drawing's own units; 0 keeps each line as drawn.
-export async function grooveContoursAt(strokes, width) {
-  if (!strokes?.length) {
+// The engraving's contours put together again from what it was made of: the
+// filled shapes, and the lines drawn `lineWidth` wide (0 as drawn), with every gap
+// narrower than `gapWidth` closed (0 leaves them). Both in the drawing's units.
+export async function redrawnContours({ fills = [], strokes = [] }, { lineWidth = 0, gapWidth = 0 } = {}) {
+  if (!fills.length && !strokes.length) {
     return [];
   }
   const wasm = await loadManifold();
-  return grooveContours(wasm, width > 0 ? strokes.map((line) => ({ ...line, width })) : strokes);
+  const grooves = strokes.length
+    ? grooveContours(wasm, lineWidth > 0 ? strokes.map((line) => ({ ...line, width: lineWidth })) : strokes)
+    : [];
+  return closeNarrowGaps(wasm, [...fills, ...grooves], gapWidth);
 }
 
 function isFilled(element, window) {
