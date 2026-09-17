@@ -1,6 +1,7 @@
 import { Children, Fragment, useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "./utils.js";
+import { SAFE_AREA_BOTTOM, SAFE_AREA_RIGHT, SAFE_AREA_TOP } from "./safeArea.js";
 import {
   AccordionContent,
   AccordionItem,
@@ -1059,17 +1060,25 @@ export default function FileSheet({
   scrollBody = true,
   children
 }) {
-  const desktopWidth = `min(${normalizeFileSheetWidth(width)}px, ${DESKTOP_FILE_SHEET_MAX_WIDTH})`;
+  // The panel keeps its width clear of the screen's safe areas: beside the
+  // scene it grows by the right inset and stops above the bottom one; as a
+  // sheet over the scene it also clears the top (see safeArea.js).
+  const desktopWidth = `calc(min(${normalizeFileSheetWidth(width)}px, ${DESKTOP_FILE_SHEET_MAX_WIDTH}) + ${SAFE_AREA_RIGHT})`;
   const sheetStyle = isDesktop
     ? {
       width: desktopWidth,
       flexBasis: desktopWidth,
-      minWidth: `min(${DESKTOP_FILE_SHEET_MIN_WIDTH}px, ${DESKTOP_FILE_SHEET_MAX_WIDTH})`,
-      maxWidth: DESKTOP_FILE_SHEET_MAX_WIDTH
+      minWidth: `calc(min(${DESKTOP_FILE_SHEET_MIN_WIDTH}px, ${DESKTOP_FILE_SHEET_MAX_WIDTH}) + ${SAFE_AREA_RIGHT})`,
+      maxWidth: `calc(${DESKTOP_FILE_SHEET_MAX_WIDTH} + ${SAFE_AREA_RIGHT})`,
+      paddingRight: SAFE_AREA_RIGHT,
+      paddingBottom: SAFE_AREA_BOTTOM
     }
     : {
       width: MOBILE_FILE_SHEET_WIDTH,
-      maxWidth: DESKTOP_FILE_SHEET_MAX_WIDTH
+      maxWidth: DESKTOP_FILE_SHEET_MAX_WIDTH,
+      paddingTop: SAFE_AREA_TOP,
+      paddingRight: SAFE_AREA_RIGHT,
+      paddingBottom: SAFE_AREA_BOTTOM
     };
   const sheetBody = scrollBody ? (
     <ScrollArea
