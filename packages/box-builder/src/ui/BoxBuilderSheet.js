@@ -113,7 +113,7 @@ import {
   nextId,
   roundMm
 } from "../core/boxSpec.js";
-import { formatWarning } from "../core/i18n.js";
+import { formatBoxNumber, formatWarning, getBoxLanguage } from "../core/i18n.js";
 import FileSheet, {
   FILE_SHEET_COMPACT_BUTTON_CLASSES,
   FILE_SHEET_COMPACT_ICON_BUTTON_CLASSES,
@@ -165,9 +165,10 @@ const STATUS_POLL_MS = 800;
 
 // --- inputs ------------------------------------------------------------------
 
+// Every component that shows numbers reads the language through useBoxLanguage, so
+// it renders again when the language changes.
 function formatNumber(value, digits = 2) {
-  const number = Number(value);
-  return Number.isFinite(number) ? String(Number(number.toFixed(digits))) : "";
+  return formatBoxNumber(getBoxLanguage(), value, digits);
 }
 
 function formatValue(value, unit, digits) {
@@ -181,7 +182,7 @@ function formatValue(value, unit, digits) {
 function NumberInput({
   value,
   onCommit,
-  unit = "mm",
+  unit,
   digits = 2,
   min = -Infinity,
   max = Infinity,
@@ -189,9 +190,10 @@ function NumberInput({
   ariaLabel,
   className
 }) {
+  const { t } = useBoxLanguage();
   return (
     <FileSheetValueInput
-      value={formatValue(value, unit, digits)}
+      value={formatValue(value, unit ?? t("unit.mm"), digits)}
       ariaLabel={ariaLabel}
       className={className}
       step={step}
@@ -342,12 +344,12 @@ function BodyTab({ builder }) {
       <FileSheetSubsection title={t("section.dimensions")}>
         <FileSheetControlRow
           label={t("field.overall")}
-          value={`${formatNumber(dims.width)} × ${formatNumber(dims.depth)} × ${formatNumber(dims.totalHeight)} mm`}
+          value={`${formatNumber(dims.width)} × ${formatNumber(dims.depth)} × ${formatNumber(dims.totalHeight)} ${t("unit.mm")}`}
         />
         {dims.wallsEnabled ? (
           <FileSheetControlRow
             label={t("field.inside")}
-            value={`${formatNumber(dims.innerWidth)} × ${formatNumber(dims.innerDepth)} × ${formatNumber(dims.wallHeight)} mm`}
+            value={`${formatNumber(dims.innerWidth)} × ${formatNumber(dims.innerDepth)} × ${formatNumber(dims.wallHeight)} ${t("unit.mm")}`}
           />
         ) : null}
       </FileSheetSubsection>
@@ -491,7 +493,7 @@ function LidTab({ builder }) {
               <NumberRow label={t("field.clearance")} value={spec.lid.clearance} min={0} max={3} step={0.05} onCommit={set("clearance")} />
               <FileSheetControlRow
                 label={t("field.lipSize")}
-                value={`${formatNumber(dims.lipWidth)} × ${formatNumber(dims.lipDepth)} mm`}
+                value={`${formatNumber(dims.lipWidth)} × ${formatNumber(dims.lipDepth)} ${t("unit.mm")}`}
               />
             </>
           ) : null}
@@ -811,7 +813,7 @@ function ArraySection({ builder, kind }) {
           <NumberRow label={t("field.step")} value={step} min={0.5} max={500} step={0.5} onCommit={setStep} />
         )}
         {mode === "even" && planned.spacing ? (
-          <FileSheetControlRow label={t("field.arraySpacing")} value={`${formatNumber(planned.spacing)} mm`} />
+          <FileSheetControlRow label={t("field.arraySpacing")} value={`${formatNumber(planned.spacing)} ${t("unit.mm")}`} />
         ) : null}
         <FileSheetControlRow label={t("field.arrayResult")} value={t("array.result", { count: planned.positions.length })} />
         {planned.skipped ? (

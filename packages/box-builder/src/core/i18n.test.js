@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 
 import { newBoard } from "./boxBoards.js";
 import { boxSpecWarnings, defaultBoxSpec, newHole, newStandoffGroup, normalizeBoxSpec } from "./boxSpec.js";
-import { BOX_MESSAGES, detectLanguage, formatWarning, translate } from "./i18n.js";
+import { BOX_MESSAGES, detectLanguage, formatBoxNumber, formatWarning, translate } from "./i18n.js";
 
 test("both languages carry exactly the same keys", () => {
   const english = Object.keys(BOX_MESSAGES.en).sort();
@@ -79,4 +79,25 @@ test("every warning the spec produces has a sentence in both languages", () => {
   }
   const off = warnings.find((warning) => warning.key === "warning.holeFaceOff");
   assert.equal(formatWarning("en", off), "Hole 2: the lid is off, so the hole does nothing.");
+});
+
+test("numbers and millimetres are written the way each language writes them", () => {
+  assert.equal(formatBoxNumber("en", 1.6), "1.6");
+  assert.equal(formatBoxNumber("uk", 1.6), "1,6");
+  assert.equal(formatBoxNumber("uk", 67.444), "67,44");
+  assert.equal(formatBoxNumber("uk", 3), "3");
+  assert.equal(formatBoxNumber("en", 0.125, 1), "0.1");
+  assert.equal(formatBoxNumber("uk", Number.NaN), "");
+  assert.equal(translate("en", "unit.mm"), "mm");
+  assert.equal(translate("uk", "unit.mm"), "мм");
+  const warning = { key: "warning.test", params: { value: 2.5 } };
+  assert.equal(formatWarning("uk", warning), translate("uk", "warning.test", { value: "2,5" }));
+});
+
+test("the panel's UI writes no unit of its own: millimetres come from the translations", () => {
+  for (const file of ["../ui/BoxBuilderSheet.js", "../ui/BoxBuilderViewport.js"]) {
+    // Comments may speak of millimetres; the code may not show them.
+    const source = readFileSync(new URL(file, import.meta.url), "utf8").replace(/^\s*\/\/.*$/gmu, "");
+    assert.doesNotMatch(source, /[\d}] mm\b|"mm"/u, file);
+  }
 });
