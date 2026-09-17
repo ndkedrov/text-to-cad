@@ -197,15 +197,22 @@ function boardClampPostNodes(board, dims) {
   );
 }
 
-// The T piece lies flat on the bed, `CLAMP_DEPTH` tall.
+// The T piece prints with its bar flat on the bed and the stem standing up from it.
+// The bar is `CLAMP_DEPTH` wide along the board and reaches `CLAMP_BAR_OVERHANG`
+// past each post's outer edge; the stem is a `CLAMP_STEM_SPAN` wide plate across the
+// board, `CLAMP_STEM_WIDTH` thick along it.
 export const CLAMP_DEPTH = 10;
+const CLAMP_BAR_OVERHANG = 2;
 const CLAMP_STEM_WIDTH = 4;
+const CLAMP_STEM_SPAN = 10;
 const CLAMP_PRINT_GAP = 5;
 // A screw passes freely through the T's bar into the post's bore.
 const CLAMP_SCREW_PLAY = 0.8;
+// The stem sinks this far into the bar so the two fuse.
+const CLAMP_STEM_OVERLAP = 0.01;
 
 // The T pieces of the clamped boards, side by side on the bed to the right of the
-// box: where each starts along X, how wide it lies (bar plus stem) and its sizes.
+// box: where each starts along X, how wide it lies and its sizes.
 export function clampPieces(spec, dims) {
   let x = dims.width / 2 + CLAMP_PRINT_GAP;
   return spec.boards
@@ -213,32 +220,33 @@ export function clampPieces(spec, dims) {
     .map((board) => {
       const span = boardClampSpan(board);
       const stem = Math.max(clampStemLength(board), 0);
-      const piece = { board, x, span, length: span + board.clampDiameter, stem, width: CLAMP_BAR + stem };
+      const length = span + board.clampDiameter + 2 * CLAMP_BAR_OVERHANG;
+      const piece = { board, x, span, length, stem, width: CLAMP_DEPTH };
       x += piece.width + CLAMP_PRINT_GAP;
       return piece;
     });
 }
 
-// Seen from above as it prints: the bar along Y at X 0..CLAMP_BAR with a screw hole
-// through it over each post, the stem out along +X. In the box the bar lies across
-// the post tops and the stem hangs down onto the middle of the board.
+// Seen from above as it prints: the bar along Y, `CLAMP_BAR` thick on the bed, with a
+// screw hole down through it over each post, and the stem rising from its middle.
+// Turned over in the box, the bar lies across the post tops and the stem presses
+// the middle of the board down across its width.
 function clampPieceNode(piece) {
   const { board } = piece;
-  const half = piece.length / 2;
-  const stemHalf = CLAMP_STEM_WIDTH / 2;
-  const tip = CLAMP_BAR + piece.stem;
-  const points = piece.stem > 0.05
-    ? [[0, -half], [CLAMP_BAR, -half], [CLAMP_BAR, -stemHalf], [tip, -stemHalf], [tip, stemHalf], [CLAMP_BAR, stemHalf], [CLAMP_BAR, half], [0, half]]
-    : [[0, -half], [CLAMP_BAR, -half], [CLAMP_BAR, half], [0, half]];
-  const body = { type: "poly", points: points.map(([x, y]) => [tidy(x), tidy(y)]), h: CLAMP_DEPTH };
+  const centre = CLAMP_DEPTH / 2;
+  const bar = roundedPrism(CLAMP_DEPTH, piece.length, CLAMP_BAR, 0, { pos: [centre, 0, 0] });
+  const stem = piece.stem > 0.05
+    ? roundedPrism(CLAMP_STEM_WIDTH, Math.min(CLAMP_STEM_SPAN, piece.length), piece.stem + CLAMP_STEM_OVERLAP, 0, {
+      pos: [centre, 0, CLAMP_BAR - CLAMP_STEM_OVERLAP]
+    })
+    : null;
   const screw = board.clampBore > 0 ? Math.min(board.clampBore + CLAMP_SCREW_PLAY, CLAMP_DEPTH - 2) : 0;
   const holes = screw > 0
     ? [-1, 1].map((side) => cylinder(screw / 2, CLAMP_BAR + 2 * CUT_MARGIN, {
-      rot: [0, 90, 0],
-      pos: [-CUT_MARGIN, side * piece.span / 2, CLAMP_DEPTH / 2]
+      pos: [centre, side * piece.span / 2, -CUT_MARGIN]
     }))
     : [];
-  return group([difference(body, holes)], { pos: [piece.x, 0, 0] });
+  return group([difference(bar, holes), stem], { pos: [piece.x, 0, 0] });
 }
 
 // How much a lid screw boss's taper narrows per step; each step is as tall as

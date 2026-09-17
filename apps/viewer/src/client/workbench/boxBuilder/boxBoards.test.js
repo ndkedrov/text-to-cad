@@ -122,13 +122,16 @@ test("the dual USB-C ESP32-S3 rests on two ribs and a T piece next to the box cl
   moved.boards[0].clampOffset = 20;
   const movedPosts = findNodes(buildBoxPlan(moved).base, (node) => node.type === "cyl" && node.r === 2.5 && node.h === 14.01);
   assert.deepEqual(movedPosts.map((post) => post.pos), [[-16.2, -27, 1.99], [16.2, -27, 1.99]]);
-  const tee = findNodes(base, (node) => node.type === "poly" && node.h === CLAMP_DEPTH);
-  assert.equal(tee.length, 1);
-  // Bar 3 mm plus a stem from the 14 mm post tops down to the board top at 3.6 mm.
-  assert.equal(Math.max(...tee[0].points.map(([x]) => x)), 13.4);
-  assert.deepEqual(tee[0].points.map(([, y]) => y).filter((y) => y > 0).sort((a, b) => a - b), [2, 2, 18.7, 18.7]);
+  // The bar lies on the bed, CLAMP_DEPTH wide, over the posts 32.4 apart plus a 5 mm
+  // post and 2 mm past each post's edge.
+  const bars = findNodes(base, (node) => node.type === "rrect" && node.w === CLAMP_DEPTH && node.h === 3);
+  assert.deepEqual(bars.map((bar) => [bar.d, bar.pos]), [[41.4, [5, 0, 0]]]);
+  // The stem stands in its middle as a 10 mm plate across the board, 4 mm thick along
+  // it, from the bar up to the board top: 14 mm post tops down to 3.6 mm.
+  const stems = findNodes(base, (node) => node.type === "rrect" && node.w === 4 && node.d === 10);
+  assert.deepEqual(stems.map((stem) => [stem.h, stem.pos]), [[10.41, [5, 0, 2.99]]]);
   const screwHoles = findNodes(base, (node) => node.type === "cyl" && node.r === 1.4);
-  assert.deepEqual(screwHoles.map((hole) => hole.pos), [[-1, -16.2, 5], [-1, 16.2, 5]]);
+  assert.deepEqual(screwHoles.map((hole) => hole.pos), [[5, -16.2, -1], [5, 16.2, -1]]);
   assert.deepEqual(clampPieces(spec, boxDimensions(spec)).map((piece) => piece.x), [65]);
   assert.deepEqual(boxSpecWarnings(spec), []);
 });
