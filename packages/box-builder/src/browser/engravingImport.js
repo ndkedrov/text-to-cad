@@ -11,13 +11,9 @@ import {
   simplifyContour
 } from "../core/engraving.js";
 import { closeNarrowGaps } from "../core/engravingGaps.js";
+import { GROOVE_TOLERANCE, grooveContours } from "../core/engravingGrooves.js";
 import { loadManifold } from "./manifoldRuntime.js";
 
-// Corners of a groove are rounded in this many steps, and the result is thinned
-// to this much, in the drawing's own units. Both are fine enough that a small
-// circle keeps its roundness instead of coming out as a decagon.
-const GROOVE_CORNER_STEPS = 24;
-const GROOVE_TOLERANCE = 0.002;
 
 // A drawing may be laid out in real sizes; these are the units a file may say so in.
 const MM_PER_UNIT = Object.freeze({ mm: 1, cm: 10, m: 1000, in: 25.4, pt: 25.4 / 72, pc: 25.4 / 6, px: 25.4 / 96 });
@@ -90,30 +86,6 @@ function sampleShape(shape, matrix, budget = MAX_SAMPLES) {
   return contours;
 }
 
-// What a pen of the line's width covers, as closed shapes: manifold's 2D side
-// offsets the line outwards and inwards and takes the difference, which sorts out
-// the loops a tight bend makes and the holes a closed line leaves by itself.
-function grooveContours(wasm, lines) {
-  const { CrossSection } = wasm;
-  const contours = [];
-  for (const line of lines) {
-    const ring = new CrossSection([line.points], "NonZero");
-    const outer = ring.offset(line.width / 2, "Round", 2, GROOVE_CORNER_STEPS);
-    const inner = line.closed ? ring.offset(-line.width / 2, "Round", 2, GROOVE_CORNER_STEPS) : null;
-    const groove = inner ? outer.subtract(inner) : outer;
-    const thinned = groove.simplify(GROOVE_TOLERANCE);
-    for (const polygon of thinned.toPolygons()) {
-      if (polygon.length >= 3) {
-        contours.push([...polygon].map(([x, y]) => [x, y]));
-      }
-    }
-    for (const shape of [ring, outer, inner, groove, thinned]) {
-      shape?.delete?.();
-    }
-  }
-  return contours;
-}
-
 // Filled shapes tidied by the same hands: overlaps merged, holes told apart from
 // shapes by which way each contour runs (SVG's even-odd rule decides what is a
 // hole, and a walked outline says nothing about it by itself).
@@ -143,7 +115,12 @@ export async function redrawnContours({ fills = [], strokes = [] }, { lineWidth 
   return closeNarrowGaps(wasm, [...fills, ...grooves], gapWidth);
 }
 
+// A <line> has no inside, so its fill (black unless the file says otherwise) never
+// shows: only its stroke does.
 function isFilled(element, window) {
+  if (element.tagName?.toLowerCase() === "line") {
+    return false;
+  }
   const fill = window.getComputedStyle(element).fill;
   return Boolean(fill) && fill !== "none" && !/^rgba\([^)]*,\s*0\)$/u.test(fill);
 }
@@ -225,13 +202,20 @@ export async function drawingFromSvg(text, { name = "", documentRef = globalThis
       const matrix = shape.getCTM ? shape.getCTM() : null;
       // Back out the viewport's own transform: the drawing keeps its own units.
       const local = matrix && root ? root.inverse().multiply(matrix) : matrix;
-      const filled = isFilled(shape, windowRef);
-      const groove = filled ? 0 : strokeWidth(shape, windowRef, local);
-      if (!filled && !groove) {
+      const fill = isFilled(shape, windowRef);
+      const stroke = strokeWidth(shape, windowRef, local);
+      if (!fill && !stroke) {
         continue;
       }
       const contours = sampleShape(shape, local, samples);
       samples -= contours.reduce((total, points) => total + points.length, 0);
+      // A shape filled by default but drawn as an open stroke (a path with no
+      // fill="none") covers no area: what shows, and what is cut, is its stroke.
+      const filled = fill && contours.some((points) => Math.abs(contourArea(points)) > tolerance * tolerance);
+      const groove = filled ? 0 : stroke;
+      if (!filled && !groove) {
+        continue;
+      }
       if (filled) {
         walked.push(...contours);
         continue;
