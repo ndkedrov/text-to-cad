@@ -20,6 +20,15 @@ import {
 const MARGIN = 12;
 const HEADER = 16;
 const RULER = 50;
+// The grid has no labels along its top edge, so less room above it than round the rest.
+const TOP_GAP = 4;
+// Font sizes of the header text (mm) and how wide a character is on average, as a
+// share of the size: generous, so a wrapped line never runs past the page.
+const TITLE_SIZE = 4;
+const NOTE_SIZE = 2.6;
+const CHARACTER_WIDTH = 0.6;
+// The print window: a popup of its own, so the page it came from stays in place.
+export const FLOOR_SHEET_WINDOW_FEATURES = "width=900,height=700";
 
 function tidy(value) {
   return roundMm(value, 3);
@@ -90,6 +99,26 @@ function text(x, y, label, className = "label", anchor = "middle") {
   return `<text class="${className}" x="${tidy(x)}" y="${tidy(y)}" text-anchor="${anchor}">${escapeText(label)}</text>`;
 }
 
+// Breaks a label into lines that fit the width, at spaces; a word longer than a
+// line stays whole on its own line.
+function wrapLines(label, width, size) {
+  const perLine = Math.max(8, Math.floor(width / (size * CHARACTER_WIDTH)));
+  const lines = [];
+  let line = "";
+  for (const word of String(label || "").split(/\s+/u).filter(Boolean)) {
+    if (line && line.length + 1 + word.length > perLine) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = line ? `${line} ${word}` : word;
+    }
+  }
+  if (line) {
+    lines.push(line);
+  }
+  return lines;
+}
+
 function boardParts(board, dims) {
   const pieces = [];
   const [sizeX, sizeY] = board.rotation % 180 === 0
@@ -118,10 +147,26 @@ function boardParts(board, dims) {
 // translated strings: { title, scale, note, ruler }.
 export function floorSheetSvg(spec, labels = {}) {
   const dims = boxDimensions(spec);
-  const sheetWidth = dims.width + 2 * MARGIN;
-  const sheetHeight = dims.depth + 2 * MARGIN + HEADER;
-  const originX = MARGIN + dims.width / 2;
-  const originY = HEADER + MARGIN + dims.depth / 2;
+  // A small box still gets a page the ruler fits on.
+  const contentWidth = Math.max(dims.width, RULER);
+  const sheetWidth = contentWidth + 2 * MARGIN;
+  // The title sits beside the ruler when it fits there on one line; otherwise it
+  // takes the whole width and the ruler gets a row of its own under the note.
+  const besideRuler = wrapLines(labels.title, contentWidth - RULER - 4, TITLE_SIZE);
+  const rulerBeside = besideRuler.length <= 1;
+  const titleLines = rulerBeside ? besideRuler : wrapLines(labels.title, contentWidth, TITLE_SIZE);
+  const noteLines = wrapLines(labels.note, contentWidth, NOTE_SIZE);
+  const titleY = (index) => 6 + index * 5;
+  const noteTop = titleY(Math.max(titleLines.length, 1) - 1) + 4.5;
+  const noteY = (index) => noteTop + index * 3.4;
+  const textBottom = noteY(Math.max(noteLines.length, 1) - 1);
+  const rulerY = rulerBeside ? 7 : textBottom + 7.5;
+  const rulerX = rulerBeside ? sheetWidth - MARGIN - RULER : MARGIN;
+  const header = Math.max(HEADER, rulerBeside ? textBottom + 5.5 : rulerY + 2.5);
+  const sheetHeight = dims.depth + TOP_GAP + MARGIN + header;
+  const gridX = MARGIN + (contentWidth - dims.width) / 2;
+  const originX = gridX + dims.width / 2;
+  const originY = header + TOP_GAP + dims.depth / 2;
 
   const marks = [];
   for (let x = -Math.floor(dims.width / 2 / 10) * 10; x <= dims.width / 2; x += 10) {
@@ -157,7 +202,6 @@ export function floorSheetSvg(spec, labels = {}) {
     parts.push(circle(x, y, dims.screwDiameter, "above") + circle(x, y, dims.screwPilot, "cut") + cross(x, y));
   }
 
-  const rulerY = HEADER - 5;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${tidy(sheetWidth)}mm" height="${tidy(sheetHeight)}mm"`
     + ` viewBox="0 0 ${tidy(sheetWidth)} ${tidy(sheetHeight)}">`
     + "<style>"
@@ -172,12 +216,12 @@ export function floorSheetSvg(spec, labels = {}) {
     + ".above{stroke:#5566aa;stroke-width:0.25;fill:none;stroke-dasharray:1.5 1}"
     + ".mark{stroke:#111;stroke-width:0.12;fill:none}.ruler{stroke:#111;stroke-width:0.3;fill:none}"
     + "</style>"
-    + text(MARGIN, 6, labels.title || "", "title", "start")
-    + text(MARGIN, 10.5, labels.note || "", "note", "start")
-    + `<path class="ruler" d="M${tidy(sheetWidth - MARGIN - RULER)} ${tidy(rulerY)}h${RULER}`
-    + `M${tidy(sheetWidth - MARGIN - RULER)} ${tidy(rulerY - 1.5)}v3M${tidy(sheetWidth - MARGIN)} ${tidy(rulerY - 1.5)}v3"/>`
-    + text(sheetWidth - MARGIN - RULER / 2, rulerY - 2.5, labels.ruler || `${RULER} mm`, "note")
-    + `<g transform="translate(${tidy(MARGIN)} ${tidy(HEADER + MARGIN)})">`
+    + titleLines.map((line, index) => text(MARGIN, titleY(index), line, "title", "start")).join("")
+    + noteLines.map((line, index) => text(MARGIN, noteY(index), line, "note", "start")).join("")
+    + `<path class="ruler" d="M${tidy(rulerX)} ${tidy(rulerY)}h${RULER}`
+    + `M${tidy(rulerX)} ${tidy(rulerY - 1.5)}v3M${tidy(rulerX + RULER)} ${tidy(rulerY - 1.5)}v3"/>`
+    + text(rulerX + RULER / 2, rulerY - 2.5, labels.ruler || `${RULER} mm`, "note")
+    + `<g transform="translate(${tidy(gridX)} ${tidy(header + TOP_GAP)})">`
     + `<path class="grid1" d="${gridPath(dims.width, dims.depth, 1)}"/>`
     + `<path class="grid5" d="${gridPath(dims.width, dims.depth, 5)}"/>`
     + `<path class="grid10" d="${gridPath(dims.width, dims.depth, 10)}"/>`
@@ -188,11 +232,17 @@ export function floorSheetSvg(spec, labels = {}) {
 
 // Opens the sheet in its own window and asks the browser to print it, where it
 // can be saved as a PDF. Returns false when the window could not be opened.
-export function printFloorSheet(svg, title) {
-  const sheet = window.open("", "_blank", "noopener,width=900,height=700");
+// `host` is the window to open it from.
+//
+// Not "noopener": with it window.open returns null even though the window opens
+// (HTML, window open steps), and the sheet could not be written. The window is
+// cut loose from this page by clearing its opener instead.
+export function printFloorSheet(svg, title, host = globalThis) {
+  const sheet = host.open("", "_blank", FLOOR_SHEET_WINDOW_FEATURES);
   if (!sheet) {
     return false;
   }
+  sheet.opener = null;
   sheet.document.write(
     `<!doctype html><html><head><meta charset="utf-8"><title>${escapeText(title)}</title>`
     + "<style>@page{margin:6mm}html,body{margin:0;padding:0;background:#fff}svg{display:block}</style>"

@@ -16,7 +16,7 @@ routes, built by cadgen's build123d kernel); another host brings its own.
   warnings), `boxPlan.js` (the CSG plan both geometry engines build),
   `boxBoards.js`, `boxEdits.js`, `engraving.js`, `engravingGaps.js`,
   `floorSheet.js`, `i18n.js` (English and Ukrainian), `manifoldPlan.js`,
-  `boxNames.js`. Tests sit beside the modules.
+  `boxNames.js`, `adapterMembers.js`. Tests sit beside the modules.
 - `src/browser/` — needs a browser: `manifoldRuntime.js` (loads the wasm through
   a Vite `?url` import) and `engravingImport.js` (reads an SVG with the DOM).
 - `src/ui/` — React: `BoxBuilderSheet.js` (the panel), `BoxBuilderViewport.js`,
@@ -43,7 +43,16 @@ const builder = useBoxBuilder();
 
 The adapter's members are documented in `src/ui/adapter.js`: `listBoxes`,
 `loadBox`, `boxStatus`, `saveBox`, `fileUrl`, `boardPresets` and, optionally,
-`onOutputsChanged`.
+`onOutputsChanged`. A host where download links, `window.confirm` or a print
+window do not work (an app's WebView) adds the optional `exportFile`, `confirm`
+and `printFloorSheet`, and says with `capabilities` which of the folder path,
+the open-STEP button and the quota to show; left out, each behaves as on a web
+page (`src/core/adapterMembers.js`).
+
+A host that writes print files itself evaluates the plan with
+`manifoldFromPlan(wasm, plan, { quality: "export" })` (`src/core/manifoldPlan.js`):
+circles and rounded corners are cut finer than the preview's default
+`"preview"`.
 
 A host also provides:
 
