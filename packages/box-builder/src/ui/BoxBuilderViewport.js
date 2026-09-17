@@ -4,6 +4,14 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { loadManifold } from "../browser/manifoldRuntime.js";
 import { Button } from "./kit/ui/button.jsx";
+import {
+  SAFE_AREA_BOTTOM,
+  SAFE_AREA_LEFT,
+  SAFE_AREA_PROBE_STYLE,
+  SAFE_AREA_RIGHT,
+  SAFE_AREA_TOP,
+  readSafeAreaInsets
+} from "./kit/safeArea.js";
 import { cn } from "./kit/utils.js";
 import { formatBoxNumber, formatWarning, getBoxLanguage } from "../core/i18n.js";
 import {
@@ -463,15 +471,17 @@ function applyTheme(runtime, dims) {
   runtime.requestRender();
 }
 
-function applyViewport(runtime, container, insets) {
+function applyViewport(runtime, container, insets, safeAreaProbe) {
   const width = Math.max(container.clientWidth, 1);
   const height = Math.max(container.clientHeight, 1);
   runtime.renderer.setSize(width, height, false);
   runtime.camera.aspect = width / height;
-  // Centre the model in the part of the canvas the side panels leave visible.
-  const left = Number(insets?.left) || 0;
-  const right = Number(insets?.right) || 0;
-  const top = Number(insets?.top) || 0;
+  // Centre the model in the part of the canvas the side panels and the
+  // screen's safe areas leave visible.
+  const safeArea = readSafeAreaInsets(safeAreaProbe);
+  const left = (Number(insets?.left) || 0) + safeArea.left;
+  const right = (Number(insets?.right) || 0) + safeArea.right;
+  const top = (Number(insets?.top) || 0) + safeArea.top;
   runtime.camera.setViewOffset(width, height, (right - left) / 2, -top / 2, width, height);
   runtime.camera.updateProjectionMatrix();
   runtime.requestRender();
@@ -501,6 +511,7 @@ function frameBox(runtime, dims, view, lidView, spec) {
 export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) {
   const containerRef = useRef(null);
   const canvasHostRef = useRef(null);
+  const safeAreaProbeRef = useRef(null);
   const runtimeRef = useRef(null);
   const framedRef = useRef(false);
   const hoverRef = useRef(null);
@@ -595,12 +606,16 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
     runtimeRef.current = runtime;
     controls.addEventListener("change", runtime.requestRender);
     applyTheme(runtime, latestRef.current.builder.dims);
-    applyViewport(runtime, host, latestRef.current.insets);
+    applyViewport(runtime, host, latestRef.current.insets, safeAreaProbeRef.current);
 
     const themeObserver = new MutationObserver(() => applyTheme(runtime, latestRef.current.builder.dims));
     themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "style", "data-theme"] });
-    const resizeObserver = new ResizeObserver(() => applyViewport(runtime, host, latestRef.current.insets));
+    const resizeObserver = new ResizeObserver(() => applyViewport(runtime, host, latestRef.current.insets, safeAreaProbeRef.current));
     resizeObserver.observe(host);
+    // The insets change without the canvas resizing (a host sets them late).
+    if (safeAreaProbeRef.current) {
+      resizeObserver.observe(safeAreaProbeRef.current, { box: "border-box" });
+    }
 
     let frame = 0;
     const tick = () => {
@@ -875,7 +890,7 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
   useEffect(() => {
     const runtime = runtimeRef.current;
     if (runtime && canvasHostRef.current) {
-      applyViewport(runtime, canvasHostRef.current, insets);
+      applyViewport(runtime, canvasHostRef.current, insets, safeAreaProbeRef.current);
     }
   }, [insets?.left, insets?.right, insets?.top]);
 
@@ -982,10 +997,15 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
   return (
     <div ref={containerRef} className="absolute inset-0 overflow-hidden" data-box-builder-viewport="">
       <div ref={canvasHostRef} className="absolute inset-0" />
+      <div ref={safeAreaProbeRef} className="pointer-events-none invisible absolute left-0 top-0" style={SAFE_AREA_PROBE_STYLE} aria-hidden="true" />
 
       <div
         className="pointer-events-auto absolute flex flex-wrap items-center gap-1.5"
-        style={{ left: left + 12, top: top + 12, maxWidth: `calc(100% - ${left + right + 24}px)` }}
+        style={{
+          left: `calc(${left + 12}px + ${SAFE_AREA_LEFT})`,
+          top: `calc(${top + 12}px + ${SAFE_AREA_TOP})`,
+          maxWidth: `calc(100% - ${left + right + 24}px - ${SAFE_AREA_LEFT} - ${SAFE_AREA_RIGHT})`
+        }}
       >
         <div className="cad-glass-surface flex items-center gap-0.5 rounded-lg border border-sidebar-border p-0.5">
           {VIEW_OPTIONS.map(([value, labelKey]) => (
@@ -1063,9 +1083,14 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
 
       <div
         className="pointer-events-none absolute flex flex-wrap items-end justify-center gap-2 px-3"
-        style={{ left, right, bottom: 12 }}
+        style={{
+          left: `calc(${left}px + ${SAFE_AREA_LEFT})`,
+          right: `calc(${right}px + ${SAFE_AREA_RIGHT})`,
+          bottom: `calc(12px + ${SAFE_AREA_BOTTOM})`
+        }}
       >
-        <div className="cad-glass-surface max-w-full rounded-lg border border-sidebar-border px-2.5 py-1 text-center text-[10px] leading-4 text-muted-foreground">
+        {/* Mouse and keyboard help: nothing in it applies to a touch screen. */}
+        <div className="cad-glass-surface max-w-full rounded-lg border border-sidebar-border px-2.5 py-1 text-center text-[10px] leading-4 text-muted-foreground pointer-coarse:hidden">
           {t("viewport.hint")}
         </div>
         {sourceUrl ? (
