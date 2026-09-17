@@ -668,7 +668,7 @@ const UK = {
   "action.mountBoard": "Змонтувати в коробку",
   "boards.mountHint": "Монтаж поставить ніжку під кожен отвір і виріже стінки під порти.",
   "action.snapBoard": "До стінок",
-  "action.fitBox": "Підігнати коробку",
+  "action.fitBox": "Підігнати",
   "action.unmountBoard": "Вийняти",
   "section.view": "Вигляд",
   "field.boxMm": "Міліметровка на коробці",
@@ -762,6 +762,11 @@ export function translate(language, key, params = {}) {
 // A warning from boxSpecWarnings ({ key, params }) as a sentence.
 export function formatWarning(language, warning) {
   const params = { ...(warning?.params || {}) };
+  for (const [name, value] of Object.entries(params)) {
+    if (typeof value === "number") {
+      params[name] = formatBoxNumber(language, value);
+    }
+  }
   if (params.face) {
     params.face = translate(language, `face.${params.face}`).toLowerCase();
   }
@@ -786,6 +791,17 @@ function readInitialLanguage() {
     // Storage blocked: fall back to the browser's language.
   }
   return detectLanguage(window.navigator?.language);
+}
+
+// A number as the language writes it: at most `digits` decimals, no trailing zeros,
+// and a decimal comma in Ukrainian ("1,6"). The panel's number fields read both.
+export function formatBoxNumber(language, value, digits = 2) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return "";
+  }
+  const text = String(Number(number.toFixed(digits)));
+  return normalizeLanguage(language) === "uk" ? text.replace(".", ",") : text;
 }
 
 export function getBoxLanguage() {

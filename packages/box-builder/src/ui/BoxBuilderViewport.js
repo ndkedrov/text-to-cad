@@ -5,7 +5,7 @@ import { toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.j
 import { loadManifold } from "../browser/manifoldRuntime.js";
 import { Button } from "./kit/ui/button.jsx";
 import { cn } from "./kit/utils.js";
-import { formatWarning } from "../core/i18n.js";
+import { formatBoxNumber, formatWarning, getBoxLanguage } from "../core/i18n.js";
 import {
   duplicateSelected,
   findSelected,
@@ -67,7 +67,7 @@ const LID_VIEW_OPTIONS = [
 
 
 function formatMm(value) {
-  return String(Number(Number(value).toFixed(2)));
+  return formatBoxNumber(getBoxLanguage(), value, 2);
 }
 
 // Theme colours are CSS (often oklch); a 1px canvas turns any of them into sRGB.
