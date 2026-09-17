@@ -1517,19 +1517,19 @@
    "width": 25.4,
    "length": 67.44,
    "thickness": 1.6,
-   "clearance": 2,
+   "clearance": 3.5,
    "componentHeight": 3,
-   "padDiameter": 5.2,
-   "boreDiameter": 2.2,
+   "padDiameter": 3.7,
+   "boreDiameter": 1.6,
    "holes": [],
    "ports": [
     {
      "type": "microUsb",
      "edge": "front",
-     "offset": 6.0,
+     "offset": 6.5,
      "elevation": 0,
      "shape": "rect",
-     "width": 8,
+     "width": 8.5,
      "height": 3,
      "radius": 0.6,
      "overhang": 0.87,
@@ -1538,10 +1538,10 @@
     {
      "type": "microUsb",
      "edge": "front",
-     "offset": 19.4,
+     "offset": 19,
      "elevation": 0,
      "shape": "rect",
-     "width": 8,
+     "width": 8.5,
      "height": 3,
      "radius": 0.6,
      "overhang": 0.87,
@@ -1550,18 +1550,24 @@
    ],
    "rails": [
     {
-     "offset": 8,
-     "length": 22,
-     "thickness": 4
+     "offset": 6.5,
+     "length": 18,
+     "thickness": 4,
+     "height": 2.5
     },
     {
-     "offset": 63.44,
+     "offset": 56.5,
      "length": 22,
-     "thickness": 4
+     "thickness": 4,
+     "height": 2.5
     }
    ],
    "clamp": true,
-   "clampHeight": 14
+   "clampHeight": 14,
+   "clampOffset": 44.72,
+   "clampDiameter": 3.7,
+   "clampBore": 1.6,
+   "clampGap": 2
   },
   {
    "id": "xiaoEsp32C3",
