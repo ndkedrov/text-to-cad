@@ -9,6 +9,7 @@ import {
   contourArea,
   engravingContours,
   engravingFromDrawing,
+  engravingGapWidth,
   engravingIslands,
   engravingLineWidth,
   engravingPointCount,
@@ -182,4 +183,20 @@ test("a crowded drawing is thinned to what a plan can hold", () => {
   const many = normalizeEngraving({ width: 100, height: 100, contours: Array.from({ length: 80 }, () => circle.slice(0, 60)) });
   assert.ok(many.contours.length <= MAX_ENGRAVING_CONTOURS);
   assert.ok(engravingPointCount(many) <= MAX_ENGRAVING_POINTS);
+});
+
+test("an engraving keeps how narrow a gap it closes, in its own units", () => {
+  const engraving = normalizeEngraving({
+    name: "gaps",
+    width: 10,
+    height: 10,
+    sizeX: 20,
+    sizeY: 20,
+    contours: [[[0, 0], [4, 0], [4, 4], [0, 4]]],
+    gapWidth: 0.3
+  });
+  assert.equal(engraving.gapWidth, 0.3);
+  assert.equal(engravingGapWidth(engraving), 0.6, "at twice the drawing's size");
+  assert.equal(normalizeEngraving({ ...engraving, gapWidth: -1 }).gapWidth, 0);
+  assert.equal(engravingGapWidth(null), 0);
 });
