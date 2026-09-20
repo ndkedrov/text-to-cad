@@ -131,6 +131,7 @@ import FileSheet, {
   FileSheetField,
   FileSheetFieldGrid,
   FileSheetInlineControlRow,
+  FileSheetSegmentedControl,
   FileSheetSelectRow,
   FileSheetStatusText,
   FileSheetSubsection,
@@ -166,6 +167,14 @@ const ENGRAVING_ERRORS = Object.freeze({
   "nothing-filled": "engraving.error.nothingFilled",
   "too-complex": "engraving.error.tooComplex"
 });
+
+// How the lid is shown in the scene. Lives beside the rest of the lid's
+// settings, not as a strip floating over the model.
+const LID_VIEW_OPTIONS = [
+  ["open", "lid.open"],
+  ["closed", "lid.closed"],
+  ["hidden", "lid.hidden"]
+];
 
 const FORMAT_ORDER = ["step", "stl", "3mf"];
 const STATUS_POLL_MS = 800;
@@ -489,6 +498,19 @@ function LidTab({ builder }) {
       >
         {spec.lid.enabled ? (
           <NumberRow label={t("field.thickness")} value={spec.lid.thickness} min={0.4} max={50} step={0.2} onCommit={set("thickness")} />
+        ) : null}
+        {/* How the lid is shown. It used to float over the scene as a second
+            strip of buttons, which on a phone took a quarter of the screen to
+            say something that belongs with the rest of the lid's settings. */}
+        {spec.lid.enabled && dims.lidEnabled ? (
+          <FileSheetControlRow label={t("field.lidView")}>
+            <FileSheetSegmentedControl
+              value={builder.lidView}
+              onChange={builder.setLidView}
+              ariaLabel={t("lid.viewAria")}
+              options={LID_VIEW_OPTIONS.map(([value, labelKey]) => ({ value, label: t(labelKey) }))}
+            />
+          </FileSheetControlRow>
         ) : null}
       </FileSheetSubsection>
       {spec.lid.enabled ? (

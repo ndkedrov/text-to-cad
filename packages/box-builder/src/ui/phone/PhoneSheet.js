@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "../kit/utils.js";
 import { PHONE_SHEET_HEADER_HEIGHT } from "./phoneUi.js";
+import { LIQUID_GLASS_BLUR, liquidGlassStyle } from "./liquidGlass.js";
 import { settleDetent } from "./phoneSheetMath.js";
 
 // The panel on a phone: a sheet that rises from above the navigation bar.
@@ -89,12 +90,14 @@ export default function PhoneSheet({
       data-phone-sheet={detent}
       aria-label={title}
       className={cn(
-        "pointer-events-auto absolute inset-x-0 bottom-0 z-30 flex flex-col overflow-hidden",
-        "cad-glass-surface rounded-t-[1.25rem] border-t border-sidebar-border text-sidebar-foreground",
-        "shadow-[0_-12px_40px_-20px_rgb(0_0_0/0.55)]",
+        "pointer-events-auto absolute inset-x-0 bottom-0 z-30 flex flex-col overflow-hidden text-sidebar-foreground",
+        LIQUID_GLASS_BLUR,
         !drag && "transition-[height] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
       )}
-      style={{ height: `${visibleHeight}px` }}
+      style={{
+        ...liquidGlassStyle({ radius: "1.5rem 1.5rem 0 0", strength: 0.72 }),
+        height: `${visibleHeight}px`
+      }}
     >
       <header
         className="flex shrink-0 cursor-grab touch-none select-none flex-col active:cursor-grabbing"

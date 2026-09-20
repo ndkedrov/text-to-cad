@@ -13,6 +13,7 @@ import {
   readSafeAreaInsets
 } from "./kit/safeArea.js";
 import { cn } from "./kit/utils.js";
+import { LIQUID_GLASS_BLUR, liquidGlassStyle } from "./phone/liquidGlass.js";
 import { formatBoxNumber, formatWarning, getBoxLanguage } from "../core/i18n.js";
 import {
   duplicateSelected,
@@ -66,13 +67,6 @@ const VIEW_OPTIONS = [
   ["front", "view.front"],
   ["side", "view.side"]
 ];
-
-const LID_VIEW_OPTIONS = [
-  ["open", "lid.open"],
-  ["closed", "lid.closed"],
-  ["hidden", "lid.hidden"]
-];
-
 
 function formatMm(value) {
   return formatBoxNumber(getBoxLanguage(), value, 2);
@@ -549,7 +543,8 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
   const [buildError, setBuildError] = useState("");
   const [hover, setHover] = useState(null);
   const [readout, setReadout] = useState(null);
-  const [lidView, setLidView] = useState("open");
+  // Chosen in the panel's Lid section; the scene only obeys it.
+  const lidView = builder.lidView;
   const [warningsOpen, setWarningsOpen] = useState(false);
   const { language, t } = useBoxLanguage();
   const { spec, dims, plan, selection, warnings } = builder;
@@ -1053,40 +1048,16 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
           maxWidth: `calc(100% - ${left + right + 24}px - ${SAFE_AREA_LEFT} - ${SAFE_AREA_RIGHT})`
         }}
       >
-        <div className="cad-glass-surface relative flex items-center gap-0.5 rounded-lg border border-sidebar-border p-0.5">
-          <span
-            className="pointer-events-none absolute inset-0 rounded-lg bg-sidebar"
-            style={{ opacity: "var(--fs-overlay-veil, 0)" }}
-            aria-hidden="true"
-          />
+        <div
+          className={cn("relative flex items-center gap-0.5 p-1", LIQUID_GLASS_BLUR)}
+          style={liquidGlassStyle({ radius: "var(--fs-overlay-radius, 0.5rem)", strength: 0.66 })}
+        >
           {VIEW_OPTIONS.map(([value, labelKey]) => (
             <Button key={value} type="button" variant="ghost" size="sm" className={buttonClasses} onClick={() => setView(value)}>
               {t(labelKey)}
             </Button>
           ))}
         </div>
-        {dims.lidEnabled ? (
-          <div className="cad-glass-surface relative flex items-center gap-0.5 rounded-lg border border-sidebar-border p-0.5" aria-label={t("lid.viewAria")}>
-            <span
-            className="pointer-events-none absolute inset-0 rounded-lg bg-sidebar"
-            style={{ opacity: "var(--fs-overlay-veil, 0)" }}
-            aria-hidden="true"
-          />
-          {LID_VIEW_OPTIONS.map(([value, labelKey]) => (
-              <Button
-                key={value}
-                type="button"
-                variant="ghost"
-                size="sm"
-                aria-pressed={lidView === value}
-                className={cn(buttonClasses, lidView === value && "bg-accent text-accent-foreground")}
-                onClick={() => setLidView(value)}
-              >
-                {t(labelKey)}
-              </Button>
-            ))}
-          </div>
-        ) : null}
         {warnings.length ? (
           <div className="relative">
             <button
