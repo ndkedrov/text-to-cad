@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "../kit/utils.js";
 import { PHONE_SHEET_HEADER_HEIGHT } from "./phoneUi.js";
+import { settleDetent } from "./phoneSheetMath.js";
 
 // The panel on a phone: a sheet that rises from above the navigation bar.
 //
@@ -9,30 +10,8 @@ import { PHONE_SHEET_HEADER_HEIGHT } from "./phoneUi.js";
 // the top bar — because a box is edited while watching it change. A sheet that
 // only knows "open" and "closed" hides the model exactly when the number being
 // dragged is the one that moves it, which is what the first build did with a
-// full-width drawer over the scene.
-export const PHONE_SHEET_DETENTS = Object.freeze(["closed", "half", "full"]);
-
-// A flick beats position: past this speed the sheet goes the way the finger
-// threw it, even from the middle of the travel.
-const FLICK_VELOCITY = 0.5;
-
-function closestDetent(heights, value) {
-  return PHONE_SHEET_DETENTS.reduce(
-    (best, name) => (Math.abs(heights[name] - value) < Math.abs(heights[best] - value) ? name : best),
-    "half"
-  );
-}
-
-export function settleDetent(heights, value, velocity) {
-  const closest = closestDetent(heights, value);
-  if (Math.abs(velocity) <= FLICK_VELOCITY) {
-    return closest;
-  }
-  // A downward flick is a positive dy, which shrinks the sheet.
-  const step = velocity > 0 ? -1 : 1;
-  const index = PHONE_SHEET_DETENTS.indexOf(closest) + step;
-  return PHONE_SHEET_DETENTS[Math.min(Math.max(index, 0), PHONE_SHEET_DETENTS.length - 1)];
-}
+// full-width drawer over the scene. Where those stops are, and where a drag
+// settles, is phoneSheetMath.js.
 
 export default function PhoneSheet({
   title,
