@@ -528,7 +528,68 @@ function frameBox(runtime, dims, view, lidView, spec) {
   runtime.requestRender();
 }
 
-export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) {
+// One still of the scene, at the size a share card wants.
+//
+// The pixels are read in the same turn as the render, so the drawing buffer is
+// still there and the renderer does not have to be created with
+// preserveDrawingBuffer (which costs a copy of every frame, on every frame,
+// for a picture taken once in a while). The canvas is put back exactly as it
+// was afterwards.
+function captureScene(runtime, host, insets, safeAreaProbe, dims, spec, lidView, width, height) {
+  const { renderer, camera } = runtime;
+  const previousAspect = camera.aspect;
+  const previousView = camera.view ? { ...camera.view } : null;
+  const size = new THREE.Vector2();
+  renderer.getSize(size);
+  const previousBackground = runtime.scene.background;
+  const previousAlpha = renderer.getClearAlpha();
+  const gridWasVisible = runtime.grid ? runtime.grid.visible : null;
+  const fineGridWasVisible = runtime.gridFine ? runtime.gridFine.visible : null;
+  try {
+    renderer.setSize(width, height, false);
+    camera.aspect = width / height;
+    camera.clearViewOffset();
+    // A card puts the box on its own background, so the picture carries none:
+    // no scene colour, no build plate, just the object on transparency.
+    runtime.scene.background = null;
+    renderer.setClearAlpha(0);
+    if (runtime.grid) {
+      runtime.grid.visible = false;
+    }
+    if (runtime.gridFine) {
+      runtime.gridFine.visible = false;
+    }
+    // Frame it for the picture, not for the screen the panel is covering.
+    runtime.viewVisible = { width: 1, height: 1 };
+    frameBox(runtime, dims, runtime.view || "iso", lidView, spec);
+    renderer.render(runtime.scene, camera);
+    return renderer.domElement.toDataURL("image/png");
+  } finally {
+    runtime.scene.background = previousBackground;
+    renderer.setClearAlpha(previousAlpha);
+    if (runtime.grid && gridWasVisible !== null) {
+      runtime.grid.visible = gridWasVisible;
+    }
+    if (runtime.gridFine && fineGridWasVisible !== null) {
+      runtime.gridFine.visible = fineGridWasVisible;
+    }
+    renderer.setSize(size.x, size.y, false);
+    camera.aspect = previousAspect;
+    if (previousView && previousView.enabled) {
+      camera.setViewOffset(
+        previousView.fullWidth, previousView.fullHeight,
+        previousView.offsetX, previousView.offsetY,
+        previousView.width, previousView.height,
+      );
+    } else {
+      camera.clearViewOffset();
+    }
+    applyViewport(runtime, host, insets, safeAreaProbe);
+    frameBox(runtime, dims, runtime.view || "iso", lidView, spec);
+  }
+}
+
+export default function BoxBuilderViewport({ builder, insets, sourceUrl = "", onReady }) {
   const containerRef = useRef(null);
   const canvasHostRef = useRef(null);
   const safeAreaProbeRef = useRef(null);
@@ -1014,6 +1075,29 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
     }
     runtime.requestRender();
   }, [builder.display]);
+
+  // The host asks for a still when it builds a share card; it never touches the
+  // runtime itself.
+  useEffect(() => {
+    if (!onReady) {
+      return undefined;
+    }
+    onReady({
+      capture: (width, height) => {
+        const runtime = runtimeRef.current;
+        const host = canvasHostRef.current;
+        if (!runtime || !host) {
+          return null;
+        }
+        return captureScene(
+          runtime, host, latestRef.current.insets, safeAreaProbeRef.current,
+          latestRef.current.builder.dims, latestRef.current.builder.spec,
+          latestRef.current.lidView, width, height,
+        );
+      },
+    });
+    return () => onReady(null);
+  }, [onReady]);
 
   const setView = (view) => {
     const runtime = runtimeRef.current;
