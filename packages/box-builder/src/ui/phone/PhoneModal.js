@@ -3,6 +3,7 @@ import { Dialog } from "radix-ui";
 import { cn } from "../kit/utils.js";
 import { SAFE_AREA_BOTTOM, SAFE_AREA_LEFT, SAFE_AREA_RIGHT, SAFE_AREA_TOP } from "../kit/safeArea.js";
 import { PHONE_UI_TOKENS, PhoneUiProvider } from "./phoneUi.js";
+import { LIQUID_GLASS_BLUR, liquidGlassStyle } from "./liquidGlass.js";
 
 // A phone modal: the card rises from the bottom edge, stops short of the status
 // bar, and keeps its own header and footer in place while only the middle
@@ -40,6 +41,7 @@ export default function PhoneModal({
           data-phone-modal={size}
           style={{
             ...PHONE_UI_TOKENS,
+            ...liquidGlassStyle({ radius: "1.5rem 1.5rem 0 0", strength: 0.78 }),
             // Never under the status bar, and never taller than what is left.
             maxHeight: `calc(100% - ${SAFE_AREA_TOP} - 2.5rem)`,
             height: size === "tall" ? `calc(100% - ${SAFE_AREA_TOP} - 2.5rem)` : undefined,
@@ -47,9 +49,8 @@ export default function PhoneModal({
             paddingRight: SAFE_AREA_RIGHT
           }}
           className={cn(
-            "cad-glass-popover fixed inset-x-0 bottom-0 z-50 flex flex-col",
-            "rounded-t-[1.25rem] border-t border-sidebar-border text-sidebar-foreground",
-            "shadow-[0_-16px_48px_-20px_rgb(0_0_0/0.6)]",
+            "fixed inset-x-0 bottom-0 z-50 flex flex-col text-sidebar-foreground",
+            LIQUID_GLASS_BLUR,
             "data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom data-[state=closed]:duration-200",
             "data-[state=open]:animate-in data-[state=open]:slide-in-from-bottom data-[state=open]:duration-300",
           )}

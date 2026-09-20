@@ -77,6 +77,10 @@ export function useBoxBuilder() {
   const [savedKey, setSavedKey] = useState(initial.savedKey);
   const [selection, setSelection] = useState(null);
   const [display, setDisplayState] = useState(readDisplay);
+  // How the lid is shown: lifted off the box, sitting on it, or out of the way.
+  // It belongs here rather than inside the viewport because the panel's Lid
+  // section is where it is chosen — the scene only obeys it.
+  const [lidView, setLidView] = useState("open");
   const [, setHistoryVersion] = useState(0);
 
   const setDisplay = useCallback((patch) => {
@@ -231,6 +235,8 @@ export function useBoxBuilder() {
     setSelection,
     display,
     setDisplay,
+    lidView,
+    setLidView,
     edit,
     beginGesture,
     gestureEdit,

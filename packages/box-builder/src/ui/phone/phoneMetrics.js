@@ -28,13 +28,16 @@ export const PHONE_UI_TOKENS = Object.freeze({
   // to hit, small enough that four of them do not own the screen.
   "--fs-overlay-h": "2.5rem",
   "--fs-overlay-text": "0.8125rem",
-  // The desktop glass is tuned for a strip over a big scene. On a phone the
-  // same strip lands on the model, so it gets an opaque backing.
-  "--fs-overlay-veil": "0.82"
+  "--fs-overlay-radius": "1.25rem"
 });
 
 // The chrome's own measurements, shared by the shell, the sheet and the host
 // that has to leave room for them.
-export const PHONE_NAV_HEIGHT = 60;
+// The dock floats: its own height, plus the gap it keeps from the bottom edge
+// (and from the sheet above it). PHONE_NAV_HEIGHT is what the two together
+// reserve, which is what the sheet arithmetic has to leave alone.
+export const PHONE_DOCK_HEIGHT = 62;
+export const PHONE_DOCK_GAP = 10;
+export const PHONE_NAV_HEIGHT = PHONE_DOCK_HEIGHT + PHONE_DOCK_GAP * 2;
 export const PHONE_TOP_BAR_HEIGHT = 52;
 export const PHONE_SHEET_HEADER_HEIGHT = 52;
