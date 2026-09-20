@@ -4,12 +4,8 @@ import PhoneNav from "./PhoneNav.js";
 import PhoneModal from "./PhoneModal.js";
 import PhoneSheet from "./PhoneSheet.js";
 import { usePhoneViewport } from "./phoneViewport.js";
-import {
-  PHONE_NAV_HEIGHT,
-  PHONE_TOP_BAR_HEIGHT,
-  PHONE_UI_TOKENS,
-  PhoneUiProvider
-} from "./phoneUi.js";
+import { phoneSheetHeights } from "./phoneSheetMath.js";
+import { PHONE_NAV_HEIGHT, PHONE_UI_TOKENS, PhoneUiProvider } from "./phoneUi.js";
 
 // The phone chrome of the box builder: a navigation bar that never moves, a
 // sheet that rises over the scene to whatever height the work needs, and the
@@ -18,18 +14,6 @@ import {
 // Nothing here has a desktop counterpart: beside a scene the panel is a column
 // with a tab strip, which is the right shape for a mouse and the wrong one for
 // a thumb. The two layouts share the controls inside them and nothing else.
-
-// How tall the sheet stands at each detent, in pixels above the navigation bar.
-export function phoneSheetHeights(viewport) {
-  const { height, safeArea } = viewport;
-  const navHeight = PHONE_NAV_HEIGHT + safeArea.bottom;
-  const full = Math.max(height - safeArea.top - PHONE_TOP_BAR_HEIGHT - navHeight, 220);
-  return {
-    closed: 0,
-    half: Math.min(Math.round(height * 0.46), full),
-    full
-  };
-}
 
 // The tokens have to reach Radix's portals, which render at the end of <body>
 // and so inherit from the document, never from this shell.
