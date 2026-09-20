@@ -288,6 +288,23 @@ export function FileSheetDisclosure({
   children,
   className
 }) {
+  const phone = usePhoneUi();
+  // Beside a scene there is room for the summary on the control axis. On a
+  // phone there is not: "Board 1 - ESP32-S3-DevKit..." and "In the box -
+  // 25.4x67.44 ..." both ended in an ellipsis on one line, so neither said
+  // which board it was. The summary goes under the label instead.
+  const labelBlock = phone ? (
+    <span className="flex min-w-0 flex-1 flex-col gap-0.5 py-2 text-left">
+      <span className="min-w-0 truncate text-[length:var(--fs-label-text,0.6875rem)] font-medium leading-[1.45] text-sidebar-foreground">
+        {label}
+      </span>
+      {summary ? (
+        <span className="min-w-0 truncate text-[length:var(--fs-status-text,0.6875rem)] leading-[1.45] text-muted-foreground">
+          {summary}
+        </span>
+      ) : null}
+    </span>
+  ) : null;
   return (
     <Collapsible
       open={open}
@@ -306,10 +323,14 @@ export function FileSheetDisclosure({
             strokeWidth={2}
             aria-hidden="true"
           />
-          <span className="min-w-0 truncate text-[length:var(--fs-label-text,0.6875rem)] font-medium leading-[1.45] text-sidebar-foreground">{label}</span>
-          {summary ? (
-            <span className="ml-auto min-w-0 shrink truncate pl-2 text-right text-[length:var(--fs-badge-text,0.625rem)] leading-[1.45] text-muted-foreground">{summary}</span>
-          ) : null}
+          {labelBlock ?? (
+            <>
+              <span className="min-w-0 truncate text-[length:var(--fs-label-text,0.6875rem)] font-medium leading-[1.45] text-sidebar-foreground">{label}</span>
+              {summary ? (
+                <span className="ml-auto min-w-0 shrink truncate pl-2 text-right text-[length:var(--fs-badge-text,0.625rem)] leading-[1.45] text-muted-foreground">{summary}</span>
+              ) : null}
+            </>
+          )}
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent className={cn(FILE_SHEET_ROW_STACK_CLASSES, "pb-2 pt-2")} data-file-sheet-row-stack="">
@@ -342,7 +363,11 @@ export function FileSheetControlRow({
   className,
   contentClassName,
   labelClassName,
-  rowKind = "control"
+  rowKind = "control",
+  // The value badge is monospaced because most values are numbers that should
+  // line up between rows. A value that is a sentence ("Not saved") is not one
+  // of those, and monospaced Cyrillic reads as if the words were spaced wrong.
+  valueMono = true
 }) {
   // A row whose control lives in the trailing slot (a color picker, a value
   // readout) has no block content. Rendering the content div anyway left an
@@ -366,7 +391,9 @@ export function FileSheetControlRow({
             <span className={cn(FILE_SHEET_FIELD_LABEL_CLASSES, labelClassName)}>{label}</span>
           ) : <span />}
           {trailing != null ? trailing : value != null ? (
-            <span className={FILE_SHEET_VALUE_BADGE_CLASSES}>{value}</span>
+            <span className={cn(FILE_SHEET_VALUE_BADGE_CLASSES, !valueMono && "font-sans tracking-normal")}>
+              {value}
+            </span>
           ) : null}
         </div>
       ) : null}

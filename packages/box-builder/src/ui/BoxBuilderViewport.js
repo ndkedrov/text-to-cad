@@ -1038,7 +1038,7 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
     : buildError ? t("viewport.geometryError", { error: buildError }) : "";
   // The floating view buttons are the one control a thumb reaches without the
   // panel, so they grow with the rest on a phone.
-  const buttonClasses = "h-[var(--fs-overlay-h,1.75rem)] rounded-[var(--fs-radius,0.375rem)] px-2 text-[length:var(--fs-overlay-text,0.6875rem)]";
+  const buttonClasses = "relative h-[var(--fs-overlay-h,1.75rem)] rounded-[var(--fs-radius,0.375rem)] px-2 text-[length:var(--fs-overlay-text,0.6875rem)]";
 
   return (
     <div ref={containerRef} className="absolute inset-0 overflow-hidden" data-box-builder-viewport="">
@@ -1053,7 +1053,12 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
           maxWidth: `calc(100% - ${left + right + 24}px - ${SAFE_AREA_LEFT} - ${SAFE_AREA_RIGHT})`
         }}
       >
-        <div className="cad-glass-surface flex items-center gap-0.5 rounded-lg border border-sidebar-border p-0.5">
+        <div className="cad-glass-surface relative flex items-center gap-0.5 rounded-lg border border-sidebar-border p-0.5">
+          <span
+            className="pointer-events-none absolute inset-0 rounded-lg bg-sidebar"
+            style={{ opacity: "var(--fs-overlay-veil, 0)" }}
+            aria-hidden="true"
+          />
           {VIEW_OPTIONS.map(([value, labelKey]) => (
             <Button key={value} type="button" variant="ghost" size="sm" className={buttonClasses} onClick={() => setView(value)}>
               {t(labelKey)}
@@ -1061,8 +1066,13 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
           ))}
         </div>
         {dims.lidEnabled ? (
-          <div className="cad-glass-surface flex items-center gap-0.5 rounded-lg border border-sidebar-border p-0.5" aria-label={t("lid.viewAria")}>
-            {LID_VIEW_OPTIONS.map(([value, labelKey]) => (
+          <div className="cad-glass-surface relative flex items-center gap-0.5 rounded-lg border border-sidebar-border p-0.5" aria-label={t("lid.viewAria")}>
+            <span
+            className="pointer-events-none absolute inset-0 rounded-lg bg-sidebar"
+            style={{ opacity: "var(--fs-overlay-veil, 0)" }}
+            aria-hidden="true"
+          />
+          {LID_VIEW_OPTIONS.map(([value, labelKey]) => (
               <Button
                 key={value}
                 type="button"

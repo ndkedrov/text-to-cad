@@ -1614,7 +1614,7 @@ function FileTab({ builder, onOpenFile, hosted = false }) {
           <FileSheetStatusText tone="error">{t("name.invalid")}</FileSheetStatusText>
         ) : null}
         {capabilities.folderPath ? <FileSheetControlRow label={t("field.folder")} value={`boxes/${name}`} /> : null}
-        <FileSheetControlRow label={t("field.state")} value={dirty ? t("state.unsaved") : t("state.saved")} />
+        <FileSheetControlRow label={t("field.state")} value={dirty ? t("state.unsaved") : t("state.saved")} valueMono={false} />
         {quota && capabilities.quota ? <FileSheetControlRow label={t("field.today")} value={quotaText(quota, t)} /> : null}
       </FileSheetSubsection>
 

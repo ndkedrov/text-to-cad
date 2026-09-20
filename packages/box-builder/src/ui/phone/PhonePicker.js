@@ -99,25 +99,23 @@ export default function PhonePicker({
       title={title}
       closeLabel={labels.close}
       size="tall"
-    >
-      {searchable ? (
-        <div className="sticky top-0 z-10 cad-glass-popover px-4 pb-3">
-          <div className="relative">
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-              aria-hidden="true"
-            />
-            <input
-              type="text"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={searchPlaceholder || labels.search}
-              aria-label={searchPlaceholder || labels.search}
-              className="h-11 w-full rounded-[var(--fs-radius,0.75rem)] border border-input bg-transparent pl-9 pr-3 text-[0.9375rem] text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-ring dark:bg-input/30"
-            />
-          </div>
+      headerExtra={searchable ? (
+        <div className="relative">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <input
+            type="text"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={searchPlaceholder || labels.search}
+            aria-label={searchPlaceholder || labels.search}
+            className="h-11 w-full rounded-[var(--fs-radius,0.75rem)] border border-input bg-transparent pl-9 pr-3 text-[0.9375rem] text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-ring dark:bg-input/30"
+          />
         </div>
       ) : null}
+    >
       <ul className="px-2 pb-2" role="listbox" aria-label={title}>
         {groups.length === 0 ? (
           <li className="px-3 py-6 text-center text-[0.9375rem] text-muted-foreground">{labels.empty}</li>

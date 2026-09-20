@@ -19,6 +19,10 @@ export default function PhoneModal({
   closeLabel,
   size = "auto",
   footer = null,
+  // Sits under the title and does not scroll: a search field belongs to the
+  // sheet, not to the list. Made sticky inside the body instead, it laid a
+  // second layer of glass over the first and showed as a pale band.
+  headerExtra = null,
   bodyClassName,
   children
 }) {
@@ -72,6 +76,7 @@ export default function PhoneModal({
                 <X className="size-5" strokeWidth={2} aria-hidden="true" />
               </Dialog.Close>
             </header>
+            {headerExtra ? <div className="shrink-0 px-4 pb-3">{headerExtra}</div> : null}
             <div
               className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", bodyClassName)}
               style={footer ? undefined : { paddingBottom: SAFE_AREA_BOTTOM }}

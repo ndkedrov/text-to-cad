@@ -30,9 +30,13 @@ const PHONE_LABELS = Object.freeze({
 const PhoneLabelsContext = createContext(PHONE_LABELS);
 
 export function PhoneUiProvider({ value = true, labels, children }) {
+  // A nested provider (a modal wrapping its own subtree) must not throw away
+  // the words the shell translated: without this the file modal's pickers
+  // said "Search" and "Close" in English inside a Ukrainian app.
+  const inherited = useContext(PhoneLabelsContext);
   const resolved = useMemo(
-    () => (labels ? { ...PHONE_LABELS, ...labels } : PHONE_LABELS),
-    [labels]
+    () => (labels ? { ...inherited, ...labels } : inherited),
+    [inherited, labels]
   );
   return (
     <PhoneUiContext.Provider value={value}>
@@ -75,7 +79,10 @@ export const PHONE_UI_TOKENS = Object.freeze({
   // The strips floating over the scene are secondary to the panel: big enough
   // to hit, small enough that four of them do not own the screen.
   "--fs-overlay-h": "2.5rem",
-  "--fs-overlay-text": "0.8125rem"
+  "--fs-overlay-text": "0.8125rem",
+  // The desktop glass is tuned for a strip over a big scene. On a phone the
+  // same strip lands on the model, so it gets an opaque backing.
+  "--fs-overlay-veil": "0.82"
 });
 
 // The chrome's own measurements, shared by the shell, the sheet and the host
