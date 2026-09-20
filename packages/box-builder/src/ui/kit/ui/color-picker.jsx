@@ -205,7 +205,7 @@ function roundedColorNumbers(hex) {
 function ColorNumberInput({ label, value, min, max, onChange }) {
   return (
     <label className="min-w-0 space-y-1">
-      <span className="block text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+      <span className="block text-[length:var(--fs-badge-text,0.625rem)] font-medium uppercase tracking-[0.08em] text-muted-foreground">
         {label}
       </span>
       <Input
@@ -214,7 +214,7 @@ function ColorNumberInput({ label, value, min, max, onChange }) {
         max={max}
         value={value}
         onChange={(event) => onChange(clamp(event.currentTarget.value, min, max))}
-        className="h-7 px-1.5 text-[11px]"
+        className="h-[var(--fs-control-h,1.75rem)] px-1.5 text-[length:var(--fs-control-text,0.6875rem)]"
       />
     </label>
   )
@@ -340,7 +340,7 @@ function ColorPicker({
           variant="outline"
           size="sm"
           disabled={disabled}
-          className={cn("h-7 w-auto max-w-full justify-start gap-1.5 px-1.5 text-[11px] font-medium", className)}
+          className={cn("h-[var(--fs-control-h,1.75rem)] w-auto max-w-full justify-start gap-1.5 px-1.5 text-[length:var(--fs-control-text,0.6875rem)] font-medium", className)}
           {...props}
         >
           <span
@@ -416,7 +416,7 @@ function ColorPicker({
 
         {showOpacity ? (
           <div className="space-y-1">
-            <div className="flex items-center justify-between gap-2 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+            <div className="flex items-center justify-between gap-2 text-[length:var(--fs-badge-text,0.625rem)] font-medium uppercase tracking-[0.08em] text-muted-foreground">
               <span>Opacity</span>
               <span>{Math.round(normalizedOpacity * 100)}%</span>
             </div>
@@ -430,10 +430,10 @@ function ColorPicker({
                 onChange={(event) => {
                   onOpacityChange?.(clamp(event.currentTarget.value, 0, 100) / 100)
                 }}
-                className="h-7 px-1.5 text-[11px]"
+                className="h-[var(--fs-control-h,1.75rem)] px-1.5 text-[length:var(--fs-control-text,0.6875rem)]"
                 aria-label="Color opacity"
               />
-              <span className="text-[10px] font-medium text-muted-foreground">%</span>
+              <span className="text-[length:var(--fs-badge-text,0.625rem)] font-medium text-muted-foreground">%</span>
             </div>
           </div>
         ) : null}
@@ -445,7 +445,7 @@ function ColorPicker({
               type="button"
               variant={format === option ? "secondary" : "ghost"}
               size="xs"
-              className="h-6 flex-1 px-2 text-[10px] uppercase"
+              className="h-6 flex-1 px-2 text-[length:var(--fs-badge-text,0.625rem)] uppercase"
               onClick={() => setFormat(option)}
             >
               {option}
@@ -464,7 +464,7 @@ function ColorPicker({
                   handleHexCommit(event.currentTarget.value)
                 }
               }}
-              className="h-7 px-1.5 text-[11px] font-mono uppercase"
+              className="h-[var(--fs-control-h,1.75rem)] px-1.5 text-[length:var(--fs-control-text,0.6875rem)] font-mono uppercase"
               aria-label="Hex color"
             />
             {canUseEyeDropper ? (

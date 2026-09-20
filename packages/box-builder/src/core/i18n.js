@@ -8,6 +8,13 @@ export const BOX_LANGUAGE_STORAGE_KEY = "3dmaker:lang";
 
 const EN = {
   "sheet.title": "Box builder",
+  "sheet.expand": "Show the whole panel",
+  "sheet.collapse": "Show the model",
+  "action.close": "Close",
+  "picker.search": "Search",
+  "picker.empty": "Nothing found.",
+  "action.decrease": "{label}: less",
+  "action.increase": "{label}: more",
   "tab.body": "Body",
   "tab.lid": "Lid",
   "tab.holes": "Holes",
@@ -376,6 +383,13 @@ const EN = {
 
 const UK = {
   "sheet.title": "Конструктор коробки",
+  "sheet.expand": "Показати всю панель",
+  "sheet.collapse": "Показати модель",
+  "action.close": "Закрити",
+  "picker.search": "Пошук",
+  "picker.empty": "Нічого не знайдено.",
+  "action.decrease": "{label}: менше",
+  "action.increase": "{label}: більше",
   "tab.body": "Корпус",
   "tab.lid": "Кришка",
   "tab.holes": "Отвори",

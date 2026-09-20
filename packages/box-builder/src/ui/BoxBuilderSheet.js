@@ -2,7 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
+  Box,
+  CircleDashed,
+  CircuitBoard,
   Copy,
+  Cylinder,
   Crosshair,
   Download,
   Eye,
@@ -10,6 +14,7 @@ import {
   LoaderCircle,
   Magnet,
   Maximize2,
+  PanelTop,
   Plus,
   Printer,
   Redo2,
@@ -134,6 +139,8 @@ import FileSheet, {
   parseFileSheetNumberInput
 } from "./kit/FileSheet.js";
 import FileSheetTabbedSurface from "./kit/FileSheetTabbedSurface.js";
+import BoxBuilderPhoneShell from "./phone/BoxBuilderPhoneShell.js";
+import { usePhoneUi } from "./phone/phoneUi.js";
 import { useBoardPresets } from "./useBoardPresets.js";
 import { useBoxLanguage } from "./useBoxLanguage.js";
 
@@ -195,6 +202,8 @@ function NumberInput({
     <FileSheetValueInput
       value={formatValue(value, unit ?? t("unit.mm"), digits)}
       ariaLabel={ariaLabel}
+      decreaseLabel={t("action.decrease", { label: ariaLabel || "" })}
+      increaseLabel={t("action.increase", { label: ariaLabel || "" })}
       className={className}
       step={step}
       min={min}
@@ -210,9 +219,10 @@ function NumberInput({
 }
 
 function NumberRow({ label, ...props }) {
+  const phone = usePhoneUi();
   return (
     <FileSheetInlineControlRow label={label}>
-      <NumberInput ariaLabel={label} className="w-24" {...props} />
+      <NumberInput ariaLabel={label} className={phone ? undefined : "w-24"} {...props} />
     </FileSheetInlineControlRow>
   );
 }
@@ -228,7 +238,7 @@ function NumberField({ label, ...props }) {
 function CompactButton({ icon: Icon, children, className, ...props }) {
   return (
     <Button type="button" size="sm" variant="outline" className={cn(FILE_SHEET_COMPACT_BUTTON_CLASSES, className)} {...props}>
-      {Icon ? <Icon className="size-3.5" strokeWidth={2} aria-hidden="true" /> : null}
+      {Icon ? <Icon className="size-[var(--fs-icon,0.875rem)]" strokeWidth={2} aria-hidden="true" /> : null}
       {children}
     </Button>
   );
@@ -1125,7 +1135,7 @@ function BoardItem({ builder, board, index, presets }) {
         </>
       ) : (
         <FileSheetButtonRow>
-          <Button type="button" size="sm" className="h-7 text-[11px]" onClick={() => run(mountBoard)}>
+          <Button type="button" size="sm" className="h-[var(--fs-control-h,1.75rem)] text-[length:var(--fs-control-text,0.6875rem)]" onClick={() => run(mountBoard)}>
             <ArrowDownToLine className="size-3.5" aria-hidden="true" />
             {t("action.mountBoard")}
           </Button>
@@ -1604,7 +1614,7 @@ function FileTab({ builder, onOpenFile, hosted = false }) {
           <FileSheetStatusText tone="error">{t("name.invalid")}</FileSheetStatusText>
         ) : null}
         {capabilities.folderPath ? <FileSheetControlRow label={t("field.folder")} value={`boxes/${name}`} /> : null}
-        <FileSheetControlRow label={t("field.state")} value={dirty ? t("state.unsaved") : t("state.saved")} />
+        <FileSheetControlRow label={t("field.state")} value={dirty ? t("state.unsaved") : t("state.saved")} valueMono={false} />
         {quota && capabilities.quota ? <FileSheetControlRow label={t("field.today")} value={quotaText(quota, t)} /> : null}
       </FileSheetSubsection>
 
@@ -1613,7 +1623,7 @@ function FileTab({ builder, onOpenFile, hosted = false }) {
           <Button
             type="button"
             size="sm"
-            className="h-7 text-[11px]"
+            className="h-[var(--fs-control-h,1.75rem)] text-[length:var(--fs-control-text,0.6875rem)]"
             onClick={save}
             disabled={!nameValid || saving || building}
           >
@@ -1745,6 +1755,24 @@ function FileTab({ builder, onOpenFile, hosted = false }) {
   );
 }
 
+const SECTION_IDS_LIST = Object.values(SECTION_IDS);
+
+function HistoryActions({ builder }) {
+  const { t } = useBoxLanguage();
+  const { undo, redo, canUndo, canRedo } = builder;
+  const classes = "flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors active:bg-sidebar-accent/70 disabled:opacity-35";
+  return (
+    <>
+      <button type="button" className={classes} onClick={undo} disabled={!canUndo} aria-label={t("action.undo")} title={t("action.undo")}>
+        <Undo2 className="size-5" strokeWidth={2} aria-hidden="true" />
+      </button>
+      <button type="button" className={classes} onClick={redo} disabled={!canRedo} aria-label={t("action.redo")} title={t("action.redo")}>
+        <Redo2 className="size-5" strokeWidth={2} aria-hidden="true" />
+      </button>
+    </>
+  );
+}
+
 // --- sheet -------------------------------------------------------------------
 
 export default function BoxBuilderSheet({
@@ -1756,7 +1784,11 @@ export default function BoxBuilderSheet({
   builder,
   onOpenFile,
   hosted = false,
-  adapter
+  adapter,
+  // A host that gives the panel the whole bottom of a phone screen asks for the
+  // phone chrome and takes back the insets the model has to be framed in.
+  phoneShell = false,
+  onPhoneInsetsChange
 }) {
   const { t } = useBoxLanguage();
   const [openSectionIds, setOpenSectionIds] = useState([SECTION_IDS.BODY]);
@@ -1811,14 +1843,53 @@ export default function BoxBuilderSheet({
     setOpenSectionIds([SECTION_FOR_SELECTION[selectionKind]]);
   }, [selectionKind, selectionId]);
 
-  const sections = [
-    { id: SECTION_IDS.BODY, title: t("tab.body"), content: <BodyTab builder={builder} /> },
-    { id: SECTION_IDS.LID, title: t("tab.lid"), content: <LidTab builder={builder} /> },
-    { id: SECTION_IDS.HOLES, title: t("tab.holes"), content: <HolesTab builder={builder} /> },
-    { id: SECTION_IDS.STANDOFFS, title: t("tab.standoffs"), content: <StandoffsTab builder={builder} /> },
-    { id: SECTION_IDS.BOARDS, title: t("tab.boards"), content: <BoardsTab builder={builder} /> },
-    { id: SECTION_IDS.FILE, title: t("tab.file"), content: <FileTab builder={builder} onOpenFile={onOpenFile} hosted={hosted} /> }
+  const designSections = [
+    { id: SECTION_IDS.BODY, title: t("tab.body"), Icon: Box, content: <BodyTab builder={builder} /> },
+    { id: SECTION_IDS.LID, title: t("tab.lid"), Icon: PanelTop, content: <LidTab builder={builder} /> },
+    { id: SECTION_IDS.HOLES, title: t("tab.holes"), Icon: CircleDashed, content: <HolesTab builder={builder} /> },
+    { id: SECTION_IDS.STANDOFFS, title: t("tab.standoffs"), Icon: Cylinder, content: <StandoffsTab builder={builder} /> },
+    { id: SECTION_IDS.BOARDS, title: t("tab.boards"), Icon: CircuitBoard, content: <BoardsTab builder={builder} /> }
   ];
+  const fileSection = {
+    id: SECTION_IDS.FILE,
+    title: t("tab.file"),
+    Icon: FolderOpen,
+    content: <FileTab builder={builder} onOpenFile={onOpenFile} hosted={hosted} />
+  };
+  const sections = [...designSections, fileSection];
+
+  // On a phone the panel is the whole bottom of the screen: a navigation bar,
+  // a sheet that the model stays visible above, and the file actions as a
+  // modal. Saving and exporting are a task with an end, not a place to browse,
+  // and giving them a tab is what left the phone build with six cramped tabs
+  // and no room for any of them.
+  if (!isDesktop && phoneShell) {
+    const activeId = [...openSectionIds].reverse().find((id) => SECTION_IDS_LIST.includes(id))
+      || SECTION_IDS.BODY;
+    return (
+      <BoxAdapterProvider adapter={adapter}>
+        <BoxBuilderPhoneShell
+          sections={designSections}
+          modalSections={[fileSection]}
+          activeId={activeId === SECTION_IDS.FILE ? SECTION_IDS.BODY : activeId}
+          onActiveIdChange={(id) => setOpenSectionIds([id])}
+          onInsetsChange={onPhoneInsetsChange}
+          navLabel={t("sheet.title")}
+          expandLabel={t("sheet.expand")}
+          collapseLabel={t("sheet.collapse")}
+          closeLabel={t("action.close")}
+          labels={{
+            close: t("action.close"),
+            search: t("picker.search"),
+            empty: t("picker.empty")
+          }}
+          sheetActions={
+            <HistoryActions builder={builder} />
+          }
+        />
+      </BoxAdapterProvider>
+    );
+  }
 
   return (
     <BoxAdapterProvider adapter={adapter}>

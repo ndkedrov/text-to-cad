@@ -1,6 +1,8 @@
-import { Children, Fragment, useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, ChevronRight } from "lucide-react";
+import { Children, createContext, Fragment, useContext, useEffect, useRef, useState } from "react";
+import { Check, ChevronDown, ChevronRight, Minus, Plus } from "lucide-react";
 import { cn } from "./utils.js";
+import { usePhoneUi } from "../phone/phoneUi.js";
+import PhonePicker, { PhonePickerTrigger } from "../phone/PhonePicker.js";
 import { SAFE_AREA_BOTTOM, SAFE_AREA_RIGHT, SAFE_AREA_TOP } from "./safeArea.js";
 import {
   AccordionContent,
@@ -44,29 +46,29 @@ const DESKTOP_FILE_SHEET_MIN_WIDTH = 240;
 const DESKTOP_FILE_SHEET_MAX_WIDTH = "min(28rem, calc(100vw - 0.75rem))";
 const MOBILE_FILE_SHEET_WIDTH = "min(24rem, calc(100vw - 0.75rem))";
 const FILE_SHEET_CONTROL_TEXT_CLASSES = [
-  "[&_[data-slot=input]]:!text-[11px]",
-  "[&_[data-slot=select-trigger]]:!text-[11px]",
-  "[&_[data-slot=color-picker-trigger]]:!text-[11px]"
+  "[&_[data-slot=input]]:!text-[length:var(--fs-control-text,0.6875rem)]",
+  "[&_[data-slot=select-trigger]]:!text-[length:var(--fs-control-text,0.6875rem)]",
+  "[&_[data-slot=color-picker-trigger]]:!text-[length:var(--fs-control-text,0.6875rem)]"
 ].join(" ");
 
 export const FILE_SHEET_SECTION_TRIGGER_CLASSES = "px-2 py-2 text-sm font-normal text-sidebar-foreground/90";
 export const FILE_SHEET_SECTION_CONTENT_CLASSES = "py-2";
-export const FILE_SHEET_CONTROL_ROW_CLASSES = "space-y-1 px-2";
-export const FILE_SHEET_ROW_STACK_CLASSES = "space-y-3";
+export const FILE_SHEET_CONTROL_ROW_CLASSES = "space-y-1 px-[var(--fs-row-px,0.5rem)]";
+export const FILE_SHEET_ROW_STACK_CLASSES = "space-y-[var(--fs-row-gap,0.75rem)]";
 export const FILE_SHEET_SECTION_BODY_CLASSES = `${FILE_SHEET_ROW_STACK_CLASSES} py-2`;
-export const FILE_SHEET_SLIDER_FIELD_CLASSES = "space-y-1 px-2";
-export const FILE_SHEET_INLINE_CONTROL_ROW_CLASSES = "px-2";
+export const FILE_SHEET_SLIDER_FIELD_CLASSES = "space-y-1 px-[var(--fs-row-px,0.5rem)]";
+export const FILE_SHEET_INLINE_CONTROL_ROW_CLASSES = "px-[var(--fs-row-px,0.5rem)]";
 // Section headers sit at the navbar's size (12px medium) — a sheet's headings
 // and the chrome above it read as the same level of structure. Row labels stay
 // 11px muted, so a header separates from its rows by both size and colour.
-export const FILE_SHEET_SECTION_TITLE_CLASSES = "text-xs font-medium text-sidebar-foreground";
-export const FILE_SHEET_FIELD_LABEL_CLASSES = "block min-w-0 truncate text-[11px] font-medium leading-4 text-muted-foreground";
-export const FILE_SHEET_STATUS_TEXT_CLASSES = "px-2 text-[11px] leading-4 text-muted-foreground";
-export const FILE_SHEET_UNIT_SUFFIX_CLASSES = "pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] text-muted-foreground";
+export const FILE_SHEET_SECTION_TITLE_CLASSES = "text-[length:var(--fs-title-text,0.75rem)] font-medium text-sidebar-foreground";
+export const FILE_SHEET_FIELD_LABEL_CLASSES = "block min-w-0 truncate text-[length:var(--fs-label-text,0.6875rem)] font-medium leading-[1.45] text-muted-foreground";
+export const FILE_SHEET_STATUS_TEXT_CLASSES = "px-[var(--fs-row-px,0.5rem)] text-[length:var(--fs-status-text,0.6875rem)] leading-[1.45] text-muted-foreground";
+export const FILE_SHEET_UNIT_SUFFIX_CLASSES = "pointer-events-none absolute inset-y-0 right-2 flex items-center text-[length:var(--fs-badge-text,0.625rem)] text-muted-foreground";
 // A trigger must clip and ellipsize its own value: the Radix trigger only sets
 // whitespace-nowrap, so without this a long option pushes its chevron out
 // through the border instead of truncating.
-const FILE_SHEET_SELECT_TRIGGER_BASE_CLASSES = "!h-7 px-2 !text-[11px] overflow-hidden [&_svg]:size-3.5 [&>span]:min-w-0 [&>span]:truncate";
+const FILE_SHEET_SELECT_TRIGGER_BASE_CLASSES = "!h-[var(--fs-control-h,1.75rem)] !rounded-[var(--fs-radius,0.375rem)] px-2 !text-[length:var(--fs-control-text,0.6875rem)] overflow-hidden [&_svg]:size-[var(--fs-icon,0.875rem)] [&>span]:min-w-0 [&>span]:truncate";
 export const FILE_SHEET_SELECT_TRIGGER_CLASSES = `${FILE_SHEET_SELECT_TRIGGER_BASE_CLASSES} w-full`;
 // Inline triggers hug their value between two fixed bounds: never narrower than
 // the standard control (the 80px value input / colour swatch) so a column of
@@ -74,27 +76,30 @@ export const FILE_SHEET_SELECT_TRIGGER_CLASSES = `${FILE_SHEET_SELECT_TRIGGER_BA
 // to crowd the label. A percentage max-width cannot be used here — the wrapper
 // is shrink-to-fit, so the percentage resolves against a width the trigger
 // itself determines.
-export const FILE_SHEET_INLINE_SELECT_TRIGGER_CLASSES = `${FILE_SHEET_SELECT_TRIGGER_BASE_CLASSES} w-fit min-w-20 max-w-44`;
-export const FILE_SHEET_VALUE_BADGE_CLASSES = "shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium leading-none tabular-nums text-muted-foreground";
+export const FILE_SHEET_INLINE_SELECT_TRIGGER_CLASSES = `${FILE_SHEET_SELECT_TRIGGER_BASE_CLASSES} w-fit min-w-[var(--fs-value-w,5rem)] max-w-44`;
+export const FILE_SHEET_VALUE_BADGE_CLASSES = "shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[length:var(--fs-badge-text,0.625rem)] font-medium leading-none tabular-nums text-muted-foreground";
 export const FILE_SHEET_VALUE_BADGE_INPUT_CLASSES = [
-  "h-7 w-20 shrink-0 rounded-md border border-input bg-transparent px-2 py-1 text-right text-[11px] font-medium leading-none tabular-nums text-foreground shadow-xs outline-none",
+  "h-[var(--fs-control-h,1.75rem)] w-[var(--fs-value-w,5rem)] shrink-0 rounded-[var(--fs-radius,0.375rem)] border border-input bg-transparent px-2 py-1 text-right text-[length:var(--fs-control-text,0.6875rem)] font-medium leading-none tabular-nums text-foreground shadow-xs outline-none",
   "m-0 box-border min-w-0 theme-none transition-[color,box-shadow,border-color] placeholder:text-muted-foreground",
   "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50 dark:bg-input/30"
 ].join(" ");
-export const FILE_SHEET_COMPACT_BUTTON_CLASSES = "h-7 px-2 text-[11px] text-muted-foreground hover:text-foreground";
-export const FILE_SHEET_COMPACT_ICON_BUTTON_CLASSES = "size-7 text-muted-foreground hover:text-foreground";
-export const FILE_SHEET_COMPACT_INPUT_CLASSES = "!h-7 px-2 text-[11px] !text-foreground";
-export const FILE_SHEET_COMPACT_NUMERIC_INPUT_CLASSES = "h-7 px-2 !text-[11px] font-medium leading-none tabular-nums text-foreground";
-export const FILE_SHEET_COMPACT_JOINT_INPUT_CLASSES = "h-7 px-2 !text-[11px] font-medium leading-none tabular-nums text-foreground";
+export const FILE_SHEET_COMPACT_BUTTON_CLASSES = "h-[var(--fs-control-h,1.75rem)] rounded-[var(--fs-radius,0.375rem)] px-2 text-[length:var(--fs-control-text,0.6875rem)] text-muted-foreground hover:text-foreground";
+export const FILE_SHEET_COMPACT_ICON_BUTTON_CLASSES = "size-[var(--fs-control-h,1.75rem)] rounded-[var(--fs-radius,0.375rem)] text-muted-foreground hover:text-foreground";
+export const FILE_SHEET_COMPACT_INPUT_CLASSES = "!h-[var(--fs-control-h,1.75rem)] !rounded-[var(--fs-radius,0.375rem)] px-2 text-[length:var(--fs-control-text,0.6875rem)] !text-foreground";
+export const FILE_SHEET_COMPACT_NUMERIC_INPUT_CLASSES = "h-[var(--fs-control-h,1.75rem)] !rounded-[var(--fs-radius,0.375rem)] px-2 !text-[length:var(--fs-control-text,0.6875rem)] font-medium leading-none tabular-nums text-foreground";
+export const FILE_SHEET_COMPACT_JOINT_INPUT_CLASSES = "h-[var(--fs-control-h,1.75rem)] !rounded-[var(--fs-radius,0.375rem)] px-2 !text-[length:var(--fs-control-text,0.6875rem)] font-medium leading-none tabular-nums text-foreground";
 export const FILE_SHEET_BOOLEAN_SWITCH_CLASSES = [
-  "h-4 w-7 border shadow-none",
+  "h-[var(--fs-switch-h,1rem)] w-[var(--fs-switch-w,1.75rem)] border shadow-none",
+  // The track is as tall as it looks right; the target is as tall as a thumb
+  // needs. This grows the second without touching the first.
+  "relative before:absolute before:inset-x-0 before:-inset-y-[var(--fs-switch-pad,0px)] before:content-['']",
   "data-[state=checked]:border-primary/75 data-[state=checked]:bg-primary",
   "data-[state=unchecked]:!border-[rgb(115_125_140_/_0.52)] data-[state=unchecked]:!bg-[rgb(115_125_140_/_0.22)]",
   "dark:data-[state=unchecked]:!border-[rgb(148_163_184_/_0.44)] dark:data-[state=unchecked]:!bg-[rgb(148_163_184_/_0.18)]"
 ].join(" ");
 export const FILE_SHEET_BOOLEAN_SWITCH_THUMB_CLASSES = [
-  "!size-3 shadow-sm",
-  "data-[state=checked]:!translate-x-3 data-[state=checked]:!bg-background",
+  "!size-[var(--fs-switch-thumb,0.75rem)] shadow-sm",
+  "data-[state=checked]:!translate-x-[var(--fs-switch-travel,0.75rem)] data-[state=checked]:!bg-background",
   "data-[state=unchecked]:!translate-x-0 data-[state=unchecked]:!bg-[rgb(115_125_140)]",
   "dark:data-[state=unchecked]:!bg-[rgb(148_163_184)]"
 ].join(" ");
@@ -123,6 +128,11 @@ export const FILE_SHEET_PRECISION_SLIDER_CLASSES = [
   "[&_[data-slot=slider-thumb]]:focus-visible:ring-2",
   "[&_[data-slot=slider-thumb]]:focus-visible:ring-ring/30"
 ].join(" ");
+
+// Inside a field grid the cells are a tuple (x, y, z) read together, so they
+// stay plain inputs even on a phone: three steppers side by side fit nowhere,
+// and a coordinate is typed, not nudged.
+const FieldGridContext = createContext(false);
 
 export function FileSheetSection({
   value,
@@ -157,11 +167,51 @@ export function FileSheetSubsection({
   contentClassName,
   hideFirstSeparator = true
 }) {
+  const phone = usePhoneUi();
   // A gated section collapses to its heading alone. The heading's bottom gap
   // exists to separate it from the first row, so with no rows it must go —
   // otherwise a collapsed section carries 16px above its heading and 24px
   // below, which is where the padding visibly stopped being even.
   const hasRows = Children.toArray(children).length > 0;
+
+  // On a phone a section is a card, not a stretch of rows under a rule. A thumb
+  // scrolls past a flat list without ever seeing where one group ends, which is
+  // how the first build turned six settings into one undifferentiated column;
+  // a card gives the group an edge, and the edge is what makes it scannable.
+  if (phone) {
+    return (
+      <section
+        data-file-sheet-subsection=""
+        className={cn(
+          "mx-3 mb-3 overflow-hidden rounded-[1.125rem] border border-sidebar-border/60 bg-sidebar/35 py-3",
+          className
+        )}
+      >
+        {title ? (
+          <div
+            className={cn(
+              "flex min-h-8 min-w-0 items-center justify-between gap-2 px-[var(--fs-row-px,0.5rem)]",
+              hasRows && "pb-3"
+            )}
+          >
+            <span className={cn("min-w-0 truncate leading-5", FILE_SHEET_SECTION_TITLE_CLASSES, "font-semibold")}>
+              {title}
+            </span>
+            {trailing ? <span className="flex shrink-0 items-center">{trailing}</span> : null}
+          </div>
+        ) : null}
+        {hasRows ? (
+          <div
+            className={cn(FILE_SHEET_ROW_STACK_CLASSES, contentClassName)}
+            data-file-sheet-row-stack=""
+          >
+            {children}
+          </div>
+        ) : null}
+      </section>
+    );
+  }
+
   return (
     // The rule belongs to the top of a section, so a section owns the gap below
     // its own last row (pb-4) and the rule owns the gap down to the heading
@@ -175,14 +225,14 @@ export function FileSheetSubsection({
         className
       )}
     >
-      <div className="cad-sheet-subsection-separator mx-2 mb-4 h-px bg-border/60" />
+      <div className="cad-sheet-subsection-separator mx-[var(--fs-row-px,0.5rem)] mb-4 h-px bg-border/60" />
       {/* Titleless subsections are a rule plus rows: for a couple of settings
           that belong to the sheet as a whole rather than to any named group, and
           would otherwise need a heading invented for them. */}
       {title ? (
         <div
           className={cn(
-            "flex min-h-5 min-w-0 items-center justify-between gap-2 px-2",
+            "flex min-h-5 min-w-0 items-center justify-between gap-2 px-[var(--fs-row-px,0.5rem)]",
             hasRows && "pb-3"
           )}
         >
@@ -212,8 +262,8 @@ export function FileSheetItemGroup({ label, children, className }) {
   // are separated by the section's 16px rhythm with no rule: the next label is the boundary.
   return (
     <div className={cn("space-y-1 [&:not(:first-child)]:mt-4", className)} data-file-sheet-item-group="">
-      <div className="flex min-h-4 items-center px-2">
-        <span className="min-w-0 truncate text-[11px] font-medium leading-4 text-sidebar-foreground">
+      <div className="flex min-h-4 items-center px-[var(--fs-row-px,0.5rem)]">
+        <span className="min-w-0 truncate text-[length:var(--fs-title-text,0.6875rem)] font-medium leading-[1.45] text-sidebar-foreground">
           {label}
         </span>
       </div>
@@ -238,6 +288,23 @@ export function FileSheetDisclosure({
   children,
   className
 }) {
+  const phone = usePhoneUi();
+  // Beside a scene there is room for the summary on the control axis. On a
+  // phone there is not: "Board 1 - ESP32-S3-DevKit..." and "In the box -
+  // 25.4x67.44 ..." both ended in an ellipsis on one line, so neither said
+  // which board it was. The summary goes under the label instead.
+  const labelBlock = phone ? (
+    <span className="flex min-w-0 flex-1 flex-col gap-0.5 py-2 text-left">
+      <span className="min-w-0 truncate text-[length:var(--fs-label-text,0.6875rem)] font-medium leading-[1.45] text-sidebar-foreground">
+        {label}
+      </span>
+      {summary ? (
+        <span className="min-w-0 truncate text-[length:var(--fs-status-text,0.6875rem)] leading-[1.45] text-muted-foreground">
+          {summary}
+        </span>
+      ) : null}
+    </span>
+  ) : null;
   return (
     <Collapsible
       open={open}
@@ -249,17 +316,21 @@ export function FileSheetDisclosure({
       <CollapsibleTrigger asChild>
         <button
           type="button"
-          className="group flex min-h-7 w-full min-w-0 items-center gap-1.5 rounded-md px-2 text-left outline-none transition-colors hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="group flex min-h-[var(--fs-control-h,1.75rem)] w-full min-w-0 items-center gap-1.5 rounded-[var(--fs-radius,0.375rem)] px-[var(--fs-row-px,0.5rem)] text-left outline-none transition-colors hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-ring/50"
         >
           <ChevronRight
-            className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90"
+            className="size-[var(--fs-icon,0.875rem)] shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90"
             strokeWidth={2}
             aria-hidden="true"
           />
-          <span className="min-w-0 truncate text-[11px] font-medium leading-4 text-sidebar-foreground">{label}</span>
-          {summary ? (
-            <span className="ml-auto min-w-0 shrink truncate pl-2 text-right text-[10px] leading-4 text-muted-foreground">{summary}</span>
-          ) : null}
+          {labelBlock ?? (
+            <>
+              <span className="min-w-0 truncate text-[length:var(--fs-label-text,0.6875rem)] font-medium leading-[1.45] text-sidebar-foreground">{label}</span>
+              {summary ? (
+                <span className="ml-auto min-w-0 shrink truncate pl-2 text-right text-[length:var(--fs-badge-text,0.625rem)] leading-[1.45] text-muted-foreground">{summary}</span>
+              ) : null}
+            </>
+          )}
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent className={cn(FILE_SHEET_ROW_STACK_CLASSES, "pb-2 pt-2")} data-file-sheet-row-stack="">
@@ -292,7 +363,11 @@ export function FileSheetControlRow({
   className,
   contentClassName,
   labelClassName,
-  rowKind = "control"
+  rowKind = "control",
+  // The value badge is monospaced because most values are numbers that should
+  // line up between rows. A value that is a sentence ("Not saved") is not one
+  // of those, and monospaced Cyrillic reads as if the words were spaced wrong.
+  valueMono = true
 }) {
   // A row whose control lives in the trailing slot (a color picker, a value
   // readout) has no block content. Rendering the content div anyway left an
@@ -309,14 +384,16 @@ export function FileSheetControlRow({
         <div
           className={cn(
             "flex items-center justify-between gap-2",
-            hasContent ? "min-h-4" : "min-h-7"
+            hasContent ? "min-h-4" : "min-h-[var(--fs-control-h,1.75rem)]"
           )}
         >
           {label != null ? (
             <span className={cn(FILE_SHEET_FIELD_LABEL_CLASSES, labelClassName)}>{label}</span>
           ) : <span />}
           {trailing != null ? trailing : value != null ? (
-            <span className={FILE_SHEET_VALUE_BADGE_CLASSES}>{value}</span>
+            <span className={cn(FILE_SHEET_VALUE_BADGE_CLASSES, !valueMono && "font-sans tracking-normal")}>
+              {value}
+            </span>
           ) : null}
         </div>
       ) : null}
@@ -357,8 +434,17 @@ export function FileSheetValueInput({
   // Optional ArrowUp/ArrowDown stepping (Shift x10), committed live and clamped.
   step,
   min,
-  max
+  max,
+  // On a phone a steppable number grows a minus and a plus around it, because
+  // a 2 mm wall thickness is adjusted, not typed, and raising the keyboard to
+  // change one digit covers the model the number is changing. `false` keeps the
+  // bare field (a tuple cell, or a number that already has a slider).
+  stepper = "auto",
+  decreaseLabel,
+  increaseLabel
 }) {
+  const phone = usePhoneUi();
+  const inFieldGrid = useContext(FieldGridContext);
   const inputRef = useRef(null);
   const displayValue = String(value ?? "");
   const [draftValue, setDraftValue] = useState(displayValue);
@@ -381,6 +467,17 @@ export function FileSheetValueInput({
     inputRef.current?.select?.();
   }, [editing, visibleValue]);
 
+  const steppedValue = (direction, multiplier = 1) => {
+    const currentValue = parseFileSheetNumberInput(draftValue, {
+      fallback: parseFileSheetNumberInput(displayValue)
+    });
+    const increment = Number(step) * multiplier * direction;
+    return String(parseFileSheetNumberInput(
+      String(Math.round((currentValue + increment) * 1e6) / 1e6),
+      { min, max }
+    ));
+  };
+
   const pendingSelectFrameRef = useRef(0);
   const selectInputValue = (input) => {
     input?.select?.();
@@ -398,7 +495,10 @@ export function FileSheetValueInput({
     }
   };
 
-  return (
+  const showStepper = stepper === true
+    || (stepper === "auto" && phone && !inFieldGrid && Number(step) > 0);
+
+  const field = (
     <input
       ref={inputRef}
       type="text"
@@ -439,16 +539,9 @@ export function FileSheetValueInput({
       onKeyDown={(event) => {
         if ((event.key === "ArrowUp" || event.key === "ArrowDown") && Number(step) > 0) {
           event.preventDefault();
-          const currentValue = parseFileSheetNumberInput(draftValue, {
-            fallback: parseFileSheetNumberInput(displayValue)
-          });
-          const increment = Number(step) * (event.shiftKey ? 10 : 1) * (event.key === "ArrowUp" ? 1 : -1);
-          const nextValue = parseFileSheetNumberInput(
-            String(Math.round((currentValue + increment) * 1e6) / 1e6),
-            { min, max }
-          );
-          setDraftValue(String(nextValue));
-          onValueCommit?.(String(nextValue));
+          const nextValue = steppedValue(event.key === "ArrowUp" ? 1 : -1, event.shiftKey ? 10 : 1);
+          setDraftValue(nextValue);
+          onValueCommit?.(nextValue);
           return;
         }
         if (event.key === "Enter") {
@@ -462,14 +555,66 @@ export function FileSheetValueInput({
       }}
       className={cn(
         FILE_SHEET_VALUE_BADGE_INPUT_CLASSES,
-        className
+        showStepper && "h-full w-auto min-w-0 flex-1 rounded-none border-0 px-1 text-center shadow-none dark:bg-transparent",
+        className,
+        // The stepper owns the width; a caller's own w-* would fight the group.
+        showStepper && "w-auto"
       )}
       style={{
-        borderColor: editing ? "var(--ring)" : undefined,
+        borderColor: editing && !showStepper ? "var(--ring)" : undefined,
         ...style
       }}
       aria-label={ariaLabel}
     />
+  );
+
+  if (!showStepper) {
+    return field;
+  }
+
+  const nudge = (direction) => {
+    const nextValue = steppedValue(direction);
+    setDraftValue(nextValue);
+    onValueCommit?.(nextValue);
+  };
+
+  const buttonClasses = "flex h-[var(--fs-control-h,2.75rem)] w-10 shrink-0 items-center justify-center text-muted-foreground transition-colors active:bg-sidebar-accent disabled:opacity-40";
+
+  return (
+    <div
+      data-file-sheet-stepper=""
+      className={cn(
+        "flex h-[var(--fs-control-h,2.75rem)] shrink-0 items-stretch overflow-hidden rounded-[var(--fs-radius,0.375rem)] border border-input bg-transparent shadow-xs dark:bg-input/30",
+        // Wide enough for a minus, a three-digit value with its unit ("100 mm")
+        // and a plus, with none of them shrinking; the label keeps the rest of
+        // the row. Anything narrower clipped the unit off the widest numbers.
+        "w-[9.75rem]",
+        disabled && "opacity-50"
+      )}
+      style={{ borderColor: editing ? "var(--ring)" : undefined }}
+    >
+      <button
+        type="button"
+        className={cn(buttonClasses, "border-r border-input/70")}
+        onClick={() => nudge(-1)}
+        disabled={disabled}
+        aria-label={decreaseLabel}
+        title={decreaseLabel}
+      >
+        <Minus className="size-4" strokeWidth={2.25} aria-hidden="true" />
+      </button>
+      {field}
+      <button
+        type="button"
+        className={cn(buttonClasses, "border-l border-input/70")}
+        onClick={() => nudge(1)}
+        disabled={disabled}
+        aria-label={increaseLabel}
+        title={increaseLabel}
+      >
+        <Plus className="size-4" strokeWidth={2.25} aria-hidden="true" />
+      </button>
+    </div>
   );
 }
 
@@ -488,6 +633,7 @@ export function FileSheetSliderField({
     <FileSheetValueInput
       value={value}
       onValueCommit={onValueCommit}
+      stepper={false}
       {...valueInputProps}
     />
   ) : null);
@@ -542,12 +688,12 @@ export function FileSheetInlineControlRow({
       data-file-sheet-control-row=""
       data-file-sheet-row-kind="inline"
     >
-      <div className="flex min-h-7 max-w-full items-center justify-between gap-2">
+      <div className="flex min-h-[var(--fs-control-h,1.75rem)] max-w-full items-center justify-between gap-2">
         <span className={cn(FILE_SHEET_FIELD_LABEL_CLASSES, labelClassName)}>{label}</span>
         <span className="shrink-0">{children}</span>
       </div>
       {description ? (
-        <p className="mt-0.5 max-w-[28rem] text-[11px] leading-4 text-muted-foreground">{description}</p>
+        <p className="mt-0.5 max-w-[28rem] text-[length:var(--fs-status-text,0.6875rem)] leading-[1.45] text-muted-foreground">{description}</p>
       ) : null}
     </div>
   );
@@ -636,7 +782,7 @@ export function FileSheetValueField({ label, value, mono = false }) {
       <span className={FILE_SHEET_FIELD_LABEL_CLASSES}>{label}</span>
       <div
         className={cn(
-          "mt-1 min-h-7 truncate rounded-md border border-border/70 bg-muted/25 px-2 py-1 text-[11px] font-medium leading-4 text-foreground",
+          "mt-1 flex min-h-[var(--fs-control-h,1.75rem)] items-center truncate rounded-[var(--fs-radius,0.375rem)] border border-border/70 bg-muted/25 px-2 py-1 text-[length:var(--fs-control-text,0.6875rem)] font-medium leading-[1.45] text-foreground",
           mono && "font-mono tabular-nums"
         )}
         title={displayValue}
@@ -649,13 +795,15 @@ export function FileSheetValueField({ label, value, mono = false }) {
 
 export function FileSheetFieldGrid({ columns = 2, children, className }) {
   return (
-    <div
-      className={cn("grid gap-2 px-2", className)}
-      style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
-      data-file-sheet-field-grid=""
-    >
-      {children}
-    </div>
+    <FieldGridContext.Provider value={true}>
+      <div
+        className={cn("grid gap-2 px-[var(--fs-row-px,0.5rem)]", className)}
+        style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+        data-file-sheet-field-grid=""
+      >
+        {children}
+      </div>
+    </FieldGridContext.Provider>
   );
 }
 
@@ -665,7 +813,7 @@ export function FileSheetButtonRow({ children, columns, className }) {
   const columnCount = Math.max(1, columns || Children.count(children));
   return (
     <div
-      className={cn("grid gap-1.5 px-2", className)}
+      className={cn("grid gap-1.5 px-[var(--fs-row-px,0.5rem)]", className)}
       style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
       data-file-sheet-button-row=""
     >
@@ -694,8 +842,8 @@ export function FileSheetSegmentedControl({ value, onChange, options, ariaLabel,
         onChange(nextValue);
       }}
       className={cn(
-        "min-h-7",
-        fit ? "flex w-fit" : "grid w-full min-w-0 auto-rows-[1.75rem]"
+        "min-h-[var(--fs-control-h,1.75rem)]",
+        fit ? "flex w-fit" : "grid w-full min-w-0 auto-rows-[var(--fs-control-h,1.75rem)]"
       )}
       style={fit ? undefined : { gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
       aria-label={ariaLabel}
@@ -708,7 +856,7 @@ export function FileSheetSegmentedControl({ value, onChange, options, ariaLabel,
             value={option.value}
             disabled={option.disabled === true}
             className={cn(
-              "min-w-0 gap-1.5 !h-7 px-1.5 text-[11px]",
+              "min-w-0 gap-1.5 !h-[var(--fs-control-h,1.75rem)] !rounded-[var(--fs-radius,0.375rem)] px-1.5 text-[length:var(--fs-control-text,0.6875rem)]",
               fit && "!flex-none px-2",
               option.iconOnly && "px-1",
               FILE_SHEET_SEGMENTED_ITEM_CLASSES
@@ -716,7 +864,7 @@ export function FileSheetSegmentedControl({ value, onChange, options, ariaLabel,
             title={option.title || option.label}
             aria-label={option.label}
           >
-            {Icon ? <Icon className="size-3" strokeWidth={2} aria-hidden="true" /> : null}
+            {Icon ? <Icon className="size-[var(--fs-icon,0.75rem)]" strokeWidth={2} aria-hidden="true" /> : null}
             {/* iconOnly keeps the label for the tooltip and screen readers only. */}
             {Icon && option.iconOnly ? null : <span className="truncate">{option.label}</span>}
           </ToggleGroupItem>
@@ -744,6 +892,38 @@ export function FileSheetSelectRow({
   stacked = false,
   className
 }) {
+  const phone = usePhoneUi();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const selected = options.find((option) => option.value === value);
+
+  if (phone) {
+    const trigger = (
+      <>
+        <PhonePickerTrigger
+          label={ariaLabel || (typeof label === "string" ? label : undefined)}
+          value={triggerContent ?? selected?.label ?? ""}
+          placeholder={placeholder}
+          disabled={disabled}
+          onClick={() => setPickerOpen(true)}
+          className={stacked ? "w-full max-w-none" : undefined}
+        />
+        <PhonePicker
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          title={typeof label === "string" ? label : ariaLabel || ""}
+          options={options}
+          value={value}
+          onValueChange={onValueChange}
+        />
+      </>
+    );
+    return stacked ? (
+      <FileSheetControlRow label={label} className={className}>{trigger}</FileSheetControlRow>
+    ) : (
+      <FileSheetInlineControlRow label={label} className={className}>{trigger}</FileSheetInlineControlRow>
+    );
+  }
+
   const select = (
     <Select value={value} onValueChange={onValueChange} disabled={disabled}>
       <SelectTrigger
@@ -778,7 +958,7 @@ export function FileSheetSelectRow({
               {ungrouped.map(renderItem)}
               {groupNames.map((groupName) => (
                 <SelectGroup key={groupName}>
-                  <SelectLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <SelectLabel className="text-[length:var(--fs-badge-text,0.625rem)] uppercase tracking-wide text-muted-foreground">
                     {groupName}
                   </SelectLabel>
                   {options.filter((option) => option.group === groupName).map(renderItem)}
@@ -820,7 +1000,31 @@ export function FileSheetComboboxRow({
   ariaLabel,
   className
 }) {
+  const phone = usePhoneUi();
   const [open, setOpen] = useState(false);
+  if (phone) {
+    const selectedOption = options.find((option) => option.value === value);
+    return (
+      <FileSheetInlineControlRow label={label} className={className}>
+        <PhonePickerTrigger
+          label={ariaLabel || (typeof label === "string" ? label : undefined)}
+          value={selectedOption?.label ?? ""}
+          placeholder={searchPlaceholder}
+          onClick={() => setOpen(true)}
+        />
+        <PhonePicker
+          open={open}
+          onOpenChange={setOpen}
+          title={typeof label === "string" ? label : ariaLabel || ""}
+          options={options}
+          value={value}
+          onValueChange={onValueChange}
+          searchable
+          searchPlaceholder={searchPlaceholder}
+        />
+      </FileSheetInlineControlRow>
+    );
+  }
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const inputRef = useRef(null);
@@ -862,7 +1066,7 @@ export function FileSheetComboboxRow({
   let lastGroup;
   const rows = shown.map((option, index) => {
     const heading = option.group && option.group !== lastGroup ? (
-      <div className="px-2 pb-0.5 pt-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">{option.group}</div>
+      <div className="px-2 pb-0.5 pt-1.5 text-[length:var(--fs-badge-text,0.625rem)] uppercase tracking-wide text-muted-foreground">{option.group}</div>
     ) : null;
     lastGroup = option.group;
     return (
@@ -876,12 +1080,12 @@ export function FileSheetComboboxRow({
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => choose(option)}
           className={cn(
-            "relative flex cursor-default items-center rounded-sm py-1.5 pl-2 pr-8 text-xs outline-none select-none",
+            "relative flex min-h-[var(--fs-option-h,auto)] cursor-default items-center rounded-sm py-1.5 pl-2 pr-8 text-[length:var(--fs-control-text,0.75rem)] outline-none select-none",
             index === active && "bg-accent text-accent-foreground"
           )}
         >
           <span className="min-w-0 truncate">{option.label}</span>
-          {option.value === value ? <Check className="absolute right-2 size-3.5" aria-hidden="true" /> : null}
+          {option.value === value ? <Check className="absolute right-2 size-[var(--fs-icon,0.875rem)]" aria-hidden="true" /> : null}
         </div>
       </Fragment>
     );
@@ -902,7 +1106,7 @@ export function FileSheetComboboxRow({
             )}
           >
             <span className="min-w-0 truncate">{selected ? selected.label : ""}</span>
-            <ChevronDown className="size-3.5 shrink-0 opacity-50" aria-hidden="true" />
+            <ChevronDown className="size-[var(--fs-icon,0.875rem)] shrink-0 opacity-50" aria-hidden="true" />
           </button>
         </PopoverTrigger>
         <PopoverContent
@@ -922,10 +1126,10 @@ export function FileSheetComboboxRow({
             aria-label={searchPlaceholder || ariaLabel || (typeof label === "string" ? label : undefined)}
             spellCheck={false}
             autoComplete="off"
-            className="mb-1 h-7 w-full rounded-md border border-input bg-transparent px-2 text-[11px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
+            className="mb-1 h-[var(--fs-control-h,1.75rem)] w-full rounded-[var(--fs-radius,0.375rem)] border border-input bg-transparent px-2 text-[length:var(--fs-control-text,0.6875rem)] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
           />
           <div ref={listRef} role="listbox" className="max-h-72 overflow-y-auto">
-            {rows.length ? rows : <div className="px-2 py-1.5 text-[11px] text-muted-foreground">{emptyText}</div>}
+            {rows.length ? rows : <div className="px-2 py-1.5 text-[length:var(--fs-control-text,0.6875rem)] text-muted-foreground">{emptyText}</div>}
           </div>
         </PopoverContent>
       </Popover>
@@ -948,7 +1152,31 @@ export function FileSheetCascadeSelectRow({
   ariaLabel,
   className
 }) {
+  const phone = usePhoneUi();
+  const [pickerOpen, setPickerOpen] = useState(false);
   const selected = options.find((option) => option.value === value) || null;
+  if (phone) {
+    // Submenus need a pointer that can hover a parent row while reaching the
+    // child; a thumb cannot. The same options open as one grouped list.
+    return (
+      <FileSheetInlineControlRow label={label} className={className}>
+        <PhonePickerTrigger
+          label={ariaLabel || (typeof label === "string" ? label : undefined)}
+          value={selected?.label ?? ""}
+          onClick={() => setPickerOpen(true)}
+        />
+        <PhonePicker
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          title={typeof label === "string" ? label : ariaLabel || ""}
+          options={options}
+          value={value}
+          onValueChange={onValueChange}
+          searchable={options.length > 12}
+        />
+      </FileSheetInlineControlRow>
+    );
+  }
   const ungrouped = options.filter((option) => !option.group);
   const groupNames = [...new Set(options.map((option) => option.group).filter(Boolean))];
   // The tick sits on the RIGHT: a checkbox item's left indicator gutter indents checked
@@ -957,12 +1185,12 @@ export function FileSheetCascadeSelectRow({
   const renderItem = (option) => (
     <DropdownMenuItem
       key={option.value}
-      className="justify-between gap-2 text-xs"
+      className="min-h-[var(--fs-option-h,auto)] justify-between gap-2 text-[length:var(--fs-control-text,0.75rem)]"
       onSelect={() => onValueChange?.(option.value)}
     >
       <span className="min-w-0 truncate">{option.label}</span>
       {option.value === value ? (
-        <Check className="size-3.5 shrink-0" strokeWidth={2} aria-hidden="true" />
+        <Check className="size-[var(--fs-icon,0.875rem)] shrink-0" strokeWidth={2} aria-hidden="true" />
       ) : null}
     </DropdownMenuItem>
   );
@@ -974,20 +1202,20 @@ export function FileSheetCascadeSelectRow({
             type="button"
             aria-label={ariaLabel || (typeof label === "string" ? label : undefined)}
             className={cn(
-              "flex !h-7 w-fit min-w-20 max-w-44 items-center justify-between gap-1 overflow-hidden",
-              "rounded-md border border-input bg-transparent px-2 !text-[11px] shadow-xs outline-none",
+              "flex !h-[var(--fs-control-h,1.75rem)] w-fit min-w-[var(--fs-value-w,5rem)] max-w-44 items-center justify-between gap-1 overflow-hidden",
+              "rounded-[var(--fs-radius,0.375rem)] border border-input bg-transparent px-2 !text-[length:var(--fs-control-text,0.6875rem)] shadow-xs outline-none",
               "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
             )}
           >
             <span className="min-w-0 truncate">{selected?.label ?? ""}</span>
-            <ChevronDown className="size-3.5 shrink-0 opacity-60" aria-hidden="true" />
+            <ChevronDown className="size-[var(--fs-icon,0.875rem)] shrink-0 opacity-60" aria-hidden="true" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" sideOffset={4} className="w-52">
           {ungrouped.map(renderItem)}
           {groupNames.map((groupName) => (
             <DropdownMenuSub key={groupName}>
-              <DropdownMenuSubTrigger className="text-xs">{groupName}</DropdownMenuSubTrigger>
+              <DropdownMenuSubTrigger className="min-h-[var(--fs-option-h,auto)] text-[length:var(--fs-control-text,0.75rem)]">{groupName}</DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="max-h-80 w-56 overflow-y-auto">
                 {options.filter((option) => option.group === groupName).map(renderItem)}
               </DropdownMenuSubContent>
@@ -1015,7 +1243,7 @@ export function FileSheetColorPicker({
         "w-fit justify-start gap-1.5 px-1.5",
         className
       )}
-      swatchClassName={cn("size-3.5", swatchClassName)}
+      swatchClassName={cn("size-[var(--fs-icon,0.875rem)]", swatchClassName)}
       popoverAlign="end"
       {...props}
     />

@@ -482,13 +482,26 @@ function applyViewport(runtime, container, insets, safeAreaProbe) {
   const left = (Number(insets?.left) || 0) + safeArea.left;
   const right = (Number(insets?.right) || 0) + safeArea.right;
   const top = (Number(insets?.top) || 0) + safeArea.top;
-  runtime.camera.setViewOffset(width, height, (right - left) / 2, -top / 2, width, height);
+  // The bottom inset is what a phone's sheet and navigation bar take. Leaving
+  // it out centred the box behind the sheet, so half the model sat under the
+  // panel that was editing it.
+  const bottom = (Number(insets?.bottom) || 0) + safeArea.bottom;
+  runtime.camera.setViewOffset(width, height, (right - left) / 2, (bottom - top) / 2, width, height);
+  // Shifting the view is not enough once the chrome owns half the screen: a box
+  // framed against the whole canvas then runs off both ends of the strip that
+  // is left. This is the share of the canvas the scene still has to itself, and
+  // frameBox fits the box into that instead of into the whole of it.
+  runtime.viewVisible = {
+    width: Math.max(width - left - right, 1) / width,
+    height: Math.max(height - top - bottom, 1) / height
+  };
   runtime.camera.updateProjectionMatrix();
   runtime.requestRender();
 }
 
 function frameBox(runtime, dims, view, lidView, spec) {
   const { camera, controls } = runtime;
+  runtime.view = view;
   const lift = lidView === "open" && dims.lidEnabled ? lidLift(dims) : 0;
   const height = dims.totalHeight + lift;
   // Clamp T pieces lie on the bed to the right of the box: keep them in the frame.
@@ -497,7 +510,20 @@ function frameBox(runtime, dims, view, lidView, spec) {
   const extra = last ? last.x + last.width - dims.width / 2 : 0;
   const center = new THREE.Vector3(extra / 2, 0, height / 2);
   const radius = 0.5 * Math.hypot(dims.width + extra, dims.depth, height);
-  const distance = (radius / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2))) * 1.12;
+  // How far back the camera has to stand for the box to fit inside the part of
+  // the canvas that is showing. `fov` is the vertical angle, so the horizontal
+  // one comes from the aspect; each is then narrowed to the share of the canvas
+  // the chrome leaves, and the tighter of the two decides. On a phone held
+  // upright the horizontal angle is the one that runs out first, which is why
+  // fitting by the vertical one alone put the box off both sides.
+  const visible = runtime.viewVisible || { width: 1, height: 1 };
+  const halfVertical = THREE.MathUtils.degToRad(camera.fov / 2);
+  const halfHorizontal = Math.atan(Math.tan(halfVertical) * Math.max(camera.aspect, 0.01));
+  const angle = Math.min(
+    Math.atan(Math.tan(halfVertical) * visible.height),
+    Math.atan(Math.tan(halfHorizontal) * visible.width)
+  );
+  const distance = (radius / Math.sin(Math.max(angle, 0.01))) * 1.12;
   const direction = new THREE.Vector3(...(VIEW_DIRECTIONS[view] || VIEW_DIRECTIONS.iso)).normalize();
   camera.position.copy(center).addScaledVector(direction, distance);
   camera.near = Math.max(distance / 200, 0.05);
@@ -514,6 +540,8 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
   const safeAreaProbeRef = useRef(null);
   const runtimeRef = useRef(null);
   const framedRef = useRef(false);
+  // Set the first time the viewer moves the camera themselves.
+  const orbitedRef = useRef(false);
   const hoverRef = useRef(null);
   const latestRef = useRef({});
   const [wasm, setWasm] = useState(null);
@@ -605,6 +633,9 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
     };
     runtimeRef.current = runtime;
     controls.addEventListener("change", runtime.requestRender);
+    controls.addEventListener("start", () => {
+      orbitedRef.current = true;
+    });
     applyTheme(runtime, latestRef.current.builder.dims);
     applyViewport(runtime, host, latestRef.current.insets, safeAreaProbeRef.current);
 
@@ -889,10 +920,20 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
 
   useEffect(() => {
     const runtime = runtimeRef.current;
-    if (runtime && canvasHostRef.current) {
-      applyViewport(runtime, canvasHostRef.current, insets, safeAreaProbeRef.current);
+    if (!runtime || !canvasHostRef.current) {
+      return;
     }
-  }, [insets?.left, insets?.right, insets?.top]);
+    applyViewport(runtime, canvasHostRef.current, insets, safeAreaProbeRef.current);
+    if (framedRef.current && !orbitedRef.current) {
+      frameBox(
+        runtime,
+        latestRef.current.builder.dims,
+        runtime.view || "iso",
+        latestRef.current.lidView,
+        latestRef.current.builder?.spec
+      );
+    }
+  }, [insets?.left, insets?.right, insets?.top, insets?.bottom]);
 
   // Geometry: rebuilt from the plan at most once per frame.
   useEffect(() => {
@@ -982,6 +1023,9 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
   const setView = (view) => {
     const runtime = runtimeRef.current;
     if (runtime) {
+      // Asking for a view hands the camera back: it frames itself again when
+      // the panel changes how much of the screen is left.
+      orbitedRef.current = false;
       frameBox(runtime, dims, view, lidView, spec);
     }
   };
@@ -992,7 +1036,9 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
   const error = loadError
     ? t("viewport.loadError", { error: loadError })
     : buildError ? t("viewport.geometryError", { error: buildError }) : "";
-  const buttonClasses = "h-7 px-2 text-[11px]";
+  // The floating view buttons are the one control a thumb reaches without the
+  // panel, so they grow with the rest on a phone.
+  const buttonClasses = "relative h-[var(--fs-overlay-h,1.75rem)] rounded-[var(--fs-radius,0.375rem)] px-2 text-[length:var(--fs-overlay-text,0.6875rem)]";
 
   return (
     <div ref={containerRef} className="absolute inset-0 overflow-hidden" data-box-builder-viewport="">
@@ -1007,7 +1053,12 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
           maxWidth: `calc(100% - ${left + right + 24}px - ${SAFE_AREA_LEFT} - ${SAFE_AREA_RIGHT})`
         }}
       >
-        <div className="cad-glass-surface flex items-center gap-0.5 rounded-lg border border-sidebar-border p-0.5">
+        <div className="cad-glass-surface relative flex items-center gap-0.5 rounded-lg border border-sidebar-border p-0.5">
+          <span
+            className="pointer-events-none absolute inset-0 rounded-lg bg-sidebar"
+            style={{ opacity: "var(--fs-overlay-veil, 0)" }}
+            aria-hidden="true"
+          />
           {VIEW_OPTIONS.map(([value, labelKey]) => (
             <Button key={value} type="button" variant="ghost" size="sm" className={buttonClasses} onClick={() => setView(value)}>
               {t(labelKey)}
@@ -1015,8 +1066,13 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
           ))}
         </div>
         {dims.lidEnabled ? (
-          <div className="cad-glass-surface flex items-center gap-0.5 rounded-lg border border-sidebar-border p-0.5" aria-label={t("lid.viewAria")}>
-            {LID_VIEW_OPTIONS.map(([value, labelKey]) => (
+          <div className="cad-glass-surface relative flex items-center gap-0.5 rounded-lg border border-sidebar-border p-0.5" aria-label={t("lid.viewAria")}>
+            <span
+            className="pointer-events-none absolute inset-0 rounded-lg bg-sidebar"
+            style={{ opacity: "var(--fs-overlay-veil, 0)" }}
+            aria-hidden="true"
+          />
+          {LID_VIEW_OPTIONS.map(([value, labelKey]) => (
               <Button
                 key={value}
                 type="button"
@@ -1037,7 +1093,7 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
               type="button"
               aria-expanded={warningsOpen}
               onClick={() => setWarningsOpen((open) => !open)}
-              className="cad-glass-surface rounded-lg border border-amber-500/50 px-2 py-1 text-[11px] font-medium text-amber-700 transition-colors hover:bg-amber-500/10 dark:text-amber-300"
+              className="cad-glass-surface rounded-lg border border-amber-500/50 px-2 py-1 text-[length:var(--fs-control-text,0.6875rem)] font-medium text-amber-700 transition-colors hover:bg-amber-500/10 dark:text-amber-300"
             >
               {t("viewport.warnings", { count: warnings.length })} {warningsOpen ? "▴" : "▾"}
             </button>
@@ -1057,25 +1113,25 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
                           }
                           setWarningsOpen(false);
                         }}
-                        className="w-full rounded-md px-2 py-1.5 text-left text-[11px] leading-4 text-foreground hover:bg-accent disabled:cursor-default disabled:hover:bg-transparent"
+                        className="w-full rounded-md px-2 py-1.5 text-left text-[length:var(--fs-control-text,0.6875rem)] leading-4 text-foreground hover:bg-accent disabled:cursor-default disabled:hover:bg-transparent"
                       >
                         {sentence}
                       </button>
                     </li>
                   );
                 })}
-                <li className="px-2 pb-1 pt-0.5 text-[10px] leading-4 text-muted-foreground">{t("viewport.warningsHint")}</li>
+                <li className="px-2 pb-1 pt-0.5 text-[length:var(--fs-badge-text,0.625rem)] leading-4 text-muted-foreground">{t("viewport.warningsHint")}</li>
               </ul>
             ) : null}
           </div>
         ) : null}
         {!wasm && !loadError ? (
-          <div className="cad-glass-surface rounded-lg border border-sidebar-border px-2 py-1 text-[11px] text-muted-foreground">
+          <div className="cad-glass-surface rounded-lg border border-sidebar-border px-2 py-1 text-[length:var(--fs-control-text,0.6875rem)] text-muted-foreground">
             {t("viewport.loading")}
           </div>
         ) : null}
         {error ? (
-          <div className="cad-glass-surface rounded-lg border border-destructive/50 px-2 py-1 text-[11px] text-destructive">
+          <div className="cad-glass-surface rounded-lg border border-destructive/50 px-2 py-1 text-[length:var(--fs-control-text,0.6875rem)] text-destructive">
             {error}
           </div>
         ) : null}
@@ -1090,7 +1146,7 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
         }}
       >
         {/* Mouse and keyboard help: nothing in it applies to a touch screen. */}
-        <div className="cad-glass-surface max-w-full rounded-lg border border-sidebar-border px-2.5 py-1 text-center text-[10px] leading-4 text-muted-foreground pointer-coarse:hidden">
+        <div className="cad-glass-surface max-w-full rounded-lg border border-sidebar-border px-2.5 py-1 text-center text-[length:var(--fs-badge-text,0.625rem)] leading-4 text-muted-foreground pointer-coarse:hidden">
           {t("viewport.hint")}
         </div>
         {sourceUrl ? (
@@ -1098,7 +1154,7 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
             href={sourceUrl}
             target="_blank"
             rel="noreferrer"
-            className="cad-glass-surface pointer-events-auto rounded-lg border border-sidebar-border px-2.5 py-1 text-[10px] font-medium leading-4 text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+            className="cad-glass-surface pointer-events-auto rounded-lg border border-sidebar-border px-2.5 py-1 text-[length:var(--fs-badge-text,0.625rem)] font-medium leading-4 text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
           >
             {t("footer.source")}
           </a>
@@ -1107,7 +1163,7 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "" }) 
 
       {readout ? (
         <div
-          className="pointer-events-none fixed z-50 rounded-md border border-border bg-popover px-2 py-1 text-[11px] font-medium tabular-nums text-popover-foreground shadow-md"
+          className="pointer-events-none fixed z-50 rounded-md border border-border bg-popover px-2 py-1 text-[length:var(--fs-control-text,0.6875rem)] font-medium tabular-nums text-popover-foreground shadow-md"
           style={{ left: readout.x + 16, top: readout.y + 16 }}
         >
           {readout.text}
