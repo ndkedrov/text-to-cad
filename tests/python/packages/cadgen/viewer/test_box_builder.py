@@ -341,6 +341,30 @@ class Accounts(BuilderTestCase):
             self.builder.save("first", body(), owner=ALICE)
         self.assertEqual(caught.exception.code, "quota_unavailable")
 
+    def test_an_unlimited_account_is_exempt_from_its_own_daily_caps(self):
+        builder = self.make_builder(BoxLimits(daily_new_boxes=1, daily_builds=3, unlimited_keys=frozenset({owner_key(ALICE)})))
+        for name in ("first", "second", "third"):
+            self.save(name=name, owner=ALICE, builder=builder)
+        # A second build of the same box also stays exempt from daily_builds.
+        self.save(name="first", owner=ALICE, builder=builder)
+        status = builder.status("first", ALICE)
+        self.assertIsNone(status["quota"]["dailyNewBoxes"])
+        self.assertIsNone(status["quota"]["dailyBuilds"])
+        # A regular account keeps the caps.
+        self.save(name="first", owner="bob@example.com", builder=builder)
+        with self.assertRaises(BoxQuotaExceeded) as caught:
+            builder.save("second", body(), owner="bob@example.com")
+        self.assertEqual(caught.exception.code, "quota_new")
+
+    def test_an_unlimited_account_still_counts_against_the_global_cap(self):
+        builder = self.make_builder(
+            BoxLimits(daily_new_boxes=1, global_daily_new_boxes=1, unlimited_keys=frozenset({owner_key(ALICE)}))
+        )
+        self.save(name="first", owner=ALICE, builder=builder)
+        with self.assertRaises(BoxQuotaExceeded) as caught:
+            builder.save("second", body(), owner=ALICE)
+        self.assertEqual(caught.exception.code, "quota_global")
+
 
 class HostedLimits(BuilderTestCase):
     expose_paths = False
@@ -396,6 +420,11 @@ class HostedLimits(BuilderTestCase):
         tuned = BoxLimits.from_env(hosted=True, environ={"CADGEN_BOX_DAILY_NEW": "3", "CADGEN_BOX_MIN_FREE_BYTES": "-1"})
         self.assertEqual(tuned.daily_new_boxes, 3)
         self.assertIsNone(tuned.min_free_bytes)
+
+    def test_unlimited_emails_come_from_the_environment_as_hashed_keys(self):
+        limits = BoxLimits.from_env(hosted=True, environ={"CADGEN_BOX_UNLIMITED_EMAILS": f" {ALICE} , ,bob@example.com"})
+        self.assertEqual(limits.unlimited_keys, {owner_key(ALICE), owner_key("bob@example.com")})
+        self.assertEqual(BoxLimits.from_env(hosted=True, environ={}).unlimited_keys, frozenset())
 
 
 class Capacity(unittest.TestCase):

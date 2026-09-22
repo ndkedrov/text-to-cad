@@ -369,6 +369,9 @@ class BoxLimits:
     # A fresh cadgen cache per build, deleted afterwards.
     ephemeral_cache: bool = False
     timezone: str = "Europe/Kyiv"
+    # Hashed owner_key()s exempt from daily_new_boxes/daily_builds (not from
+    # global_daily_new_boxes, which protects the service, not per-account fairness).
+    unlimited_keys: frozenset[str] = frozenset()
 
     @classmethod
     def from_env(cls, *, hosted: bool, environ: dict | None = None) -> "BoxLimits":
@@ -385,6 +388,10 @@ class BoxLimits:
             return None if value < 0 else value
 
         flag = str(source.get("CADGEN_BOX_EPHEMERAL_CACHE", "")).strip().lower()
+        unlimited_raw = str(source.get("CADGEN_BOX_UNLIMITED_EMAILS", ""))
+        unlimited_keys = frozenset(
+            key for email in unlimited_raw.split(",") if email.strip() and (key := owner_key(email))
+        )
         return cls(
             max_builds=max(1, read("CADGEN_BOX_MAX_BUILDS", 2) or 1),
             max_queue=max(0, read("CADGEN_BOX_MAX_QUEUE", 8) or 0),
@@ -397,6 +404,7 @@ class BoxLimits:
             min_free_bytes=read("CADGEN_BOX_MIN_FREE_BYTES", 10 * 1024**3 if hosted else None),
             ephemeral_cache=(flag in {"1", "true", "yes"}) if flag else hosted,
             timezone=str(source.get("CADGEN_BOX_TIMEZONE", "") or "Europe/Kyiv"),
+            unlimited_keys=unlimited_keys,
         )
 
 
@@ -601,6 +609,7 @@ class BoxBuilder:
         key = owner_key(owner)
         if key is None:
             return {}
+        unlimited = key in self.limits.unlimited_keys
         try:
             usage = self._quota.usage(key)
         except BoxError:
@@ -608,8 +617,8 @@ class BoxBuilder:
         return {
             "quota": {
                 **usage,
-                "dailyNewBoxes": self.limits.daily_new_boxes,
-                "dailyBuilds": self.limits.daily_builds,
+                "dailyNewBoxes": None if unlimited else self.limits.daily_new_boxes,
+                "dailyBuilds": None if unlimited else self.limits.daily_builds,
             }
         }
 
@@ -695,11 +704,14 @@ class BoxBuilder:
         if key is None:
             return
         limits = self.limits
+        unlimited = key in limits.unlimited_keys
         usage = self._quota.usage(key)
-        if is_new and limits.daily_new_boxes is not None and usage["newBoxes"] >= limits.daily_new_boxes:
+        if not unlimited and is_new and limits.daily_new_boxes is not None and usage["newBoxes"] >= limits.daily_new_boxes:
             raise BoxQuotaExceeded(f"daily limit of {limits.daily_new_boxes} new box(es) reached", code="quota_new")
-        if limits.daily_builds is not None and usage["builds"] >= limits.daily_builds:
+        if not unlimited and limits.daily_builds is not None and usage["builds"] >= limits.daily_builds:
             raise BoxQuotaExceeded(f"daily limit of {limits.daily_builds} builds reached", code="quota_builds")
+        # The global cap still applies: it protects shared server resources,
+        # not per-account fairness, so unlimited accounts still count toward it.
         if is_new and limits.global_daily_new_boxes is not None:
             if self._quota.usage(_ALL_ACCOUNTS_KEY)["newBoxes"] >= limits.global_daily_new_boxes:
                 raise BoxQuotaExceeded("the service has made all its new boxes for today", code="quota_global")
