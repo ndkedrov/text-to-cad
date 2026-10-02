@@ -10,8 +10,9 @@ from __future__ import annotations
 from typing import Any
 
 from cadgen.box_plan import normalize_plan_node
+from cadgen.color import srgb
 
-__all__ = ["shape_from_plan"]
+__all__ = ["shape_from_plan", "colored_shapes_from_plan"]
 
 _EPS = 1e-6
 
@@ -23,6 +24,22 @@ def shape_from_plan(node: Any):
     return _build(bd, normalize_plan_node(node))
 
 
+def colored_shapes_from_plan(node: Any):
+    """Build material leaves separately, preserving all parent transforms."""
+    from cadgen import build123d as bd
+
+    def visit(plan):
+        if "color" in plan:
+            shape = _build(bd, plan)
+            shape.color = srgb(plan["color"])
+            return [shape]
+        if plan["type"] != "union":
+            return []
+        return [_placed(bd, shape, plan) for child in plan["children"] for shape in visit(child)]
+
+    return visit(normalize_plan_node(node))
+
+
 def _build(bd, node: dict):
     kind = node["type"]
     if kind == "rrect":
@@ -30,12 +47,43 @@ def _build(bd, node: dict):
     elif kind == "cyl":
         shape = bd.Cylinder(node["r"], node["h"], align=(bd.Align.CENTER, bd.Align.CENTER, bd.Align.MIN))
     elif kind == "poly":
-        outline = bd.Polygon(*[tuple(point) for point in node["points"]], align=None)
-        shape = bd.extrude(outline, amount=node["h"])
+        shape = _polygon_prism(bd, node["points"], node["h"])
     else:
         children = [_build(bd, child) for child in node["children"]]
         shape = _combine(children, kind)
     return _placed(bd, shape, node)
+
+
+def _polygon_prism(bd, points, height):
+    # Clipped SVG rings can touch themselves at a vertex, or acquire a tiny
+    # crossing when coordinates are rounded. Manifold resolves these in the
+    # preview; OCC needs explicit simple faces before extrusion.
+    from shapely.geometry import Polygon
+    from shapely.geometry.polygon import orient
+    from shapely.validation import make_valid
+
+    polygon = Polygon(points)
+    if polygon.is_valid:
+        return bd.extrude(bd.Polygon(*[tuple(p) for p in points], align=None), amount=height)
+
+    def faces(geometry):
+        if geometry.geom_type == "Polygon":
+            if geometry.area > 1e-8:
+                yield geometry
+        elif hasattr(geometry, "geoms"):
+            for child in geometry.geoms:
+                yield from faces(child)
+
+    pieces = []
+    for face in faces(make_valid(polygon)):
+        face = orient(face, sign=1.0)
+        outline = bd.Polygon(*list(face.exterior.coords)[:-1], align=None)
+        for hole in face.interiors:
+            outline = outline - bd.Polygon(*list(hole.coords)[:-1], align=None)
+        pieces.append(bd.extrude(outline, amount=height))
+    if not pieces:
+        raise ValueError("polygon has no printable area")
+    return pieces[0] if len(pieces) == 1 else bd.Compound(children=pieces)
 
 
 def _combine(children: list, kind: str):

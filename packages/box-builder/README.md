@@ -63,6 +63,23 @@ A host also provides:
 - Tailwind CSS 4 scanning `src/`, with the shadcn theme variables the kit's
   classes use (`--background`, `--card`, `--muted-foreground`, …).
 
+## SVG lid artwork
+
+SVG imports retain solid fill/stroke colours, explicit subpaths, fill rules and
+local clip paths. Definition-only paths do not become visible artwork. Paint
+order is resolved into disjoint colour regions, so overlapping colours produce
+separate inlay bodies instead of cancelling one another as even-odd holes.
+Each source colour has its own control in the collapsed colour group section;
+recolouring does not merge those controls. New imports fit within 90% of both
+lid dimensions, keeping their proportions even when the SVG declares a physical
+size. Saved drawings retain their existing placement and size.
+
+The spec stores `colorGroups` with source/current colours and contours. Older
+specs without groups still load. Inlay plan nodes carry a validated `color`;
+the viewport and the web STEP/3MF export preserve separate material bodies.
+STL geometry has no colour information. Native shells require their own release
+before this shared panel change reaches installed apps.
+
 ## Checks
 
 ```bash

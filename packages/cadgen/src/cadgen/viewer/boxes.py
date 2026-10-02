@@ -194,7 +194,7 @@ def script_source(name: str, part: str, node: dict, held_by: dict | None = None)
         header
         + "from cadgen import build123d as bd\n"
         "from cadgen import step, stl, threemf\n"
-        "from cadgen.box_csg import shape_from_plan\n"
+        "from cadgen.box_csg import shape_from_plan, colored_shapes_from_plan\n"
         "\n"
         f"PLAN = {plan}\n"
         "\n"
@@ -205,13 +205,19 @@ def script_source(name: str, part: str, node: dict, held_by: dict | None = None)
         "@stl\n"
         "@step\n"
         f"def {function}():\n"
-        "    piece = shape_from_plan(PLAN)\n"
+        "    pieces = colored_shapes_from_plan(PLAN)\n"
+        "    piece = shape_from_plan(PLAN) if not pieces else None\n"
         "    holder = shape_from_plan(HOLDER_PLAN)\n"
-        f'    piece.label = "{part}"\n'
+        "    if piece is not None:\n"
+        f'        piece.label = "{part}"\n'
+        "        piece.color = bd.Color(0.95, 0.65, 0.15)\n"
+        "        pieces = [piece]\n"
+        "    else:\n"
+        "        for index, region in enumerate(pieces, 1):\n"
+        "            region.label = f'inlay-color-{index}'\n"
         f'    holder.label = "{held_by["part"]}"\n'
-        "    piece.color = bd.Color(0.95, 0.65, 0.15)\n"
         "    holder.color = bd.Color(0.78, 0.82, 0.86)\n"
-        "    return bd.Compound(children=[holder, piece])\n"
+        "    return bd.Compound(children=[holder, *pieces])\n"
         "\n"
         "\n"
         'if __name__ == "__main__":\n'

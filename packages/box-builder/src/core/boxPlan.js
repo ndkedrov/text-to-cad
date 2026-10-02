@@ -382,7 +382,13 @@ function inlayPlan(spec, dims) {
     return null;
   }
   const height = Math.min(engraving.depth, dims.lidThickness);
-  return group(engravingShapes(engraving, height), { pos: [0, 0, dims.lidTop - height] });
+  const shapes = engraving.colorGroups?.length
+    ? engraving.colorGroups.map((region) => {
+      const shape = group(engravingShapes({ ...engraving, contours: region.contours, strokes: [] }, height));
+      return shape ? { ...shape, color: region.color } : null;
+    }).filter(Boolean)
+    : engravingShapes(engraving, height);
+  return group(shapes, { pos: [0, 0, dims.lidTop - height] });
 }
 
 function lidPlan(spec, dims) {
@@ -470,4 +476,14 @@ export function countPlanNodes(node) {
     return 0;
   }
   return 1 + (node.children || []).reduce((total, child) => total + countPlanNodes(child), 0);
+}
+
+// Material leaves retain every ancestor placement (including print orientation).
+export function coloredPlanParts(node) {
+  if (!node) return [];
+  if (node.color) return [{ color: node.color, plan: node }];
+  if (node.type !== "union") return [];
+  return node.children.flatMap((child) => coloredPlanParts(child).map((part) => ({
+    color: part.color, plan: group([part.plan], { pos: node.pos, rot: node.rot })
+  })));
 }

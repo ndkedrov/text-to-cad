@@ -80,7 +80,7 @@ import {
   engravingPointCount,
   engravingUnitsPerMm
 } from "../core/engraving.js";
-import { drawingFromSvg, redrawnContours } from "../browser/engravingImport.js";
+import { drawingFromSvg, redrawnDrawing } from "../browser/engravingImport.js";
 import {
   BOARD_EDGES,
   BOARD_ROTATIONS,
@@ -120,6 +120,7 @@ import {
 } from "../core/boxSpec.js";
 import { formatBoxNumber, formatWarning, getBoxLanguage } from "../core/i18n.js";
 import FileSheet, {
+  FileSheetColorRow,
   FILE_SHEET_COMPACT_BUTTON_CLASSES,
   FILE_SHEET_COMPACT_ICON_BUTTON_CLASSES,
   FILE_SHEET_COMPACT_INPUT_CLASSES,
@@ -448,13 +449,13 @@ function LidTab({ builder }) {
     const lineWidth = engraving.strokes.length ? lineMm * units : 0;
     const gapWidth = gapMm * units;
     try {
-      const contours = await redrawnContours(engraving, { lineWidth, gapWidth });
+      const drawing = await redrawnDrawing(engraving, { lineWidth, gapWidth });
       edit((draft) => {
         const target = draft.lid.engraving;
         if (target) {
           target.lineWidth = lineWidth;
           target.gapWidth = gapWidth;
-          target.contours = contours;
+          Object.assign(target, drawing);
         }
       });
       setEngravingError("");
@@ -471,11 +472,8 @@ function LidTab({ builder }) {
     }
     try {
       const drawing = await drawingFromSvg(await file.text(), { name: file.name.replace(/\.svg$/iu, "") });
-      // A drawing that gives its real size comes in at it; one that does not is
-      // sized to sit on the lid, two thirds of it at most.
-      const fit = Math.min((dims.width * 2) / 3 / drawing.width, (dims.depth * 2) / 3 / drawing.height);
       edit((draft) => {
-        draft.lid.engraving = engravingFromDrawing(drawing, { millimetresPerUnit: drawing.millimetresPerUnit || fit });
+        draft.lid.engraving = engravingFromDrawing(drawing, { lidWidth: dims.width, lidDepth: dims.depth });
       });
       setEngravingError("");
     } catch (error) {
@@ -611,6 +609,23 @@ function LidTab({ builder }) {
                 onValueChange={(mode) => patchEngraving({ mode })}
                 options={ENGRAVING_MODES.map((mode) => ({ value: mode, label: t(`engraving.mode.${mode}`) }))}
               />
+              {engraving.colorGroups.length ? (
+                <details className="px-2">
+                  <summary className="cursor-pointer text-xs text-muted-foreground">
+                    {t("engraving.colors", { count: engraving.colorGroups.length })}
+                  </summary>
+                  {engraving.colorGroups.map((group, index) => (
+                    <FileSheetColorRow
+                      key={group.id}
+                      label={t("engraving.color", { index: index + 1, color: group.sourceColor })}
+                      value={group.color}
+                      onChange={(color) => patchEngraving({
+                        colorGroups: engraving.colorGroups.map((entry) => entry.id === group.id ? { ...entry, color } : entry)
+                      })}
+                    />
+                  ))}
+                </details>
+              ) : null}
               <FileSheetFieldGrid columns={2}>
                 <NumberField label={t("field.centerX")} value={engraving.x} min={-2000} max={2000} step={0.5} onCommit={(x) => patchEngraving({ x })} />
                 <NumberField label={t("field.centerY")} value={engraving.y} min={-2000} max={2000} step={0.5} onCommit={(y) => patchEngraving({ y })} />
@@ -1836,7 +1851,7 @@ export default function BoxBuilderSheet({
         edit((draft) => {
           const target = draft.lid.engraving;
           if (target && !target.contours.length) {
-            target.contours = contours;
+            Object.assign(target, drawing);
           }
         });
       },

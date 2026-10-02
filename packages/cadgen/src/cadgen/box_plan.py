@@ -17,6 +17,7 @@ Grammar, millimetres and degrees::
 
 Every node may carry ``"rot": [rx, ry, rz]`` and ``"pos": [x, y, z]``, applied
 as rotation about global X, then global Y, then global Z, then translation.
+Optional ``"color": "#rrggbb"`` marks a material body for multi-colour inlays.
 
 The limits describe a desktop-printable box, not what the kernel could do: a
 plan is also a request for CPU time, and an internet-facing viewer must not
@@ -26,6 +27,7 @@ accept one that keeps a worker busy for an hour.
 from __future__ import annotations
 
 import math
+import re
 from typing import Any
 
 __all__ = [
@@ -129,6 +131,11 @@ def normalize_plan_node(node: Any, where: str = "plan", *, _budget: _Budget | No
             normalize_plan_node(child, f"{where}.children[{index}]", _budget=budget, _depth=_depth + 1)
             for index, child in enumerate(children)
         ]
+    if "color" in node:
+        color = node["color"]
+        if not isinstance(color, str) or re.fullmatch(r"#[0-9a-fA-F]{6}", color) is None:
+            raise PlanError(f"{where}.color: expected #RRGGBB")
+        clean["color"] = color.lower()
     if "rot" in node:
         clean["rot"] = _vector(node["rot"], f"{where}.rot", 3, -_MAX_ANGLE, _MAX_ANGLE)
     if "pos" in node:

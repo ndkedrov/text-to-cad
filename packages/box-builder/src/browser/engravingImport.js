@@ -3,6 +3,8 @@
 // lays out, sampling each into a closed contour. What comes out is plain numbers
 // (see engraving.js), so nothing here is needed again when the box is built.
 
+import { SVGLoader } from "three/examples/jsm/loaders/SVGLoader.js";
+import { composeColorGroups, unionColorContours } from "../core/engravingColors.js";
 import {
   MAX_CONTOUR_POINTS,
   MAX_ENGRAVING_CONTOURS,
@@ -22,9 +24,7 @@ const STROKE_LINE_POINTS = 200;
 
 // How finely a shape is walked before it is simplified, and what counts as the
 // jump from the end of one subpath to the start of the next.
-const SAMPLE_STEP = 0.1;
 const MAX_SAMPLES = 4000;
-const JUMP = 6;
 // A drawing is read on the page's own thread, so the work is bounded on every
 // side: a crowded file would otherwise walk millions of points and the browser
 // would sit there, looking hung.
@@ -59,39 +59,31 @@ function viewportSize(svg) {
 // subpaths (a letter with a counter, a logo of separate marks) breaks where the
 // pen jumps.
 function sampleShape(shape, matrix, budget = MAX_SAMPLES) {
-  const length = shape.getTotalLength();
-  if (!Number.isFinite(length) || length <= 0) {
-    return [];
-  }
-  const step = Math.max(length / Math.max(Math.min(MAX_SAMPLES, budget), 1), SAMPLE_STEP);
-  const contours = [];
-  let current = [];
-  let previous = null;
-  for (let walked = 0; walked <= length + step / 2; walked += step) {
-    const point = shape.getPointAtLength(Math.min(walked, length));
-    const placed = matrix ? point.matrixTransform(matrix) : point;
-    const here = [placed.x, placed.y];
-    if (previous && Math.hypot(here[0] - previous[0], here[1] - previous[1]) > JUMP * step) {
-      if (current.length >= 3) {
-        contours.push(current);
-      }
-      current = [];
-    }
-    current.push(here);
-    previous = here;
-  }
-  if (current.length >= 3) {
-    contours.push(current);
-  }
-  return contours;
+  // Parse subpaths explicitly: distance jumps cannot distinguish a pen lift
+  // from a long edge, and can accidentally join separate coloured islands.
+  const copy = shape.cloneNode(true);
+  copy.removeAttribute("transform");
+  const source = new XMLSerializer().serializeToString(copy);
+  const paths = new SVGLoader().parse(`<svg xmlns="http://www.w3.org/2000/svg">${source}</svg>`).paths;
+  const subpaths = paths.flatMap((path) => path.subPaths);
+  const total = subpaths.reduce((sum, path) => sum + path.getLength(), 0);
+  return subpaths.map((path) => path.curves.flatMap((curve, index) => {
+    const count = curve.isLineCurve ? 1 : Math.max(4, Math.min(128,
+      Math.floor(Math.min(MAX_SAMPLES, budget) * curve.getLength() / (total || 1))));
+    const points = curve.getPoints(count);
+    return (index ? points.slice(1) : points).map((point) => {
+      const placed = matrix ? new DOMPoint(point.x, point.y).matrixTransform(matrix) : point;
+      return [placed.x, placed.y];
+    });
+  }));
 }
 
 // Filled shapes tidied by the same hands: overlaps merged, holes told apart from
 // shapes by which way each contour runs (SVG's even-odd rule decides what is a
 // hole, and a walked outline says nothing about it by itself).
-function filledContours(wasm, shapes, tolerance) {
+function filledContours(wasm, shapes, tolerance, rule = "EvenOdd") {
   const { CrossSection } = wasm;
-  const area = new CrossSection(shapes, "EvenOdd");
+  const area = new CrossSection(shapes, rule);
   const thinned = area.simplify(tolerance);
   const contours = thinned.toPolygons()
     .filter((polygon) => polygon.length >= 3)
@@ -113,6 +105,78 @@ export async function redrawnContours({ fills = [], strokes = [] }, { lineWidth 
     ? grooveContours(wasm, lineWidth > 0 ? strokes.map((line) => ({ ...line, width: lineWidth })) : strokes)
     : [];
   return closeNarrowGaps(wasm, [...fills, ...grooves], gapWidth);
+}
+
+// Clip paths use their own fill rule and are never paint layers themselves.
+function clippedContours(wasm, contours, element, svg, root, tolerance, windowRef) {
+  if (!contours.length) return [];
+  let area = new wasm.CrossSection(contours, "Positive");
+  try {
+    for (let host = element; host && host !== svg.parentNode; host = host.parentElement) {
+      const clip = windowRef.getComputedStyle(host).clipPath;
+      if (!clip || clip === "none") continue;
+      const id = /#([^"')]+)["']?\)/u.exec(clip)?.[1];
+      const definition = [...svg.querySelectorAll("clipPath")].find((node) => node.id === id);
+      if (!definition) throw new EngravingError("unsupported-clip");
+      let placement = root.inverse().multiply(host.getCTM());
+      if (definition.getAttribute("clipPathUnits") === "objectBoundingBox") {
+        const box = host.getBBox();
+        placement = placement.translate(box.x, box.y).scale(box.width, box.height);
+      }
+      const transform = definition.transform?.baseVal?.consolidate()?.matrix;
+      if (transform) placement = placement.multiply(transform);
+      let mask = null;
+      try {
+        for (const shape of definition.querySelectorAll("path,rect,circle,ellipse,polygon,polyline")) {
+          let local = placement;
+          const ancestors = [];
+          for (let node = shape; node !== definition; node = node.parentElement) ancestors.unshift(node);
+          for (const node of ancestors) {
+            const matrix = node.transform?.baseVal?.consolidate()?.matrix;
+            if (matrix) local = local.multiply(matrix);
+          }
+          const rings = sampleShape(shape, local).map((ring) => simplifyContour(ring, tolerance));
+          const rule = windowRef.getComputedStyle(shape).clipRule === "evenodd" ? "EvenOdd" : "NonZero";
+          if (!rings.length) continue;
+          const part = new wasm.CrossSection(rings, rule);
+          if (mask) {
+            const next = mask.add(part);
+            part.delete(); mask.delete(); mask = next;
+          } else mask = part;
+        }
+        if (!mask) return [];
+        const next = area.intersect(mask);
+        area.delete(); area = next;
+      } finally { mask?.delete(); }
+    }
+    return area.toPolygons().map((ring) => ring.map(([x, y]) => [x, y]));
+  } finally { area.delete(); }
+}
+
+function paintColor(value, documentRef) {
+  if (!value || value === "none" || value.startsWith("url(")) throw new EngravingError("unsupported-paint");
+  const context = documentRef.createElement("canvas").getContext("2d");
+  context.fillStyle = value;
+  const normalized = context.fillStyle;
+  if (/^#[0-9a-f]{6}$/iu.test(normalized)) return normalized.toLowerCase();
+  const rgb = normalized.match(/[\d.]+/gu)?.slice(0, 3).map(Number);
+  if (!rgb || rgb.length !== 3) throw new EngravingError("unsupported-paint");
+  return `#${rgb.map((n) => Math.round(n).toString(16).padStart(2, "0")).join("")}`;
+}
+
+export async function redrawnDrawing(engraving, options) {
+  if (!engraving.colorGroups?.length) return { contours: await redrawnContours(engraving, options) };
+  const wasm = await loadManifold();
+  const layers = await Promise.all(engraving.colorGroups.map(async (group) => ({
+    ...group, contours: await redrawnContours(group.strokes?.length
+      ? { fills: group.fills || [], strokes: group.strokes }
+      : { fills: group.contours }, options)
+  })));
+  const colorGroups = composeColorGroups(wasm, layers).map((group) => {
+    const source = engraving.colorGroups.find((entry) => entry.id === group.id);
+    return { ...group, fills: source?.fills || [], strokes: source?.strokes || [] };
+  });
+  return { colorGroups, contours: unionColorContours(wasm, colorGroups) };
 }
 
 // A <line> has no inside, so its fill (black unless the file says otherwise) never
@@ -175,13 +239,27 @@ export async function drawingFromSvg(text, { name = "", documentRef = globalThis
   stage.setAttribute("aria-hidden", "true");
   stage.style.cssText = "position:absolute;left:-10000px;top:0;width:0;height:0;overflow:hidden";
   const svg = documentRef.importNode(parsed.documentElement, true);
-  stage.appendChild(svg);
+  // Uploaded drawings are geometry, never executable page content.
+  svg.querySelectorAll("script,foreignObject,image,use,style").forEach((node) => {
+    if (node.tagName.toLowerCase() !== "style") node.remove();
+    else if (/@import|url\s*\(/iu.test(node.textContent)) node.remove();
+  });
+  for (const node of [svg, ...svg.querySelectorAll("*")]) {
+    for (const attr of [...node.attributes]) {
+      if (/^on/iu.test(attr.name) || /href$/iu.test(attr.name)) node.removeAttribute(attr.name);
+    }
+  }
+  stage.attachShadow({ mode: "closed" }).appendChild(svg);
   documentRef.body.appendChild(stage);
   try {
     const size = viewportSize(svg);
     const root = svg.getCTM ? svg.getCTM() : null;
-    const tolerance = Math.hypot(size.width, size.height) / 1500;
-    const shapes = [...svg.querySelectorAll("path,rect,circle,ellipse,polygon,polyline,line")].slice(0, MAX_SHAPES);
+    const tolerance = Math.hypot(size.width, size.height) / 6000;
+    const shapes = [...svg.querySelectorAll("path,rect,circle,ellipse,polygon,polyline,line")]
+      .filter((shape) => !shape.closest("defs,clipPath,mask,symbol"));
+    if (shapes.length > MAX_SHAPES) throw new EngravingError("too-complex");
+    const wasm = await loadManifold();
+    const layers = [];
     const walked = [];
     const lines = [];
     const deadline = Date.now() + TIME_BUDGET_MS;
@@ -190,7 +268,7 @@ export async function drawingFromSvg(text, { name = "", documentRef = globalThis
     for (const shape of shapes) {
       shapeIndex += 1;
       if (samples <= 0 || Date.now() > deadline) {
-        break;
+        throw new EngravingError("too-complex");
       }
       if (shapeIndex % SHAPES_PER_BREATH === 0) {
         // Let the page draw: this runs where the user is waiting.
@@ -199,10 +277,14 @@ export async function drawingFromSvg(text, { name = "", documentRef = globalThis
       if (typeof shape.getTotalLength !== "function") {
         continue;
       }
+      const style = windowRef.getComputedStyle(shape);
+      if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) continue;
+      if ([...function* () { for (let p = shape.parentElement; p; p = p.parentElement) yield p; }()]
+        .some((p) => windowRef.getComputedStyle(p).display === "none" || Number(windowRef.getComputedStyle(p).opacity) === 0)) continue;
       const matrix = shape.getCTM ? shape.getCTM() : null;
       // Back out the viewport's own transform: the drawing keeps its own units.
       const local = matrix && root ? root.inverse().multiply(matrix) : matrix;
-      const fill = isFilled(shape, windowRef);
+      const fill = isFilled(shape, windowRef) && Number(style.fillOpacity) > 0;
       const stroke = strokeWidth(shape, windowRef, local);
       if (!fill && !stroke) {
         continue;
@@ -217,47 +299,48 @@ export async function drawingFromSvg(text, { name = "", documentRef = globalThis
         continue;
       }
       if (filled) {
-        walked.push(...contours);
+        const walls = contours.map((ring) => simplifyContour(ring, tolerance));
+        const filled = filledContours(wasm, walls, GROOVE_TOLERANCE, style.fillRule === "evenodd" ? "EvenOdd" : "NonZero");
+        const clipped = clippedContours(wasm, filled, shape, svg, root, tolerance, windowRef);
+        walked.push(...clipped);
+        layers.push({ color: paintColor(style.fill, documentRef), contours: clipped, fills: clipped });
         continue;
       }
       // The line is followed closely: whatever it is off by comes straight off the
       // width of the groove drawn along it.
       const fine = Math.min(tolerance, groove / 100);
+      const shapeLines = [];
       for (const line of contours) {
         const ends = Math.hypot(line[0][0] - line[line.length - 1][0], line[0][1] - line[line.length - 1][1]);
         const closed = ends <= groove;
         const kept = simplifyContour(closed ? line.slice(0, -1) : line, fine, STROKE_LINE_POINTS);
         if (kept.length >= 2) {
-          lines.push({ width: groove, closed, points: kept });
+          shapeLines.push({ width: groove, closed, points: kept });
         }
       }
+      lines.push(...shapeLines);
+      layers.push({ color: paintColor(style.stroke, documentRef), strokes: shapeLines, contours: clippedContours(wasm, grooveContours(wasm, shapeLines), shape, svg, root, tolerance, windowRef) });
     }
     if (!walked.length && !lines.length) {
       throw new EngravingError("nothing-filled");
     }
-    const wasm = await loadManifold();
-    const walls = walked
-      .map((points) => simplifyContour(points, tolerance))
-      .filter((points) => points.length >= 3 && Math.abs(contourArea(points)) > 1e-6);
-    const fills = walls.length ? filledContours(wasm, walls, GROOVE_TOLERANCE) : [];
-    const contours = fills
-      .concat(lines.length ? grooveContours(wasm, lines) : [])
-      // The biggest marks first, so a crowded drawing keeps what matters most.
-      .sort((left, right) => Math.abs(contourArea(right)) - Math.abs(contourArea(left)))
-      .slice(0, MAX_ENGRAVING_CONTOURS);
-    const kept = [];
-    let budget = MAX_ENGRAVING_POINTS;
-    for (const points of contours) {
-      const fitted = points.length > budget ? simplifyContour(points, tolerance, Math.min(budget, MAX_CONTOUR_POINTS)) : points;
-      if (fitted.length < 3 || budget - fitted.length < 0) {
-        break;
-      }
-      budget -= fitted.length;
-      kept.push(fitted.map(([x, y]) => [x - size.minX, y - size.minY]));
+    const colorGroups = composeColorGroups(wasm, layers).map((group) => ({
+      ...group,
+      fills: layers.filter((layer) => layer.color === group.color).flatMap((layer) => layer.fills || [])
+        .map((ring) => ring.map(([x, y]) => [x - size.minX, y - size.minY])),
+      strokes: layers.filter((layer) => layer.color === group.color).flatMap((layer) => layer.strokes || [])
+        .map((line) => ({ ...line, points: line.points.map(([x, y]) => [x - size.minX, y - size.minY]) })),
+      contours: group.contours.map((ring) => ring.map(([x, y]) => [x - size.minX, y - size.minY]))
+    }));
+    const kept = unionColorContours(wasm, colorGroups);
+    if (!kept.length) throw new EngravingError("nothing-filled");
+    const all = [...kept, ...colorGroups.flatMap((group) => group.contours)];
+    if (colorGroups.length > 32 || all.some((ring) => ring.length > MAX_CONTOUR_POINTS)
+      || all.reduce((sum, ring) => sum + ring.length, 0) > MAX_ENGRAVING_POINTS
+      || colorGroups.some((group) => group.contours.length > MAX_ENGRAVING_CONTOURS)) {
+      throw Object.assign(new EngravingError("too-complex"), { details: { points: all.reduce((sum, ring) => sum + ring.length, 0), longest: Math.max(...all.map((ring) => ring.length)), groups: colorGroups.map((g) => g.contours.length) } });
     }
-    if (!kept.length) {
-      throw new EngravingError("too-complex");
-    }
+    const fills = walked;
     return {
       name: String(name).slice(0, 60),
       width: size.width,
@@ -265,6 +348,7 @@ export async function drawingFromSvg(text, { name = "", documentRef = globalThis
       // Set when the file gives its real size, so the drawing can come in 1:1.
       millimetresPerUnit: millimetresPerUnit(svg, size),
       contours: kept,
+      colorGroups,
       // What the contours were made from, so the groove can be redrawn at another
       // width without the file: the shapes that were filled, and the lines drawn.
       fills: fills.map((points) => points.map(([x, y]) => [x - size.minX, y - size.minY])),
