@@ -91,6 +91,13 @@ class PlanGrammar(unittest.TestCase):
         clean = normalize_plan_node({"type": "cyl", "r": 2, "h": 5, "pos": [1, 2, 3], "evil": "__import__"})
         self.assertEqual(clean, {"type": "cyl", "r": 2.0, "h": 5.0, "pos": [1.0, 2.0, 3.0]})
 
+    def test_material_colors_are_validated_and_retained(self):
+        clean = normalize_plan_node({**LID, "color": "#FF00ab"})
+        self.assertEqual(clean["color"], "#ff00ab")
+        for color in ("red", "#123", "#11223344", "__import__('os')", None, 42):
+            with self.subTest(color=color), self.assertRaises(PlanError):
+                normalize_plan_node({**LID, "color": color})
+
     def test_refuses_unknown_types_bad_numbers_and_out_of_envelope_values(self):
         bad = [
             {"type": "exec", "code": "x"},
@@ -183,7 +190,7 @@ class SavingABox(BuilderTestCase):
         source = (self.root / "boxes" / "inlaid" / "inlaid_inlay.py").read_text(encoding="utf-8")
         # One model of two coloured bodies, so a slicer opens both in their places.
         self.assertIn("HOLDER_PLAN", source)
-        self.assertIn("bd.Compound(children=[holder, piece])", source)
+        self.assertIn("bd.Compound(children=[holder, *pieces])", source)
         self.assertIn('piece.label = "inlay"', source)
         self.assertIn('holder.label = "lid"', source)
         compile(source, "inlaid_inlay.py", "exec")

@@ -1,3 +1,4 @@
+import { coloredPlanParts } from "../core/boxPlan.js";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
@@ -188,7 +189,7 @@ function addMillimetreGrid(material, runtime) {
   return material;
 }
 
-function replacePartMesh(runtime, part, geometry) {
+function replacePartMesh(runtime, part, geometry, color = null) {
   const group = part === "base" ? runtime.baseGroup : runtime.lidGroup;
   for (const key of [`${part}Mesh`, `${part}Edges`]) {
     const previous = runtime[key];
@@ -202,7 +203,7 @@ function replacePartMesh(runtime, part, geometry) {
     return;
   }
   const mesh = new THREE.Mesh(geometry, addMillimetreGrid(new THREE.MeshStandardMaterial({
-    color: part === "base" ? BASE_COLOR : part === "inlay" ? INLAY_COLOR : LID_COLOR,
+    color: color || (part === "base" ? BASE_COLOR : part === "inlay" ? INLAY_COLOR : LID_COLOR),
     roughness: 0.78,
     metalness: 0,
     polygonOffset: true,
@@ -1001,7 +1002,15 @@ export default function BoxBuilderViewport({ builder, insets, sourceUrl = "", on
       try {
         replacePartMesh(runtime, "base", plan.base ? geometryFromPlan(wasm, plan.base) : null);
         replacePartMesh(runtime, "lid", plan.lid ? geometryFromPlan(wasm, plan.lid) : null);
-        replacePartMesh(runtime, "inlay", plan.inlay ? geometryFromPlan(wasm, plan.inlay) : null);
+        for (const key of runtime.colorParts || []) replacePartMesh(runtime, key, null);
+        runtime.colorParts = [];
+        const colors = coloredPlanParts(plan.inlay);
+        replacePartMesh(runtime, "inlay", plan.inlay && !colors.length ? geometryFromPlan(wasm, plan.inlay) : null);
+        colors.forEach(({ color, plan: partPlan }, index) => {
+          const key = `inlayColor${index}`;
+          runtime.colorParts.push(key);
+          replacePartMesh(runtime, key, geometryFromPlan(wasm, partPlan), color);
+        });
         setBuildError("");
       } catch (error) {
         setBuildError(String(error?.message || error));

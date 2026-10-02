@@ -9,7 +9,7 @@
 // plan 6000 of them, so contours are simplified when they come in.
 
 export const ENGRAVING_MODES = Object.freeze(["cut", "inlay"]);
-export const MAX_ENGRAVING_CONTOURS = 80;
+export const MAX_ENGRAVING_CONTOURS = 300;
 export const MAX_CONTOUR_POINTS = 800;
 // The plan grammar allows 12000 polygon points in all; the rest is for the box.
 export const MAX_ENGRAVING_POINTS = 9000;
@@ -43,7 +43,7 @@ function lineDistance(point, start, end) {
 
 // Before thinning, a contour walked in tiny steps is cut down to this many points:
 // the shape survives, and the thinning has a bounded amount of work to do.
-const PRE_THIN_POINTS = 600;
+const PRE_THIN_POINTS = 4000;
 
 // Ramer-Douglas-Peucker, kept to a stack of its own: a contour of thousands of
 // points would otherwise recurse deep enough to matter.
@@ -122,10 +122,15 @@ export function pointInContour([x, y], points) {
 
 // What a drawing becomes when it is first placed on a lid: contours kept as they
 // are, sized in millimetres from `millimetresPerUnit`, centred on the lid.
-export function engravingFromDrawing(drawing, { depth = 0.6, millimetresPerUnit = 1 } = {}) {
+export function engravingFromDrawing(drawing, { depth = 0.6, millimetresPerUnit = 1, lidWidth, lidDepth } = {}) {
   const width = Math.max(finiteOr(drawing?.width, 0), MIN_CONTOUR_SPAN);
   const height = Math.max(finiteOr(drawing?.height, 0), MIN_CONTOUR_SPAN);
+  if (lidWidth > 0 && lidDepth > 0) {
+    millimetresPerUnit = Math.min(0.9 * lidWidth / width, 0.9 * lidDepth / height);
+  }
   return normalizeEngraving({
+    mode: drawing?.colorGroups?.length ? "inlay" : "cut",
+    colorGroups: drawing?.colorGroups || [],
     name: drawing?.name || "",
     width,
     height,
@@ -202,6 +207,25 @@ export function normalizeEngraving(raw) {
   if (!contours.length && !strokes.length) {
     return null;
   }
+  // Keep stable source IDs even when two groups are recoloured identically.
+  const colorGroups = [];
+  let colorBudget = MAX_ENGRAVING_POINTS;
+  for (const [index, rawGroup] of (Array.isArray(source.colorGroups) ? source.colorGroups : []).slice(0, 32).entries()) {
+    if (!/^#[0-9a-f]{6}$/iu.test(rawGroup?.color || "")) continue;
+    const group = normalizeEngraving({ contours: rawGroup.contours, fills: rawGroup.fills, strokes: rawGroup.strokes, width, height });
+    if (!group) continue;
+    const points = engravingPointCount(group);
+    if (points > colorBudget) break;
+    colorBudget -= points;
+    colorGroups.push({
+      id: `color-${index + 1}`,
+      sourceColor: /^#[0-9a-f]{6}$/iu.test(rawGroup.sourceColor || "") ? rawGroup.sourceColor.toLowerCase() : rawGroup.color.toLowerCase(),
+      color: rawGroup.color.toLowerCase(),
+      contours: group.contours,
+      fills: group.fills,
+      strokes: group.strokes
+    });
+  }
   return {
     name: typeof source.name === "string" ? source.name.slice(0, 60) : "",
     // "cut" leaves the drawing hollow; "inlay" also makes the piece that fills it,
@@ -223,7 +247,8 @@ export function normalizeEngraving(raw) {
     gapWidth: numberIn(source.gapWidth, 0, 0, 1000),
     contours,
     fills,
-    strokes
+    strokes,
+    colorGroups
   };
 }
 
@@ -285,7 +310,10 @@ export function engravingContours(engraving) {
     // Turning the drawing the right way up turns every contour the wrong way
     // round, and which way a contour runs is what says whether it is a shape or a
     // hole in one; walking it backwards puts that back.
-    .reverse());
+    .reverse())
+    // Boolean clipping can leave dust slivers smaller than 0.01 x 0.01 mm.
+    // They collapse at the plan's coordinate precision and cannot form OCC faces.
+    .filter((ring) => Math.abs(contourArea(ring)) > 0.0001);
 }
 
 // The contours sorted into islands: each filled outline with the contours that
