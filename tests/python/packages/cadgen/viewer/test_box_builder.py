@@ -24,6 +24,7 @@ from cadgen.viewer.boxes import (
     check_box_name,
     owner_key,
     run_model_script,
+    script_source,
 )
 
 BASE = {"type": "difference", "children": [
@@ -90,6 +91,15 @@ class PlanGrammar(unittest.TestCase):
     def test_keeps_only_grammar_keys(self):
         clean = normalize_plan_node({"type": "cyl", "r": 2, "h": 5, "pos": [1, 2, 3], "evil": "__import__"})
         self.assertEqual(clean, {"type": "cyl", "r": 2.0, "h": 5.0, "pos": [1.0, 2.0, 3.0]})
+
+    def test_engraved_parts_declare_print_mesh_precision(self):
+        polygon = {"type": "poly", "points": [[0, 0], [1, 0], [0, 1]], "h": 0.6}
+        for node, holder in ((polygon, None), (BASE, {"part": "lid", "plan": polygon})):
+            source = script_source("engraved", "inlay", node, holder)
+            self.assertIn("@threemf(mesh_tolerance=1e-6)", source)
+            self.assertIn("@stl(mesh_tolerance=1e-6)", source)
+            compile(source, "engraved.py", "exec")
+        self.assertIn("@threemf\n@stl\n", script_source("plain", "base", BASE))
 
     def test_material_colors_are_validated_and_retained(self):
         clean = normalize_plan_node({**LID, "color": "#FF00ab"})
