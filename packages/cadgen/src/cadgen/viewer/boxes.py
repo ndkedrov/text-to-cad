@@ -160,6 +160,13 @@ def script_source(name: str, part: str, node: dict, held_by: dict | None = None)
     are then written as one model of two coloured bodies, so the 3MF a slicer opens
     holds both, each ready for its own filament.
     """
+    # SVG outlines contain tiny neighbouring vertices. The general preview
+    # tolerance can weld different corners together and open the print mesh.
+    def has_polygon(plan):
+        return plan.get("type") == "poly" or any(has_polygon(child) for child in plan.get("children", []))
+
+    detailed = has_polygon(node) or (held_by is not None and has_polygon(held_by["plan"]))
+    mesh_args = "(mesh_tolerance=1e-6)" if detailed else ""
     function = _function_name(name, part)
     plan = pprint.pformat(node, width=100, sort_dicts=False)
     header = (
@@ -179,8 +186,8 @@ def script_source(name: str, part: str, node: dict, held_by: dict | None = None)
             f"PLAN = {plan}\n"
             "\n"
             "\n"
-            "@threemf\n"
-            "@stl\n"
+            f"@threemf{mesh_args}\n"
+            f"@stl{mesh_args}\n"
             "@step\n"
             f"def {function}():\n"
             "    return shape_from_plan(PLAN)\n"
@@ -201,8 +208,8 @@ def script_source(name: str, part: str, node: dict, held_by: dict | None = None)
         f"HOLDER_PLAN = {holder}\n"
         "\n"
         "\n"
-        "@threemf\n"
-        "@stl\n"
+        f"@threemf{mesh_args}\n"
+        f"@stl{mesh_args}\n"
         "@step\n"
         f"def {function}():\n"
         "    pieces = colored_shapes_from_plan(PLAN)\n"
