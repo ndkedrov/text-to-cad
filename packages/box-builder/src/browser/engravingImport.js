@@ -5,10 +5,8 @@
 
 import { SVGLoader } from "three/examples/jsm/loaders/SVGLoader.js";
 import { composeColorGroups, unionColorContours } from "../core/engravingColors.js";
+import { engravingFits, mergeSmallColorRegions } from "../core/engravingMerge.js";
 import {
-  MAX_CONTOUR_POINTS,
-  MAX_ENGRAVING_CONTOURS,
-  MAX_ENGRAVING_POINTS,
   contourArea,
   simplifyContour
 } from "../core/engraving.js";
@@ -223,7 +221,7 @@ function millimetresPerUnit(svg, viewport) {
 
 // Reads an SVG file into { name, width, height, contours } for engraving.js.
 // Needs a document to lay the drawing out in, so this runs in the browser only.
-export async function drawingFromSvg(text, { name = "", documentRef = globalThis.document, windowRef = globalThis.window } = {}) {
+export async function drawingFromSvg(text, { name = "", lidWidth, lidDepth, documentRef = globalThis.document, windowRef = globalThis.window } = {}) {
   if (!documentRef || !windowRef) {
     throw new EngravingError("no-browser");
   }
@@ -324,7 +322,7 @@ export async function drawingFromSvg(text, { name = "", documentRef = globalThis
     if (!walked.length && !lines.length) {
       throw new EngravingError("nothing-filled");
     }
-    const colorGroups = composeColorGroups(wasm, layers).map((group) => ({
+    let colorGroups = composeColorGroups(wasm, layers).map((group) => ({
       ...group,
       fills: layers.filter((layer) => layer.color === group.color).flatMap((layer) => layer.fills || [])
         .map((ring) => ring.map(([x, y]) => [x - size.minX, y - size.minY])),
@@ -334,10 +332,17 @@ export async function drawingFromSvg(text, { name = "", documentRef = globalThis
     }));
     const kept = unionColorContours(wasm, colorGroups);
     if (!kept.length) throw new EngravingError("nothing-filled");
+    const merged = await mergeSmallColorRegions(wasm, colorGroups, kept, {
+      millimetresPerUnit: lidWidth > 0 && lidDepth > 0
+        ? Math.min(0.9 * lidWidth / size.width, 0.9 * lidDepth / size.height) : undefined,
+      breathe: pause
+    });
+    if (merged.mergedRegions) {
+      // Redrawing and save/reload must retain the new material partition.
+      colorGroups = merged.colorGroups.map((group) => ({ ...group, fills: group.contours, strokes: [] }));
+    }
     const all = [...kept, ...colorGroups.flatMap((group) => group.contours)];
-    if (colorGroups.length > 32 || all.some((ring) => ring.length > MAX_CONTOUR_POINTS)
-      || all.reduce((sum, ring) => sum + ring.length, 0) > MAX_ENGRAVING_POINTS
-      || colorGroups.some((group) => group.contours.length > MAX_ENGRAVING_CONTOURS)) {
+    if (!engravingFits(colorGroups, kept)) {
       throw Object.assign(new EngravingError("too-complex"), { details: { points: all.reduce((sum, ring) => sum + ring.length, 0), longest: Math.max(...all.map((ring) => ring.length)), groups: colorGroups.map((g) => g.contours.length) } });
     }
     const fills = walked;
@@ -349,10 +354,11 @@ export async function drawingFromSvg(text, { name = "", documentRef = globalThis
       millimetresPerUnit: millimetresPerUnit(svg, size),
       contours: kept,
       colorGroups,
+      mergedRegions: merged.mergedRegions,
       // What the contours were made from, so the groove can be redrawn at another
       // width without the file: the shapes that were filled, and the lines drawn.
-      fills: fills.map((points) => points.map(([x, y]) => [x - size.minX, y - size.minY])),
-      strokes: lines.map((line) => ({
+      fills: merged.mergedRegions ? kept : fills.map((points) => points.map(([x, y]) => [x - size.minX, y - size.minY])),
+      strokes: (merged.mergedRegions ? [] : lines).map((line) => ({
         ...line,
         points: line.points.map(([x, y]) => [x - size.minX, y - size.minY])
       }))

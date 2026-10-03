@@ -74,6 +74,15 @@ recolouring does not merge those controls. New imports fit within 90% of both
 lid dimensions, keeping their proportions even when the SVG declares a physical
 size. Saved drawings retain their existing placement and size.
 
+When an import exceeds the geometry budget, regions smaller than 0.2 mm at the
+initial fitted size may be absorbed into the neighbouring colour with the
+longest shared boundary. The smallest regions go first and merging stops as
+soon as the drawing fits. Every transferred area stays filled: the original
+silhouette and intentional holes remain unchanged, and each colour keeps its
+largest component. Separate islands and larger details are retained even if
+the import must still be rejected. The panel reports how many regions changed
+colour. Saved/reloaded drawings and later redraws use the merged partition.
+
 The spec stores `colorGroups` with source/current colours and contours. Older
 specs without groups still load. Inlay plan nodes carry a validated `color`;
 the viewport and the web STEP/3MF export preserve separate material bodies.
