@@ -188,12 +188,19 @@ export function buildPackageMeshPrimitives(descriptor, componentTessellations, o
 
 export function packageMeshToStl({ primitives }, { name = "model" } = {}) {
   let total = 0;
-  for (const p of primitives) total += p.positions.length;
+  for (const p of primitives) total += p.indices ? p.indices.length * 3 : p.positions.length;
   const positions = new Float32Array(total);
   let offset = 0;
   for (const p of primitives) {
-    positions.set(p.positions, offset);
-    offset += p.positions.length;
+    if (p.indices) {
+      for (const vertex of p.indices) {
+        positions.set(p.positions.subarray(vertex * 3, vertex * 3 + 3), offset);
+        offset += 3;
+      }
+    } else {
+      positions.set(p.positions, offset);
+      offset += p.positions.length;
+    }
   }
   return meshToBinaryStl({ positions }, { name });
 }
@@ -232,15 +239,16 @@ export function packageMeshToGlb({ primitives }, { name = "model" } = {}) {
   );
 }
 
-export function packageMeshTo3mf({ primitives }, { name = "model" } = {}) {
+export function packageMeshTo3mf({ primitives }, { name = "model", assembly = false } = {}) {
   // Core pindex is a display-material index, not a slicer's filament number.
   // Bambu/Orca read the latter from Metadata/model_settings.config (1-based).
   // Derive both from one palette, including repeated colors in direct callers.
   const colors = [...new Set(primitives.map((p) => p.color.toUpperCase()))];
   const colorIndices = new Map(colors.map((color, index) => [color, index]));
   // Bambu's standard-3MF importer reads the Materials extension's colorgroup,
-  // not core basematerials. Keep core defaults for readers without it, and
-  // reference this same palette on triangles for Bambu's color-import dialog.
+  // not core basematerials. Assembly parts and their triangles must reference
+  // the SAME group: Bambu can then assign a filament to the whole volume,
+  // instead of surface-painting every volume with a default filament of 1.
   const colorGroupId = primitives.length + 2;
   const colorGroup = `    <m:colorgroup id="${colorGroupId}">\n` +
     colors.map((color) => `      <m:color color="${xmlEscape(color)}FF"/>`).join("\n") +
@@ -274,7 +282,17 @@ export function packageMeshTo3mf({ primitives }, { name = "model" } = {}) {
       }
       return id;
     };
-    for (let k = 0; k < positions.length; k += 9) {
+    // Indexed kernels distinguish coincident vertices belonging to separate shells.
+    // Welding them by coordinates would turn point contacts into non-manifold edges.
+    if (primitive.indices) {
+      for (let k = 0; k < positions.length; k += 3) {
+        vertices.push(`        <vertex x="${positions[k]}" y="${positions[k + 1]}" z="${positions[k + 2]}"/>`);
+      }
+      for (let k = 0; k < primitive.indices.length; k += 3) {
+        const a = primitive.indices[k], b = primitive.indices[k + 1], c = primitive.indices[k + 2];
+        triangles.push(`        <triangle v1="${a}" v2="${b}" v3="${c}" pid="${colorGroupId}" p1="${materialIndex}"/>`);
+      }
+    } else for (let k = 0; k < positions.length; k += 9) {
       const a = vertexId(positions[k], positions[k + 1], positions[k + 2]);
       const b = vertexId(positions[k + 3], positions[k + 4], positions[k + 5]);
       const c = vertexId(positions[k + 6], positions[k + 7], positions[k + 8]);
@@ -284,7 +302,7 @@ export function packageMeshTo3mf({ primitives }, { name = "model" } = {}) {
     }
     const objectId = index + 2; // id 1 is the materials group
     objects.push(
-      `    <object id="${objectId}" type="model" pid="1" pindex="${materialIndex}" name="${objectName}">\n` +
+      `    <object id="${objectId}" type="model" pid="${assembly ? colorGroupId : 1}" pindex="${materialIndex}" name="${objectName}">\n` +
         `      <mesh>\n` +
         `        <vertices>\n${vertices.join("\n")}\n        </vertices>\n` +
         `        <triangles>\n${triangles.join("\n")}\n        </triangles>\n` +
@@ -313,15 +331,32 @@ export function packageMeshTo3mf({ primitives }, { name = "model" } = {}) {
         `  </object>`,
     );
   });
+  if (assembly) {
+    const assemblyId = colorGroupId + 1;
+    objects.push(`    <object id="${assemblyId}" type="model" name="${xmlEscape(name)}"><components>\n` +
+      primitives.map((_, index) => `      <component objectid="${index + 2}"/>`).join("\n") +
+      `\n    </components></object>`);
+    buildItems.splice(0, buildItems.length, `    <item objectid="${assemblyId}" printable="1"/>`);
+    objectSettings.splice(0, objectSettings.length,
+      `  <object id="${assemblyId}"><metadata key="name" value="${xmlEscape(name)}"/>\n` +
+      primitives.map((primitive, index) => {
+        const filament = colorIndices.get(primitive.color.toUpperCase()) + 1;
+        return `    <part id="${index + 2}" subtype="normal_part">` +
+          `<metadata key="name" value="${xmlEscape(`${name} - ${filament} (${primitive.color.toUpperCase()})`)}"/>` +
+          `<metadata key="extruder" value="${filament}"/></part>`;
+      }).join("\n") + `\n  </object>`);
+  }
   const model =
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" ` +
     `xmlns:m="http://schemas.microsoft.com/3dmanufacturing/material/2015/02">\n` +
     `  <metadata name="Title">${xmlEscape(name)}</metadata>\n` +
+    // Standard assemblies use Bambu's color mapping dialog without loading
+    // printer settings. Legacy independent objects retain the Prusa token.
     // Bambu selects its Prusa-compatible importer by this token. That path
     // grows the filament list to the highest assigned slot, even on Open
     // Project, without requiring a printer/process preset in the archive.
-    `  <metadata name="Application">cadgen (PrusaSlicer-compatible 3MF)</metadata>\n` +
+    `  <metadata name="Application">${assembly ? "cadgen" : "cadgen (PrusaSlicer-compatible 3MF)"}</metadata>\n` +
     `  <resources>\n` +
     `    <basematerials id="1">\n${materials}\n    </basematerials>\n${colorGroup}\n${objects.join("\n")}\n` +
     `  </resources>\n` +
@@ -348,10 +383,10 @@ export function packageMeshTo3mf({ primitives }, { name = "model" } = {}) {
       name: "Metadata/model_settings.config",
       body: `<?xml version="1.0" encoding="UTF-8"?>\n<config>\n${objectSettings.join("\n")}\n</config>\n`,
     },
-    {
+    ...(!assembly ? [{
       name: "Metadata/Slic3r_PE_model.config",
       body: `<?xml version="1.0" encoding="UTF-8"?>\n<config>\n${slic3rSettings.join("\n")}\n</config>\n`,
-    },
+    }] : []),
   ]);
 }
 
