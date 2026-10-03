@@ -118,3 +118,11 @@ The CAD Viewer's own suite and build (`npm --prefix apps/viewer run test`,
 
 MIT, like the rest of this repository (see `LICENSE`). The kit under `src/ui/kit/`
 comes from the CAD Viewer, Copyright (c) 2026 Thompson Labs LLC.
+
+Hosted quota responses also expose `storageUsedBytes`, `storageLimitBytes` and
+`outputRetentionSeconds`; the file panel shows storage usage and the retention
+notice when the host supplies them. The hosted viewer retains saved specs and
+scripts while the admin-only, POST-guarded `/__cad/admin/box-cleanup` expires
+known generated STEP/STL/3MF files and sidecars after 24 hours. A `dryRun=1`
+query reports eligible files without deleting them. The deployment schedules
+this call; the local viewer has no cleanup route and its files do not expire.

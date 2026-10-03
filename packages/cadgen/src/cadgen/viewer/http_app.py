@@ -609,6 +609,15 @@ class CadApp:
             except Exception:  # noqa: BLE001 - never a server detail to the internet
                 response.send_json(500, {"ok": False, "error": "internal error", "code": "internal"})
             return
+        if pathname == "/__cad/admin/box-cleanup":
+            if method != "POST" or not self._is_admin(account):
+                response.send_json(404, {"error": "Not found"})
+                return
+            try:
+                response.send_json(200, self.boxes.cleanup_outputs(dry_run=query.get("dryRun") == "1"))
+            except Exception:  # noqa: BLE001 - no filesystem details in the response
+                response.send_json(500, {"error": "cleanup failed", "code": "internal"})
+            return
         if pathname == "/__cad/admin/presets":
             if method not in ("GET", "POST") or not self._is_admin(account):
                 response.send_json(404, {"error": "Not found"})

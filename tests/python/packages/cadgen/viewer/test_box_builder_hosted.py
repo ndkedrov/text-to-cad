@@ -113,6 +113,18 @@ class HostedSurface(unittest.TestCase):
     def tearDown(self):
         self.server.close()
 
+    def test_cleanup_is_admin_only_and_requires_post_guard_and_proxy(self):
+        path = "/__cad/admin/box-cleanup?dryRun=1"
+        for account in (None, "alice@example.com"):
+            self.assertEqual(self.server.json("POST", path, account=account, headers=GUARD)[0], 404)
+        self.assertEqual(self.server.json("GET", path, account="owner@example.com")[0], 404)
+        self.assertEqual(self.server.json("POST", path, account="owner@example.com", headers=GUARD, proxy=False)[0], 401)
+        self.assertEqual(self.server.json("POST", path, account="owner@example.com")[0], 403)
+        status, report = self.server.json("POST", path, account="owner@example.com", headers=GUARD)
+        self.assertEqual(status, 200)
+        self.assertEqual(report["files"], 0)
+        self.assertTrue(report["dryRun"])
+
     def test_nothing_answers_without_the_proxy_secret(self):
         for path in ("/", "/__cad/server", "/__cad/boxes"):
             with self.subTest(path=path, secret="missing"):
