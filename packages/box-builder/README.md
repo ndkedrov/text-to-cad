@@ -128,7 +128,11 @@ query reports eligible files without deleting them. The deployment schedules
 this call; the local viewer has no cleanup route and its files do not expire.
 
 The hosted viewer builds STEP on the server and advertises `clientExportFormats`
-for STL/3MF. Its adapter offers these downloads when that part's STEP is ready;
+for STL/3MF. Its status also lists browser downloads (`client: true`, without
+disk size or server path) when that part's STEP is ready, so already-open web
+clients retain their download buttons after deployment. These entries are not
+server files; the file route serves only actual completed disk exports. The
+adapter preserves these entries without duplicating them;
 print meshes come from the saved spec through Manifold. The server does not
 repeat the browser print exports. Local viewers keep their server mesh exports.
 A running or failed part's files are unavailable; a failed rebuild removes old
