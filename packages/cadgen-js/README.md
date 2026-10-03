@@ -72,6 +72,20 @@ schema constants.
 
 ## Working on cadgen-js
 
+3MF exports retain standard base-material colors, a Materials-extension
+color group referenced by triangles, and
+`Metadata/model_settings.config` and `Metadata/Slic3r_PE_model.config` for
+slicer interoperability. Each distinct
+color receives one 1-based filament number; repeated colors share a number.
+Object and part assignments use the same palette as the model's 0-based
+`pindex` references. The file carries no printer or process preset, so users
+keep their printer settings and can map the numbered filaments to their spools.
+The Application metadata identifies cadgen's PrusaSlicer-compatible format:
+Bambu Studio uses that importer to retain the assignments and create missing
+filament slots automatically, including when opening the file as a project.
+Each part name includes its slot and source HEX color. Filament swatches are
+the slicer's printer/material presets; map those slots to the intended spools.
+
 - `npm --prefix packages/cadgen-js test` (node:test; no browser needed).
 - Anything here that the bundlers consume changes the shipped runtimes:
   run `scripts/bundle/bundle.sh` and commit the regenerated `_runtime/node`
