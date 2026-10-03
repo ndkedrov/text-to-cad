@@ -24,6 +24,7 @@
 // WGSL compute later; the contract here is correctness first.
 
 import { ShapeUtils, Vector2 } from "three";
+import { conformPlanarTriangles } from "./conformPlanarTriangles.js";
 
 import { evaluateCurve3, evaluatePCurve, evaluateSurface, evaluateSurfaceNormal } from "./evaluate.js";
 
@@ -34,7 +35,7 @@ import { evaluateCurve3, evaluatePCurve, evaluateSurface, evaluateSurfaceNormal 
 // meshes produced by the previous algorithm become unreachable instead of
 // being served stale; `cadgen cache gc` collects the orphans. Mirrored as
 // MESH_TESSELLATION_VERSION in cadgen/_internal/cache_paths.py (sync-tested).
-export const TESSELLATION_VERSION = 1;
+export const TESSELLATION_VERSION = 2;
 
 export const DEFAULT_OPTIONS = {
   // Max 3D distance between the surface and a triangle edge midpoint,
@@ -585,6 +586,7 @@ function gridTriangulate(face, floats, loops, chordLimit) {
         continue;
       }
       const localPoints = [...contour, ...holes.flat()];
+      if (face.surface.kind === "plane") cellFaces = conformPlanarTriangles(localPoints, cellFaces);
       const localIds = localPoints.map(({ x, y }) => vertexId(x, y));
       for (const [a, b, c] of cellFaces) {
         const A = localPoints[a];

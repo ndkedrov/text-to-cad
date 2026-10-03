@@ -422,6 +422,7 @@ function LidTab({ builder }) {
   const fileRef = useRef(null);
   const [keepRatio, setKeepRatio] = useState(true);
   const [engravingError, setEngravingError] = useState("");
+  const [engravingNotice, setEngravingNotice] = useState("");
   const patchEngraving = (values) => edit((draft) => {
     if (draft.lid.engraving) {
       Object.assign(draft.lid.engraving, values);
@@ -471,10 +472,14 @@ function LidTab({ builder }) {
       return;
     }
     try {
-      const drawing = await drawingFromSvg(await file.text(), { name: file.name.replace(/\.svg$/iu, "") });
+      setEngravingNotice("");
+      const drawing = await drawingFromSvg(await file.text(), {
+        name: file.name.replace(/\.svg$/iu, ""), lidWidth: dims.width, lidDepth: dims.depth
+      });
       edit((draft) => {
         draft.lid.engraving = engravingFromDrawing(drawing, { lidWidth: dims.width, lidDepth: dims.depth });
       });
+      setEngravingNotice(drawing.mergedRegions ? t("engraving.mergedRegions", { count: drawing.mergedRegions }) : "");
       setEngravingError("");
     } catch (error) {
       setEngravingError(t(ENGRAVING_ERRORS[error?.message] || "engraving.error.unreadable"));
@@ -688,6 +693,7 @@ function LidTab({ builder }) {
             </>
           )}
           {engravingError ? <FileSheetStatusText tone="error">{engravingError}</FileSheetStatusText> : null}
+          {engravingNotice ? <FileSheetStatusText>{engravingNotice}</FileSheetStatusText> : null}
           <input
             ref={fileRef}
             type="file"

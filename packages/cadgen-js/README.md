@@ -34,6 +34,8 @@ snapshot renderer and the node builders in `bin/`).
   with the `m.get(target)` handle contract (premultiplying calls, reset to
   rest every frame, pure in t). Neither half references the other; they
   meet only in the effect records.
+- **Planar trim boundaries**: restore collinear trim vertices omitted by
+  triangulation so neighbouring faces share the same boundary segments.
 - **Byte determinism**: the tessellator and mesh serializers here produce
   the shipped export bytes — same geometry in, same bytes out.
 - **Loud failure**: unresolved refs, unknown labels, and unknown presets
