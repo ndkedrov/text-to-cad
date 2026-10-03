@@ -282,7 +282,7 @@ test("3MF: stored zip with a basematerials group and per-object material refs", 
   assert.match(text, /basematerials id="1"/);
   assert.match(text, /displaycolor="#FF0000FF"/);
   assert.match(text, /object id="2" type="model" pid="1" pindex="0"/);
-  assert.match(text, /<triangle v1="0" v2="1" v3="2"\/>/);
+  assert.match(text, /<triangle v1="0" v2="1" v3="2" pid="3" p1="0"\/>/);
   assert.match(text, /Title">red tri</);
   // Deterministic bytes (zipStore stamps a fixed timestamp).
   assert.deepEqual(packageMeshTo3mf(mesh, { name: "red tri" }), bytes);
@@ -297,6 +297,60 @@ test("packageMeshToFormat maps formats and rejects unknown ones", () => {
   assert.throws(() => packageMeshToFormat(mesh, "obj"), /Unsupported/);
 });
 
-// zlib is imported to keep this suite honest if zipStore ever grows deflate
-// support: stored entries must remain readable without inflation.
-void zlib;
+function zipEntries(bytes) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const entries = new Map();
+  for (let offset = 0; view.getUint32(offset, true) === 0x04034b50;) {
+    const method = view.getUint16(offset + 8, true);
+    const size = view.getUint32(offset + 18, true);
+    const nameSize = view.getUint16(offset + 26, true);
+    const extraSize = view.getUint16(offset + 28, true);
+    const name = new TextDecoder().decode(bytes.subarray(offset + 30, offset + 30 + nameSize));
+    const start = offset + 30 + nameSize + extraSize;
+    const body = bytes.subarray(start, start + size);
+    entries.set(name, new TextDecoder().decode(method === 8 ? zlib.inflateRawSync(body) : body));
+    offset = start + size;
+  }
+  return entries;
+}
+
+test("3MF: every lid/logo color has its own 1-based Bambu/Orca filament assignment", () => {
+  const colors = ["#001a4e", "#0140ab", "#03f6b2", "#041120", "#07e7fc", "#089af8", "#e5eaef", "#f6f8fc", "#fdd202"];
+  const mesh = { primitives: colors.map((color) => ({ color, positions: triangleTessellation().positions })) };
+  const entries = zipEntries(packageMeshTo3mf(mesh, { name: 'lid & "logo"' }));
+  const model = entries.get("3D/3dmodel.model");
+  const settings = entries.get("Metadata/model_settings.config");
+  const slic3rSettings = entries.get("Metadata/Slic3r_PE_model.config");
+  assert.match(model, /Application">cadgen \(PrusaSlicer-compatible 3MF\)/);
+  assert.match(model, /<m:colorgroup id="11">/);
+  assert.equal([...model.matchAll(/<m:color color=/g)].length, 9);
+  assert.deepEqual([...model.matchAll(/<triangle[^>]*pid="11" p1="(\d+)"/g)].map((m) => Number(m[1])), [0,1,2,3,4,5,6,7,8]);
+  assert.equal([...model.matchAll(/<item[^>]*printable="1"/g)].length, 9);
+  const objects = [...settings.matchAll(/<object id="(\d+)">([\s\S]*?)<\/object>/g)];
+  assert.equal(objects.length, colors.length);
+  for (const [index, [, id, body]] of objects.entries()) {
+    // Follow the actual object id across the standard model and slicer config.
+    assert.match(model, new RegExp(`<object id="${id}" type="model" pid="1" pindex="${index}"`));
+    assert.match(body, new RegExp(`<metadata key="extruder" value="${index + 1}"/>`));
+    assert.match(body, new RegExp(`<part id="${id}" subtype="normal_part">`));
+    assert.ok(body.includes(colors[index].toUpperCase()));
+    const slic3rObject = slic3rSettings.match(new RegExp(`<object id="${id}" instances_count="1">([\\s\\S]*?)</object>`))[1];
+    assert.match(slic3rObject, new RegExp(`<metadata type="object" key="extruder" value="${index + 1}"/>`));
+    assert.match(slic3rObject, new RegExp(`<metadata type="volume" key="extruder" value="${index + 1}"/>`));
+    assert.match(slic3rObject, /<volume firstid="0" lastid="0">/);
+  }
+  assert.match(settings, /lid &amp; &quot;logo&quot;/);
+  // Filament metadata must not replace the user's printer/process presets.
+  assert.equal(entries.has("Metadata/project_settings.config"), false);
+  assert.equal(entries.has("Metadata/Slic3r_PE.config"), false);
+});
+
+test("3MF: repeated colors share a filament, including after recoloring two groups alike", () => {
+  const mesh = { primitives: ["#ab12cd", "#00ff00", "#AB12CD"].map((color) => ({ color, positions: triangleTessellation().positions })) };
+  const entries = zipEntries(packageMeshTo3mf(mesh));
+  const model = entries.get("3D/3dmodel.model");
+  assert.equal([...model.matchAll(/<base name=/g)].length, 2);
+  assert.deepEqual([...model.matchAll(/pindex="(\d+)"/g)].map((m) => Number(m[1])), [0, 1, 0]);
+  const settings = entries.get("Metadata/model_settings.config");
+  assert.deepEqual([...settings.matchAll(/key="extruder" value="(\d+)"/g)].map((m) => Number(m[1])), [1, 1, 2, 2, 1, 1]);
+});

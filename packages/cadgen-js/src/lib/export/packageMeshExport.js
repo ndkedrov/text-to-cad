@@ -7,7 +7,7 @@
 //
 // - STL  — binary, colorless by format;
 // - GLB  — one primitive per color through writeGlb's export preset;
-// - 3MF  — a basematerials group with per-triangle material references.
+// - 3MF  — base materials plus Bambu/Orca filament assignments per object.
 //
 // This module is PURE (no filesystem): callers supply per-component
 // tessellations (bin/mesh-export.mjs adds the disk cache; a browser caller
@@ -233,16 +233,33 @@ export function packageMeshToGlb({ primitives }, { name = "model" } = {}) {
 }
 
 export function packageMeshTo3mf({ primitives }, { name = "model" } = {}) {
-  // One basematerials group; per-object pid/pindex reference its material.
-  const materials = primitives
+  // Core pindex is a display-material index, not a slicer's filament number.
+  // Bambu/Orca read the latter from Metadata/model_settings.config (1-based).
+  // Derive both from one palette, including repeated colors in direct callers.
+  const colors = [...new Set(primitives.map((p) => p.color.toUpperCase()))];
+  const colorIndices = new Map(colors.map((color, index) => [color, index]));
+  // Bambu's standard-3MF importer reads the Materials extension's colorgroup,
+  // not core basematerials. Keep core defaults for readers without it, and
+  // reference this same palette on triangles for Bambu's color-import dialog.
+  const colorGroupId = primitives.length + 2;
+  const colorGroup = `    <m:colorgroup id="${colorGroupId}">\n` +
+    colors.map((color) => `      <m:color color="${xmlEscape(color)}FF"/>`).join("\n") +
+    `\n    </m:colorgroup>`;
+  const materials = colors
     .map(
-      (p, index) =>
-        `      <base name="material-${index}" displaycolor="${xmlEscape(p.color.toUpperCase())}FF"/>`,
+      (color, index) =>
+        `      <base name="material-${index}" displaycolor="${xmlEscape(color)}FF"/>`,
     )
     .join("\n");
   const objects = [];
   const buildItems = [];
+  const objectSettings = [];
+  const slic3rSettings = [];
   primitives.forEach((primitive, index) => {
+    const color = primitive.color.toUpperCase();
+    const materialIndex = colorIndices.get(color);
+    const filament = materialIndex + 1;
+    const objectName = xmlEscape(`${name} - ${filament} (${color})`);
     const vertices = [];
     const triangles = [];
     const seen = new Map();
@@ -262,27 +279,51 @@ export function packageMeshTo3mf({ primitives }, { name = "model" } = {}) {
       const b = vertexId(positions[k + 3], positions[k + 4], positions[k + 5]);
       const c = vertexId(positions[k + 6], positions[k + 7], positions[k + 8]);
       if (a !== b && b !== c && c !== a) {
-        triangles.push(`        <triangle v1="${a}" v2="${b}" v3="${c}"/>`);
+        triangles.push(`        <triangle v1="${a}" v2="${b}" v3="${c}" pid="${colorGroupId}" p1="${materialIndex}"/>`);
       }
     }
     const objectId = index + 2; // id 1 is the materials group
     objects.push(
-      `    <object id="${objectId}" type="model" pid="1" pindex="${index}">\n` +
+      `    <object id="${objectId}" type="model" pid="1" pindex="${materialIndex}" name="${objectName}">\n` +
         `      <mesh>\n` +
         `        <vertices>\n${vertices.join("\n")}\n        </vertices>\n` +
         `        <triangles>\n${triangles.join("\n")}\n        </triangles>\n` +
         `      </mesh>\n` +
         `    </object>`,
     );
-    buildItems.push(`    <item objectid="${objectId}"/>`);
+    buildItems.push(`    <item objectid="${objectId}" printable="1"/>`);
+    objectSettings.push(
+      `  <object id="${objectId}">\n` +
+        `    <metadata key="name" value="${objectName}"/>\n` +
+        `    <metadata key="extruder" value="${filament}"/>\n` +
+        `    <part id="${objectId}" subtype="normal_part">\n` +
+        `      <metadata key="name" value="${objectName}"/>\n` +
+        `      <metadata key="extruder" value="${filament}"/>\n` +
+        `    </part>\n` +
+        `  </object>`,
+    );
+    slic3rSettings.push(
+      `  <object id="${objectId}" instances_count="1">\n` +
+        `    <metadata type="object" key="name" value="${objectName}"/>\n` +
+        `    <metadata type="object" key="extruder" value="${filament}"/>\n` +
+        `    <volume firstid="0" lastid="${triangles.length - 1}">\n` +
+        `      <metadata type="volume" key="name" value="${objectName}"/>\n` +
+        `      <metadata type="volume" key="extruder" value="${filament}"/>\n` +
+        `    </volume>\n` +
+        `  </object>`,
+    );
   });
   const model =
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" ` +
     `xmlns:m="http://schemas.microsoft.com/3dmanufacturing/material/2015/02">\n` +
     `  <metadata name="Title">${xmlEscape(name)}</metadata>\n` +
+    // Bambu selects its Prusa-compatible importer by this token. That path
+    // grows the filament list to the highest assigned slot, even on Open
+    // Project, without requiring a printer/process preset in the archive.
+    `  <metadata name="Application">cadgen (PrusaSlicer-compatible 3MF)</metadata>\n` +
     `  <resources>\n` +
-    `    <basematerials id="1">\n${materials}\n    </basematerials>\n${objects.join("\n")}\n` +
+    `    <basematerials id="1">\n${materials}\n    </basematerials>\n${colorGroup}\n${objects.join("\n")}\n` +
     `  </resources>\n` +
     `  <build>\n${buildItems.join("\n")}\n  </build>\n` +
     `</model>\n`;
@@ -291,6 +332,7 @@ export function packageMeshTo3mf({ primitives }, { name = "model" } = {}) {
     `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n` +
     `  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n` +
     `  <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>\n` +
+    `  <Default Extension="config" ContentType="application/xml"/>\n` +
     `</Types>\n`;
   const rels =
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
@@ -302,6 +344,14 @@ export function packageMeshTo3mf({ primitives }, { name = "model" } = {}) {
     { name: "[Content_Types].xml", body: contentTypes },
     { name: "_rels/.rels", body: rels },
     { name: "3D/3dmodel.model", body: model },
+    {
+      name: "Metadata/model_settings.config",
+      body: `<?xml version="1.0" encoding="UTF-8"?>\n<config>\n${objectSettings.join("\n")}\n</config>\n`,
+    },
+    {
+      name: "Metadata/Slic3r_PE_model.config",
+      body: `<?xml version="1.0" encoding="UTF-8"?>\n<config>\n${slic3rSettings.join("\n")}\n</config>\n`,
+    },
   ]);
 }
 
