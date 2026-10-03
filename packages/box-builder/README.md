@@ -89,6 +89,21 @@ the viewport and the web STEP/3MF export preserve separate material bodies.
 STL geometry has no colour information. Native shells require their own release
 before this shared panel change reaches installed apps.
 
+The web adapter writes STL/3MF from the saved spec with `buildBoxPrintMesh`
+(`src/core/printMesh.js`), using the preview's Manifold kernel at export quality.
+STEP still comes from the server's exact solids. Indexed vertices are retained
+in 3MF: coincident vertices on touching islands must not be welded together.
+The lid and its colour regions form one assembly, so arranging the model in a
+slicer keeps the artwork in place. Whole-part material references and slicer
+metadata assign a distinct filament to every distinct colour.
+
+Bambu Studio 2.8.2 reads the standard 3MF palette through its colour import
+dialog; confirm the mappings there. Existing matching filaments may be reused,
+so the final numbers need not start at 1. No printer/process preset is embedded.
+This Bambu version may report that the file has no valid configuration and load
+geometry only before showing the colour dialog. This does not discard the
+geometry or colours. Check that its prime tower fits on the selected plate.
+
 ## Checks
 
 ```bash

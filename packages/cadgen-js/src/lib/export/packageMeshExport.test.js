@@ -354,3 +354,22 @@ test("3MF: repeated colors share a filament, including after recoloring two grou
   const settings = entries.get("Metadata/model_settings.config");
   assert.deepEqual([...settings.matchAll(/key="extruder" value="(\d+)"/g)].map((m) => Number(m[1])), [1, 1, 2, 2, 1, 1]);
 });
+
+test("indexed assembly retains coincident vertex identities and whole-part colors", () => {
+  // Two triangles touch at the origin but own distinct vertex indices.
+  const positions = new Float32Array([0,0,0, 1,0,0, 0,1,0, 0,0,0, -1,0,0, 0,-1,0]);
+  const indices = new Uint32Array([0,1,2,3,4,5]);
+  const mesh = { primitives: ["#001122", "#AABBCC", "#001122"].map(color => ({color,positions,indices})) };
+  const entries = zipEntries(packageMeshTo3mf(mesh,{assembly:true,name:"lid & logo"}));
+  const model=entries.get("3D/3dmodel.model");
+  assert.equal([...model.matchAll(/<item /g)].length,1);
+  assert.equal([...model.matchAll(/<component /g)].length,3);
+  assert.equal([...model.matchAll(/<vertex /g)].length,18,"coincident vertices remain separate");
+  assert.equal([...model.matchAll(/v1="3" v2="4" v3="5"/g)].length,3);
+  assert.deepEqual([...model.matchAll(/type="model" pid="5" pindex="(\d+)"/g)].map(m=>Number(m[1])),[0,1,0]);
+  assert.equal(entries.has("Metadata/Slic3r_PE_model.config"),false);
+  assert.equal(entries.has("Metadata/project_settings.config"),false,"no printer profile overrides");
+  assert.deepEqual([...entries.get("Metadata/model_settings.config").matchAll(/key="extruder" value="(\d+)"/g)].map(m=>Number(m[1])),[1,2,1]);
+  const stl=packageMeshToStl(mesh);
+  assert.equal(new DataView(stl.buffer,stl.byteOffset,stl.byteLength).getUint32(80,true),6);
+});

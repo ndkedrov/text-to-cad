@@ -45,6 +45,34 @@ export const serverBoxAdapter = Object.freeze({
   fileUrl(name, part, format) {
     return `${boxUrl("/file", name)}&part=${encodeURIComponent(part)}&format=${encodeURIComponent(format)}`;
   },
+  async exportFile(name, part, format) {
+    let blob;
+    if (format === "3mf" || format === "stl") {
+      const [{ spec }, { loadManifold }, { buildBoxPrintMesh }, { packageMeshToFormat }] = await Promise.all([
+        serverBoxAdapter.loadBox(name),
+        import("box-builder/browser/manifoldRuntime.js"),
+        import("box-builder/core/printMesh.js"),
+        import("cadgen-js/lib/export/packageMeshExport.js"),
+      ]);
+      // Export the saved spec, which also produced the downloadable STEP.
+      const mesh = buildBoxPrintMesh(await loadManifold(), spec, part);
+      const result = packageMeshToFormat(mesh, format, { name: `${name}_${part}`, assembly: true });
+      blob = new Blob([result.body], { type: result.contentType });
+    } else {
+      const response = await fetch(serverBoxAdapter.fileUrl(name, part, format));
+      if (!response.ok) await readJson(response);
+      blob = await response.blob();
+    }
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${name}_${part}.${format}`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    return true;
+  },
   // The circuit-board templates "Add board" offers: { boards: [...], categories }.
   async boardPresets() {
     return readJson(await fetch("/__cad/boxes/presets", { cache: "no-store" }));
