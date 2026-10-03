@@ -1659,6 +1659,13 @@ function FileTab({ builder, onOpenFile, hosted = false }) {
         {capabilities.folderPath ? <FileSheetControlRow label={t("field.folder")} value={`boxes/${name}`} /> : null}
         <FileSheetControlRow label={t("field.state")} value={dirty ? t("state.unsaved") : t("state.saved")} valueMono={false} />
         {quota && capabilities.quota ? <FileSheetControlRow label={t("field.today")} value={quotaText(quota, t)} /> : null}
+        {quota && capabilities.quota && quota.storageLimitBytes != null ? (
+          <FileSheetStatusText>{t("quota.storage", {
+            used: (quota.storageUsedBytes / 1024 ** 2).toFixed(1),
+            limit: (quota.storageLimitBytes / 1024 ** 2).toFixed(0)
+          })}</FileSheetStatusText>
+        ) : null}
+        {quota?.outputRetentionSeconds && capabilities.quota ? <FileSheetStatusText>{t("quota.retention")}</FileSheetStatusText> : null}
       </FileSheetSubsection>
 
       <FileSheetSubsection title={t("section.build")}>

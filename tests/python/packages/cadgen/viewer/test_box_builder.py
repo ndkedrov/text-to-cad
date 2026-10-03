@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 import tempfile
 import threading
 import time
@@ -518,3 +519,83 @@ class ExactGeometry(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ExpiringBoxOutputs(BuilderTestCase):
+    def old_box(self, owner=ALICE):
+        self.save(owner=owner)
+        folder = self.builder._space(owner) / "case"
+        for fmt in ("step", "stl", "3mf"):
+            (folder / f"case_base.{fmt}").write_bytes(b"mesh")
+        (folder / "case_base.step.json").write_text("{}")
+        for path in folder.iterdir():
+            os.utime(path, (time.time() - 90000,) * 2)
+        return folder
+
+    def test_dry_run_then_expiry_preserves_sources_and_can_rebuild(self):
+        folder = self.old_box()
+        (folder / "personal.step").write_bytes(b"mine")
+        before = self.builder.load("case", ALICE)["spec"]
+        report = self.builder.cleanup_outputs(dry_run=True)
+        self.assertEqual((report["files"], report["bytes"], report["boxes"]), (4, 14, 1))
+        self.assertEqual(len(self.builder.outputs("case", ALICE)), 3)
+        self.assertEqual(self.builder.cleanup_outputs()["files"], 4)
+        self.assertEqual(self.builder.load("case", ALICE)["spec"], before)
+        self.assertTrue((folder / "personal.step").exists())
+        self.assertTrue((folder / "case_base.py").exists())
+        self.assertIsNone(self.builder.status("case", ALICE)["build"])
+        self.assertEqual(self.builder.cleanup_outputs()["files"], 0)
+        def runner(script, **options):
+            script.with_suffix(".stl").write_bytes(b"rebuilt")
+            return BuildResult(0, "")
+        self.builder._runner = runner
+        self.save(owner=ALICE)
+        self.assertEqual((folder / "case_base.stl").read_bytes(), b"rebuilt")
+
+    def test_fresh_output_or_fresh_save_keeps_the_generation(self):
+        folder = self.old_box()
+        os.utime(folder / "case_base.stl", None)
+        self.assertEqual(self.builder.cleanup_outputs()["files"], 0)
+        os.utime(folder / "case_base.stl", (time.time() - 90000,) * 2)
+        os.utime(folder / "case.box.json", None)
+        self.assertEqual(self.builder.cleanup_outputs()["files"], 0)
+
+    def test_active_build_is_skipped_even_with_old_files(self):
+        folder = self.old_box()
+        gate = threading.Event()
+        self.builder._runner = RecordingRunner(gate=gate)
+        self.builder.save("case", body(), ALICE)
+        for path in folder.iterdir():
+            os.utime(path, (time.time() - 90000,) * 2)
+        try:
+            report = self.builder.cleanup_outputs()
+            self.assertEqual(report["files"], 0)
+            self.assertEqual(report["activeSkipped"], 1)
+        finally:
+            gate.set()
+            self.builder.wait("case", ALICE, timeout=5)
+
+    def test_symlinks_and_unmarked_scripts_are_never_swept(self):
+        folder = self.old_box()
+        target = self.root / "private.step"
+        target.write_bytes(b"private")
+        (folder / "case_base.step").unlink()
+        (folder / "case_base.step").symlink_to(target)
+        (folder / "case_base.py").write_text("# handwritten")
+        os.utime(folder / "case_base.py", (time.time() - 90000,) * 2)
+        (self.root / "boxes" / "u-deadbeef").symlink_to(folder.parent, target_is_directory=True)
+        self.assertEqual(self.builder.cleanup_outputs()["files"], 0)
+        self.assertEqual(target.read_bytes(), b"private")
+        self.assertTrue((folder / "case_base.stl").exists())
+
+    def test_local_viewer_files_do_not_expire(self):
+        self.old_box(owner=None)
+        self.assertEqual(self.builder.cleanup_outputs()["files"], 0)
+
+    def test_storage_usage_and_hosted_default_are_visible(self):
+        self.old_box()
+        builder = self.make_builder(BoxLimits.from_env(hosted=True, environ={}))
+        quota = builder.status("case", ALICE)["quota"]
+        self.assertGreater(quota["storageUsedBytes"], 14)
+        self.assertEqual(quota["storageLimitBytes"], 1024**3)
+        self.assertEqual(quota["outputRetentionSeconds"], 86400)
