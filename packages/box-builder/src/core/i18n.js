@@ -151,6 +151,7 @@ const EN = {
   "standoffs.empty": "No standoffs yet.",
 
   "build.queued": "Queued for building…",
+  "build.runningStep": "Building STEP… STL and 3MF are generated when downloaded.",
   "build.running": "Building STEP, STL and 3MF…",
   "build.doneAt": "Built at {time}.",
   "build.done": "Built.",
@@ -532,6 +533,7 @@ const UK = {
   "standoffs.empty": "Ніжок ще немає.",
 
   "build.queued": "У черзі на збірку…",
+  "build.runningStep": "Збираю STEP… STL і 3MF формуються під час скачування.",
   "build.running": "Збираю STEP, STL і 3MF…",
   "build.doneAt": "Зібрано о {time}.",
   "build.done": "Зібрано.",

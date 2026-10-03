@@ -3,6 +3,8 @@
 
 import { refreshCadCatalog } from "@/workbench/cadManifestStore.js";
 
+import { withClientBoxExports } from "./boxDownloads.js";
+
 const POST_GUARD_HEADERS = Object.freeze({ "x-cadgen-viewer": "1" });
 
 async function readJson(response) {
@@ -30,17 +32,17 @@ export const serverBoxAdapter = Object.freeze({
     return readJson(await fetch("/__cad/boxes", { cache: "no-store" }));
   },
   async loadBox(name) {
-    return readJson(await fetch(boxUrl("/spec", name), { cache: "no-store" }));
+    return withClientBoxExports(await readJson(await fetch(boxUrl("/spec", name), { cache: "no-store" })));
   },
   async boxStatus(name) {
-    return readJson(await fetch(boxUrl("/status", name), { cache: "no-store" }));
+    return withClientBoxExports(await readJson(await fetch(boxUrl("/status", name), { cache: "no-store" })));
   },
   async saveBox(name, { spec, plan }) {
-    return readJson(await fetch(boxUrl("/save", name), {
+    return withClientBoxExports(await readJson(await fetch(boxUrl("/save", name), {
       method: "POST",
       headers: { ...POST_GUARD_HEADERS, "content-type": "application/json" },
       body: JSON.stringify({ spec, plan })
-    }));
+    })));
   },
   fileUrl(name, part, format) {
     return `${boxUrl("/file", name)}&part=${encodeURIComponent(part)}&format=${encodeURIComponent(format)}`;

@@ -154,7 +154,7 @@ def _function_name(name: str, part: str) -> str:
     return f"{identifier}_{part}"
 
 
-def script_source(name: str, part: str, node: dict, held_by: dict | None = None) -> str:
+def script_source(name: str, part: str, node: dict, held_by: dict | None = None, *, mesh_exports: bool = True) -> str:
     """The model script for one part: the plan as a literal, built by cadgen.box_csg.
 
     ``held_by`` is the part this one sits inside -- the lid an inlay fills. The two
@@ -168,6 +168,7 @@ def script_source(name: str, part: str, node: dict, held_by: dict | None = None)
 
     detailed = has_polygon(node) or (held_by is not None and has_polygon(held_by["plan"]))
     mesh_args = "(mesh_tolerance=1e-6)" if detailed else ""
+    mesh_decorators = f"@threemf{mesh_args}\n@stl{mesh_args}\n" if mesh_exports else ""
     function = _function_name(name, part)
     plan = pprint.pformat(node, width=100, sort_dicts=False)
     header = (
@@ -187,8 +188,7 @@ def script_source(name: str, part: str, node: dict, held_by: dict | None = None)
             f"PLAN = {plan}\n"
             "\n"
             "\n"
-            f"@threemf{mesh_args}\n"
-            f"@stl{mesh_args}\n"
+            f"{mesh_decorators}"
             "@step\n"
             f"def {function}():\n"
             "    return shape_from_plan(PLAN)\n"
@@ -209,8 +209,7 @@ def script_source(name: str, part: str, node: dict, held_by: dict | None = None)
         f"HOLDER_PLAN = {holder}\n"
         "\n"
         "\n"
-        f"@threemf{mesh_args}\n"
-        f"@stl{mesh_args}\n"
+        f"{mesh_decorators}"
         "@step\n"
         f"def {function}():\n"
         "    pieces = colored_shapes_from_plan(PLAN)\n"
@@ -382,6 +381,8 @@ class BoxLimits:
     min_free_bytes: int | None = None
     # A fresh cadgen cache per build, deleted afterwards.
     ephemeral_cache: bool = False
+    # Hosted web exports print meshes from the saved spec in the browser.
+    mesh_exports: bool = True
     timezone: str = "Europe/Kyiv"
     # Hashed owner_key()s exempt from daily_new_boxes/daily_builds (not from
     # global_daily_new_boxes, which protects the service, not per-account fairness).
@@ -417,6 +418,7 @@ class BoxLimits:
             account_max_bytes=read("CADGEN_BOX_ACCOUNT_MAX_BYTES", 1024**3 if hosted else None),
             min_free_bytes=read("CADGEN_BOX_MIN_FREE_BYTES", 10 * 1024**3 if hosted else None),
             ephemeral_cache=(flag in {"1", "true", "yes"}) if flag else hosted,
+            mesh_exports=not hosted,
             timezone=str(source.get("CADGEN_BOX_TIMEZONE", "") or "Europe/Kyiv"),
             unlimited_keys=unlimited_keys,
         )
@@ -546,7 +548,12 @@ class BoxBuilder:
     def outputs(self, name: str, owner: str | None = None) -> list[dict]:
         directory = self._space(owner) / name
         found = []
+        with self._lock:
+            build = self._builds.get((owner_key(owner), name))
+            pending = {part for part, info in build.parts.items() if info["state"] != "done"} if build else set()
         for part in BOX_PART_NAMES:
+            if part in pending:
+                continue
             for fmt in BOX_OUTPUT_CONTENT_TYPES:
                 path = directory / f"{name}_{part}.{fmt}"
                 if not path.is_file():
@@ -569,7 +576,7 @@ class BoxBuilder:
         if part not in BOX_PART_NAMES or fmt not in BOX_OUTPUT_CONTENT_TYPES:
             raise BoxError("unknown part or format")
         path = self._box_dir(name, owner) / f"{name}_{part}.{fmt}"
-        if not path.is_file():
+        if not any(item["part"] == part and item["format"] == fmt for item in self.outputs(name, owner)):
             raise BoxNotFound("no such file")
         return path
 
@@ -617,7 +624,9 @@ class BoxBuilder:
                     "startedAt": build.started_at,
                     "finishedAt": build.finished_at,
                 }
-        return {"name": name, "build": snapshot, "outputs": self.outputs(name, owner), **self._quota_payload(owner)}
+        return {"name": name, "build": snapshot, "outputs": self.outputs(name, owner),
+                "clientExportFormats": [] if self.limits.mesh_exports else ["stl", "3mf"],
+                **self._quota_payload(owner)}
 
     def _quota_payload(self, owner: str | None) -> dict:
         key = owner_key(owner)
@@ -704,7 +713,7 @@ class BoxBuilder:
                         if part == "inlay" and plan.get("lid") is not None
                         else None
                     )
-                    _write_text(script, script_source(name, part, node, held_by))
+                    _write_text(script, script_source(name, part, node, held_by, mesh_exports=self.limits.mesh_exports))
                     scripts.append((part, script))
                 if key is not None:
                     self._quota.record(key, new_box=is_new)
@@ -812,6 +821,14 @@ class BoxBuilder:
             if output.is_file():
                 output.unlink()
 
+    def _clear_outputs(self, script: Path) -> None:
+        """Drop only this generated part's artifacts, never its editable sources."""
+        for fmt in BOX_OUTPUT_CONTENT_TYPES:
+            output = script.with_suffix("." + fmt)
+            for path in (output, Path(str(output) + ".json")):
+                with contextlib.suppress(FileNotFoundError):
+                    path.unlink()
+
     # --- builds --------------------------------------------------------
 
     def _forget_finished_builds(self) -> None:
@@ -831,6 +848,7 @@ class BoxBuilder:
                 timed_out = False
                 for part, script in scripts:
                     try:
+                        self._clear_outputs(script)
                         result = self._runner(
                             script,
                             timeout=self.limits.build_timeout,
@@ -843,6 +861,8 @@ class BoxBuilder:
                     if result.code == 0:
                         self._set_part(build, part, "done", "")
                     else:
+                        with contextlib.suppress(OSError):
+                            self._clear_outputs(script)
                         self._set_part(build, part, "error", _failure_text(result, self.limits.build_timeout))
             with self._lock:
                 pass_failed = any(info["state"] == "error" for info in build.parts.values())

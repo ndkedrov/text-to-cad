@@ -599,3 +599,57 @@ class ExpiringBoxOutputs(BuilderTestCase):
         self.assertGreater(quota["storageUsedBytes"], 14)
         self.assertEqual(quota["storageLimitBytes"], 1024**3)
         self.assertEqual(quota["outputRetentionSeconds"], 86400)
+
+
+class WebBuildOutputs(BuilderTestCase):
+    def test_hosted_scripts_build_only_step_and_advertise_client_formats(self):
+        limits = BoxLimits.from_env(hosted=True, environ={"CADGEN_BOX_MIN_FREE_BYTES": "-1"})
+        builder = self.make_builder(limits)
+        self.save(owner=ALICE, builder=builder)
+        folder = builder._space(ALICE) / "case"
+        source = (folder / "case_base.py").read_text()
+        self.assertIn("@step", source)
+        self.assertNotIn("@stl", source)
+        self.assertNotIn("@threemf", source)
+        self.assertEqual(builder.status("case", ALICE)["clientExportFormats"], ["stl", "3mf"])
+        combined = script_source("case", "inlay", BASE, {"part": "lid", "plan": LID}, mesh_exports=False)
+        self.assertNotIn("@stl", combined)
+        self.assertIn("bd.Compound(children=[holder, *pieces])", combined)
+        self.assertTrue(BoxLimits.from_env(hosted=False, environ={}).mesh_exports)
+
+    def test_failed_rebuild_removes_previous_meshes_and_partial_step(self):
+        self.save()
+        folder = self.root / "boxes" / "case"
+        for fmt in ("step", "stl", "3mf"):
+            (folder / f"case_base.{fmt}").write_bytes(b"previous version")
+        def runner(script, **options):
+            if script.name.endswith("_base.py"):
+                script.with_suffix(".step").write_bytes(b"unfinished new output")
+                return BuildResult(-9, "", timed_out=True)
+            return BuildResult(0, "")
+        self.builder._runner = runner
+        self.save()
+        self.assertEqual(self.builder.status("case")["build"]["parts"]["base"]["state"], "error")
+        self.assertEqual(self.builder.outputs("case"), [])
+        self.assertFalse((folder / "case_base.step").exists())
+        self.assertFalse((folder / "case_base.stl").exists())
+        with self.assertRaises(BoxNotFound):
+            self.builder.output_file("case", "base", "3mf")
+
+    def test_a_running_parts_partial_files_are_not_downloadable(self):
+        gate = threading.Event()
+        def runner(script, **options):
+            script.with_suffix(".step").write_bytes(b"still building")
+            gate.wait(5)
+            return BuildResult(0, "")
+        builder = self.make_builder(BoxLimits(), runner=runner)
+        builder.save("case", body(plan={"base": BASE, "lid": None}))
+        try:
+            deadline=time.monotonic()+3
+            while not (self.root/"boxes/case/case_base.step").exists() and time.monotonic()<deadline:
+                time.sleep(.01)
+            self.assertEqual(builder.outputs("case"), [])
+            with self.assertRaises(BoxNotFound):builder.output_file("case", "base", "step")
+        finally:
+            gate.set();builder.wait("case",timeout=5)
+        self.assertEqual(len(builder.outputs("case")), 1)
