@@ -602,6 +602,29 @@ class ExpiringBoxOutputs(BuilderTestCase):
 
 
 class WebBuildOutputs(BuilderTestCase):
+    def test_hosted_status_offers_browser_downloads_to_already_open_clients(self):
+        builder = self.make_builder(BoxLimits(mesh_exports=False))
+        self.save(owner=ALICE, builder=builder)
+        folder = builder._space(ALICE) / "case"
+        (folder / "case_base.step").write_bytes(b"finished exact solid")
+        expected = [("base", "step"), ("base", "stl"), ("base", "3mf")]
+        for response in (builder.status("case", ALICE), builder.load("case", ALICE)):
+            self.assertEqual([(item["part"], item["format"]) for item in response["outputs"]], expected)
+            for item in response["outputs"][1:]:
+                self.assertTrue(item["client"])
+                self.assertNotIn("size", item)
+                self.assertNotIn("path", item)
+        self.assertEqual(len(builder.outputs("case", ALICE)), 1)
+        self.assertTrue(builder.output_file("case", "base", "step", ALICE).is_file())
+        for fmt in ("stl", "3mf"):
+            with self.assertRaises(BoxNotFound):
+                builder.output_file("case", "base", fmt, ALICE)
+        (folder / "case_base.stl").write_bytes(b"existing legacy mesh")
+        self.assertEqual(len(builder.status("case", ALICE)["outputs"]), 3)
+        (folder / "case_base.step").unlink()
+        (folder / "case_base.stl").unlink()
+        self.assertEqual(builder.status("case", ALICE)["outputs"], [])
+
     def test_hosted_scripts_build_only_step_and_advertise_client_formats(self):
         limits = BoxLimits.from_env(hosted=True, environ={"CADGEN_BOX_MIN_FREE_BYTES": "-1"})
         builder = self.make_builder(limits)

@@ -624,7 +624,20 @@ class BoxBuilder:
                     "startedAt": build.started_at,
                     "finishedAt": build.finished_at,
                 }
-        return {"name": name, "build": snapshot, "outputs": self.outputs(name, owner),
+        outputs = self.outputs(name, owner)
+        if not self.limits.mesh_exports:
+            # Keep the download contract usable by already-open web clients:
+            # they export print meshes in the browser, but render buttons from
+            # outputs alone. outputs() itself remains the disk-file inventory.
+            for step in list(outputs):
+                if step["format"] != "step":
+                    continue
+                for fmt in ("stl", "3mf"):
+                    if any(item["part"] == step["part"] and item["format"] == fmt for item in outputs):
+                        continue
+                    outputs.append({"part": step["part"], "format": fmt,
+                                    "file": f"{name}_{step['part']}.{fmt}", "client": True})
+        return {"name": name, "build": snapshot, "outputs": outputs,
                 "clientExportFormats": [] if self.limits.mesh_exports else ["stl", "3mf"],
                 **self._quota_payload(owner)}
 

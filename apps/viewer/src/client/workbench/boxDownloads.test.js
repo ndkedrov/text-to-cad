@@ -19,3 +19,13 @@ test("legacy server exports are preserved and not duplicated", () => {
   assert.equal(withClientBoxExports(payload), payload);
   assert.equal(withClientBoxExports({...payload,clientExportFormats:["stl","3mf"]}).outputs.length, 3);
 });
+
+test("server browser downloads survive both legacy pass-through and current adapters", () => {
+  const payload = { name: "case", clientExportFormats: ["stl", "3mf"], outputs: [
+    { part: "inlay", format: "step", file: "inlay.step" },
+    { part: "inlay", format: "stl", file: "case_inlay.stl", client: true },
+    { part: "inlay", format: "3mf", file: "case_inlay.3mf", client: true },
+  ] };
+  assert.deepEqual(withClientBoxExports(payload).outputs, payload.outputs);
+  assert.equal(payload.outputs.filter((output) => output.part === "inlay").length, 3);
+});
