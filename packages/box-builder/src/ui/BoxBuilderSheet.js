@@ -1464,7 +1464,7 @@ function buildSummary(status, t, language) {
     return { tone: "muted", lines: [t("build.queued")] };
   }
   if (build.state === "building") {
-    return { tone: "muted", lines: [t("build.running")] };
+    return { tone: "muted", lines: [t(status.clientExportFormats?.length ? "build.runningStep" : "build.running")] };
   }
   if (build.state === "error") {
     return {

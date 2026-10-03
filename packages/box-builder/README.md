@@ -126,3 +126,10 @@ scripts while the admin-only, POST-guarded `/__cad/admin/box-cleanup` expires
 known generated STEP/STL/3MF files and sidecars after 24 hours. A `dryRun=1`
 query reports eligible files without deleting them. The deployment schedules
 this call; the local viewer has no cleanup route and its files do not expire.
+
+The hosted viewer builds STEP on the server and advertises `clientExportFormats`
+for STL/3MF. Its adapter offers these downloads when that part's STEP is ready;
+print meshes come from the saved spec through Manifold. The server does not
+repeat the browser print exports. Local viewers keep their server mesh exports.
+A running or failed part's files are unavailable; a failed rebuild removes old
+and partial outputs so downloads cannot mix different generations.
