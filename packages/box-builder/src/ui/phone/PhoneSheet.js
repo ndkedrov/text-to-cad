@@ -1,9 +1,9 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "../kit/utils.js";
 import { PHONE_SHEET_HEADER_HEIGHT } from "./phoneUi.js";
 import { LIQUID_GLASS_BLUR, liquidGlassStyle } from "./liquidGlass.js";
-import { settleDetent } from "./phoneSheetMath.js";
+import { keyboardRevealScroll, settleDetent } from "./phoneSheetMath.js";
 
 // The panel on a phone: a sheet that rises from above the navigation bar.
 //
@@ -82,6 +82,38 @@ export default function PhoneSheet({
     });
   }, [heights, onDetentChange]);
 
+  // The keyboard covers the bottom of the sheet instead of lifting it, so the
+  // field being typed into was left under the keys: the value went in blind.
+  // Whenever the keyboard rises or focus moves while it is up, the body
+  // scrolls that field into the strip the keyboard leaves.
+  const bodyRef = useRef(null);
+  const revealFocused = useCallback(() => {
+    const body = bodyRef.current;
+    const active = typeof document === "undefined" ? null : document.activeElement;
+    if (!keyboardInset || !body || !active || active === body || !body.contains(active)) {
+      return;
+    }
+    const field = active.getBoundingClientRect();
+    const visible = body.getBoundingClientRect();
+    const scroll = keyboardRevealScroll({
+      fieldTop: field.top,
+      fieldBottom: field.bottom,
+      visibleTop: visible.top,
+      visibleBottom: Math.min(visible.bottom, window.innerHeight - keyboardInset)
+    });
+    if (scroll) {
+      body.scrollTop += scroll;
+    }
+  }, [keyboardInset]);
+
+  useEffect(() => {
+    revealFocused();
+  }, [revealFocused]);
+
+  const revealOnFocus = useCallback(() => {
+    window.requestAnimationFrame?.(revealFocused);
+  }, [revealFocused]);
+
   const expanded = detent === "full";
   const toggle = () => onDetentChange?.(expanded ? "half" : "full");
 
@@ -128,7 +160,9 @@ export default function PhoneSheet({
         </div>
       </header>
       <div
+        ref={bodyRef}
         data-phone-sheet-body=""
+        onFocus={revealOnFocus}
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
         style={{ paddingBottom: keyboardInset ? `${keyboardInset}px` : undefined }}
       >

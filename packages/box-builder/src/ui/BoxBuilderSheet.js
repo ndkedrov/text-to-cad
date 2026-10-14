@@ -214,6 +214,7 @@ function NumberInput({
       ariaLabel={ariaLabel}
       decreaseLabel={t("action.decrease", { label: ariaLabel || "" })}
       increaseLabel={t("action.increase", { label: ariaLabel || "" })}
+      signLabel={t("action.toggleSign", { label: ariaLabel || "" })}
       className={className}
       step={step}
       min={min}

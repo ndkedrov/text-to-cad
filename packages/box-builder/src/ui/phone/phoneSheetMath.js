@@ -53,3 +53,27 @@ export function settleDetent(heights, value, velocity) {
   const index = PHONE_SHEET_DETENTS.indexOf(closest) + step;
   return PHONE_SHEET_DETENTS[Math.min(Math.max(index, 0), PHONE_SHEET_DETENTS.length - 1)];
 }
+
+// How far the sheet body has to scroll so the field being typed into sits in
+// the strip the keyboard leaves uncovered. The keyboard lies over the sheet
+// rather than pushing it up, so the browser counts a field under the keys as
+// visible and will not scroll to it by itself. Positive scrolls the content
+// up; zero means the field is already in view. A field taller than the strip
+// shows its top, where its value is.
+export const KEYBOARD_REVEAL_MARGIN = 8;
+
+export function keyboardRevealScroll({ fieldTop, fieldBottom, visibleTop, visibleBottom, margin = KEYBOARD_REVEAL_MARGIN }) {
+  const values = [fieldTop, fieldBottom, visibleTop, visibleBottom];
+  if (!values.every(Number.isFinite) || visibleBottom <= visibleTop) {
+    return 0;
+  }
+  const top = visibleTop + margin;
+  const bottom = visibleBottom - margin;
+  if (fieldTop < top || fieldBottom - fieldTop > bottom - top) {
+    return Math.round(fieldTop - top);
+  }
+  if (fieldBottom > bottom) {
+    return Math.round(fieldBottom - bottom);
+  }
+  return 0;
+}
