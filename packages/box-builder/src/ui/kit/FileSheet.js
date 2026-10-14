@@ -1,6 +1,7 @@
 import { Children, createContext, Fragment, useContext, useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, ChevronRight, Minus, Plus } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Diff, Minus, Plus } from "lucide-react";
 import { cn } from "./utils.js";
+import { allowsNegative, toggleNumberSign } from "./numberSign.js";
 import { usePhoneUi } from "../phone/phoneUi.js";
 import PhonePicker, { PhonePickerTrigger } from "../phone/PhonePicker.js";
 import { SAFE_AREA_BOTTOM, SAFE_AREA_RIGHT, SAFE_AREA_TOP } from "./safeArea.js";
@@ -441,7 +442,10 @@ export function FileSheetValueInput({
   // bare field (a tuple cell, or a number that already has a slider).
   stepper = "auto",
   decreaseLabel,
-  increaseLabel
+  increaseLabel,
+  // Read aloud for the sign key a phone shows beside a field that takes
+  // negative numbers.
+  signLabel
 }) {
   const phone = usePhoneUi();
   const inFieldGrid = useContext(FieldGridContext);
@@ -497,6 +501,31 @@ export function FileSheetValueInput({
 
   const showStepper = stepper === true
     || (stepper === "auto" && phone && !inFieldGrid && Number(step) > 0);
+  // A phone's decimal keypad has no minus (iOS has no keypad with one at all),
+  // so a field whose range goes below zero gets a sign key while it is being
+  // edited. A stepper already reaches negative values with its own minus.
+  const signKey = phone && !showStepper && allowsNegative(min);
+  const pendingSelectionRef = useRef(null);
+
+  useEffect(() => {
+    const selection = pendingSelectionRef.current;
+    if (!selection) {
+      return;
+    }
+    pendingSelectionRef.current = null;
+    inputRef.current?.setSelectionRange?.(selection[0], selection[1]);
+  }, [visibleValue]);
+
+  const toggleSign = () => {
+    const input = inputRef.current;
+    const next = toggleNumberSign(draftValue, { start: input?.selectionStart, end: input?.selectionEnd });
+    selectOnEditRef.current = false;
+    if (typeof window !== "undefined") {
+      window.cancelAnimationFrame?.(pendingSelectFrameRef.current);
+    }
+    pendingSelectionRef.current = [next.selectionStart, next.selectionEnd];
+    setDraftValue(next.text);
+  };
 
   const field = (
     <input
@@ -556,7 +585,9 @@ export function FileSheetValueInput({
       className={cn(
         FILE_SHEET_VALUE_BADGE_INPUT_CLASSES,
         showStepper && "h-full w-auto min-w-0 flex-1 rounded-none border-0 px-1 text-center shadow-none dark:bg-transparent",
-        className,
+        // With a sign key the wrapper takes the caller's width and the field fills it.
+        signKey ? "w-full" : className,
+        signKey && editing && "pl-11",
         // The stepper owns the width; a caller's own w-* would fight the group.
         showStepper && "w-auto"
       )}
@@ -567,6 +598,31 @@ export function FileSheetValueInput({
       aria-label={ariaLabel}
     />
   );
+
+  if (signKey) {
+    return (
+      <div data-file-sheet-sign-field="" className={cn("relative", className)}>
+        {field}
+        {editing ? (
+          <button
+            type="button"
+            data-file-sheet-sign-key=""
+            className="absolute inset-y-0 left-0 flex w-10 items-center justify-center rounded-l-[var(--fs-radius,0.375rem)] border-r border-input/70 text-muted-foreground transition-colors active:bg-sidebar-accent"
+            // The key must not take focus: the field losing it would commit the
+            // value, hide this key before its click and drop the keyboard.
+            onPointerDown={(event) => event.preventDefault()}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={toggleSign}
+            disabled={disabled}
+            aria-label={signLabel}
+            title={signLabel}
+          >
+            <Diff className="size-4" strokeWidth={2.25} aria-hidden="true" />
+          </button>
+        ) : null}
+      </div>
+    );
+  }
 
   if (!showStepper) {
     return field;

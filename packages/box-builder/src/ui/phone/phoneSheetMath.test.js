@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { PHONE_NAV_HEIGHT, PHONE_TOP_BAR_HEIGHT } from "./phoneMetrics.js";
-import { PHONE_SHEET_DETENTS, phoneSheetHeights, settleDetent } from "./phoneSheetMath.js";
+import { PHONE_SHEET_DETENTS, keyboardRevealScroll, phoneSheetHeights, settleDetent } from "./phoneSheetMath.js";
 
 // A phone with a cutout and a home indicator, and one without.
 const iPhone = { height: 852, safeArea: { top: 59, right: 0, bottom: 34, left: 0 } };
@@ -55,4 +55,27 @@ test("a flick carries the sheet one stop further than where the finger stopped",
   // And never past the ends.
   assert.equal(settleDetent(heights, heights.full, -2), "full");
   assert.equal(settleDetent(heights, heights.closed, 2), "closed");
+});
+
+test("a field under the keyboard is scrolled up into the strip the keys leave", () => {
+  // iPhone 11 Pro Max at the middle stop: the sheet body starts at 455 and the
+  // keyboard covers everything from 522 down. "Along" sat at 760-804.
+  const strip = { visibleTop: 455, visibleBottom: 522 };
+  const scroll = keyboardRevealScroll({ fieldTop: 760, fieldBottom: 804, ...strip });
+  assert.equal(scroll, 804 - (522 - 8));
+  assert.ok(760 - scroll >= 455 && 804 - scroll <= 522);
+});
+
+test("a field already in view is left where it is", () => {
+  assert.equal(keyboardRevealScroll({ fieldTop: 470, fieldBottom: 510, visibleTop: 455, visibleBottom: 522 }), 0);
+});
+
+test("a field scrolled above the strip comes back down to its top", () => {
+  assert.equal(keyboardRevealScroll({ fieldTop: 400, fieldBottom: 444, visibleTop: 455, visibleBottom: 700 }), 400 - 463);
+});
+
+test("a field taller than the strip shows its top, and a strip of nothing moves nothing", () => {
+  assert.equal(keyboardRevealScroll({ fieldTop: 600, fieldBottom: 700, visibleTop: 455, visibleBottom: 522 }), 600 - 463);
+  assert.equal(keyboardRevealScroll({ fieldTop: 600, fieldBottom: 640, visibleTop: 500, visibleBottom: 500 }), 0);
+  assert.equal(keyboardRevealScroll({ fieldTop: Number.NaN, fieldBottom: 640, visibleTop: 455, visibleBottom: 522 }), 0);
 });
